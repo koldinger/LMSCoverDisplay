@@ -87,11 +87,11 @@ def sendArt(f, art):
 @lru_cache(maxsize = 128)
 def getArt(trackID):
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
-    ic(url)
+    #ic(url)
     resp = requests.get(url)
     img = Image.open(BytesIO(resp.content))
     rimg = img.resize((64, 64))
-    rimg.save(f"{trackID}.jpg")
+    #rimg.save(f"{trackID}.jpg")
     return rimg
 
 def process_cmdline():
