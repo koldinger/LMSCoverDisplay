@@ -9,12 +9,20 @@ from icecream import ic
 from PIL import Image
 import rich.traceback
 from telnetlib3 import telnetlib
+import time
+from enum import StrEnum, auto
+
+import Transitions
 
 import flaschen
 
+import AnalogClockGenerator
+
 ic.configureOutput(includeContext=True)
+ic.disable()
 
 rich.traceback.install()
+
 
 def tt(string, query=False):
     if query:
@@ -45,7 +53,6 @@ def getPlayingID(t):
             return playerID
     return None
 
-
 def doQuery(t, query):
     t.write(tt(query, True))
     r = getLine(t)
@@ -55,25 +62,42 @@ def doQuery(t, query):
     return r
 
 def handleStatus(t, f, playerID):
+    lastimg =  Image.new("RGB", (args.imagesize))
     idpat = re.compile(r" id:\s*(\d+)")
     playpat = re.compile(r" mode:\s*(\w+)")
     subscribe_cmd = f"{playerID} status - 1 subscribe:30"
-    ic(subscribe_cmd)
+    clockgen = AnalogClockGenerator.AnalogClockGenerator(show_second_hand=False, hour_hand_color=(0,0,255,255), minute_hand_color=(0,255,0,255), origin_color=(255,0,0,255))
 
     t.write(tt(subscribe_cmd))
     while True:
         line = getLine(t)
         line = line.removeprefix(subscribe_cmd)
-        # ic(line)
-        idmatch = idpat.search(line)
         playmatch = playpat.search(line)
-        trackid = idmatch.group(1)
-        playing = playmatch.group(1)
-        ic(playing, trackid)
+        if playmatch:
+            playing = playmatch.group(1)
 
-        art = getArt(int(trackid))
+        if playing == 'play':
+            # ic(line)
+            idmatch = idpat.search(line)
+            if idmatch:
+                trackid = idmatch.group(1)
+                art = getArt(int(trackid))
+            else:
+                trackid = None
+                art = getCurrentArt(playerID)
 
-        sendArt(f, art)
+            if art != lastimg and args.transition:
+                transition = Transitions.getTransition(args.transition)
+                for i in transition(lastimg, art, 10):
+                    sendArt(f, i)
+                    time.sleep(0.1)
+
+            sendArt(f, art)
+            lastimg = art
+        elif args.clock:
+            clk = clockgen.get_current_clock().resize(tuple(args.imagesize))
+            sendArt(f, clk)
+
 
 def sendArt(f, art):
     ic(art)
@@ -84,13 +108,22 @@ def sendArt(f, art):
             f.set(x, y, pixel)
     f.send()
 
+
+def getCurrentArt(playerID):
+    url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/current/cover.jpg?player={playerID}"
+    resp = requests.get(url)
+    img = Image.open(BytesIO(resp.content))
+    rimg = img.resize(tuple(args.imagesize))
+    #rimg.save(f"{trackID}.jpg")
+    return rimg
+
 @lru_cache(maxsize = 128)
 def getArt(trackID):
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
     #ic(url)
     resp = requests.get(url)
     img = Image.open(BytesIO(resp.content))
-    rimg = img.resize((64, 64))
+    rimg = img.resize(tuple(args.imagesize))
     #rimg.save(f"{trackID}.jpg")
     return rimg
 
@@ -105,9 +138,10 @@ def process_cmdline():
     parser.add_argument("--lmsserver", "-l", default="localhost", type=str, help="Name of the LMS Server")
     parser.add_argument("--lmsports", "-L", default=[9000, 9090], type=int, nargs=2, help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
+    parser.add_argument("--transition", "-t", default=Transitions.TransitionTypes.none, choices=Transitions.TransitionTypes)
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
+    parser.add_argument("--clock", "-c", type=bool, const=True, nargs="?", default=False, help="Show Clock if not playing")
     return parser.parse_args()
-
 
 args: argparse.Namespace
 
