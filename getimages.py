@@ -35,6 +35,17 @@ def getPlayerID(t, name):
             return playerID
     return None
 
+def getPlayingID(t):
+    count_cmd = "player count"
+    r = doQuery(t, count_cmd)
+    for i in range(int(r)):
+        n = doQuery(t, f"player name {i}")
+        if name == n.strip():
+            playerID = doQuery(t, f"player id {i}")
+            return playerID
+    return None
+
+
 def doQuery(t, query):
     t.write(tt(query, True))
     r = getLine(t)
@@ -110,7 +121,10 @@ def main():
     t.open(args.lmsserver, args.lmsports[1])
 
     version = doQuery(t, "version")
-    playerID = getPlayerID(t, args.player)
+    if args.player:
+        playerID = getPlayerID(t, args.player)
+    else:
+        playerID = getPlayingID(t)
 
     handleStatus(t, f, playerID)
 

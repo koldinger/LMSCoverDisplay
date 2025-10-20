@@ -1,0 +1,1 @@
+sudo ./flaschen-taschen/server/ft-server --led-gpio-mapping=adafruit-hat --led-slowdown-gpio=2 --led-rows=64 --led-cols=64 --led-show-refresh --led-brightness=50 --layer-timeout 60
