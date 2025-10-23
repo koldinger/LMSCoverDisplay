@@ -3,9 +3,10 @@ Description=Flaschen Taschen Server
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/ft-server -D 64x64 --led-rows=64 --led-columns=64 --layer-timeout 60 --led-gpio-mapping=adafruit-hat --led-brightness=50 
+ExecStart=/usr/local/bin/ft-server --led-rows=64 --led-cols=64 --layer-timeout 60 --led-gpio-mapping=adafruit-hat-pwm --led-brightness=50 
 WorkingDirectory=/tmp
 Restart=always
+User=root
 
 [Install]
 WantedBy=multi-user.target
