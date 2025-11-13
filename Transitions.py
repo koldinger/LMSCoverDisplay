@@ -393,12 +393,13 @@ def zoomOut(oimg, nimg, steps):
 
 def fadeOutIn(oimg, nimg, steps):
     """Fade the old image to black, and then fade the new image in."""
-    steps = int(steps / 2)
+    # steps = int(steps / 2)
 
     for i in range(steps + 1, 0, -1):
         enhancer = ImageEnhance.Brightness(oimg)
         enchanced = enhancer.enhance(float(i / steps))
         yield enchanced
+    yield Image.new("RGB", oimg.size)
     for i in range(steps + 1):
         enhancer = ImageEnhance.Brightness(nimg)
         enchanced = enhancer.enhance(float(i / steps))
@@ -518,19 +519,26 @@ def getTransition(transition: TransitionTypes):
         case TransitionTypes.none:
             return noTransition
         case _:
-            raise Exception(f"Unknown transition: {transition}")
+            raise ValueError(transition)
 
 
 if __name__ == "__main__":
     import flaschen
     import sys
+    import itertools
+    import glob
+    import random
+    from pathlib import Path
 
     size = 64
 
-    f = flaschen.Flaschen("localhost", 1337, size, size)
+    f = flaschen.Flaschen("coverpi.local", 1337, size, size)
 
-    img1 = Image.open("cover1.jpg").resize((size, size))
-    img2 = Image.open("cover2.jpg").resize((size, size))
+    # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
+    names = list(Path("/srv/music/FLAC").glob("**/cover.jpg"))
+    random.shuffle(names)
+
+    images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))
 
     def sendArt(f, i):
         px = i.load()
@@ -544,17 +552,20 @@ if __name__ == "__main__":
             sendArt(f, i)
             time.sleep(pause)
 
-    # doTransition(f, expandRightDown(img1, img2, 10))
+    # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
     transitions = sys.argv[1:] if len(sys.argv) > 1 else TransitionTypes
 
+    cur = next(images)
+    nxt = next(images)
     for i in transitions:
         print(i)
-        sendArt(f, img1)
+        sendArt(f, cur)
         time.sleep(0.5)
         trans = getTransition(i)
-        doTransition(f, trans(img1, img2, 20))
-        img1, img2 = img2, img1
+        doTransition(f, trans(cur, nxt, 20))
+        cur = nxt
+        nxt = next(images)
         time.sleep(2)
 
-    sendArt(f, Image.new("RGB", img1.size))
+    sendArt(f, Image.new("RGB", cur.size))
