@@ -73,6 +73,7 @@ lint.ignore = [
     "E501",     # Pycodestyle - line too long
     "D1",       # Pydocstyle - missing docstring in public module, class, or function
     "FBT003",   # Flake8-boolean-trap - boolean position value in function call
+    "D205",     # Pydocstyle - 1 blank line required between summary and description
     "D210",     # Pydocstyle - no whitespaces allowed surrounding docstring text
     "D203",     # Pydocstyle - one blank line required before class docstring
     "D212",     # Pydocstyle - summary line should be immediately after the opening quotes.
@@ -89,3 +90,6 @@ lint.ignore = [
     "UP009",    # unnecessary file encoding
     "G004",     # Logging statement uses f-string
 ]
+
+[lint.pydocstyle]:w
+convention = "pep257"
