@@ -535,7 +535,7 @@ if __name__ == "__main__":
     f = flaschen.Flaschen("coverpi.local", 1337, size, size)
 
     # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = list(Path("/srv/music/FLAC").glob("**/cover.jpg"))
+    names = list(Path("/srv/music/FLAC/Phil_Collins/").glob("**/cover.jpg"))
     random.shuffle(names)
 
     images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))
