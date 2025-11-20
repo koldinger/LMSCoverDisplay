@@ -1,8 +1,7 @@
 import math
 from PIL import Image, ImageDraw
-import time
 from datetime import datetime
-from icecream import ic
+#from icecream import ic
 
 class AnalogClockGenerator:
     def __init__(self, radius = 500, hour_hand_color: tuple = (255, 255, 255, 255),
@@ -11,7 +10,7 @@ class AnalogClockGenerator:
                  show_second_hand: bool = True,
                  origin_color: tuple = (255, 255, 255, 255),
                  background_color: tuple = (0, 0, 0, 0)):
-        
+
         self.radius = radius
         self.hour_hand_color = hour_hand_color
         self.minute_hand_color = minute_hand_color
@@ -21,13 +20,9 @@ class AnalogClockGenerator:
         self.show_second_hand = show_second_hand
 
     def get_current_clock(self) -> Image.Image:
-        now = datetime.now()
+        now = datetime.now(tz=None)
 
-        hour = now.hour
-        minute = now.minute
-        second = now.second
-
-        return self.get_clock(hour, minute, second)
+        return self.get_clock(now.hour, now.minute, now.second)
 
     def get_clock(self, hour: int, minute: int, second: int) -> Image.Image:
         canvas = Image.new("RGBA", (self.radius * 2, self.radius * 2), color=self.background_color)
@@ -39,7 +34,7 @@ class AnalogClockGenerator:
         length = int(self.radius * .1)
         start_distance = int(self.radius * .85)
         self.draw_hour_markings(draw, center, start_distance, length)
-        
+
         # Draw origin in the center
         radius = int(self.radius * .05)
         draw.ellipse((center - radius, center - radius, center + radius, center + radius), fill=self.origin_color)
@@ -61,7 +56,7 @@ class AnalogClockGenerator:
             self.draw_hand(draw, center, angle, length, self.second_hand_color, 3)
 
         return canvas
-    
+
     # -------------- #
     # Helper methods #
     # -------------- #

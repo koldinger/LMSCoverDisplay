@@ -7,9 +7,9 @@ from PIL import Image, ImageEnhance
 import rich.traceback
 
 rich.traceback.install()
-from icecream import ic
 
-ic.configureOutput(includeContext=True)
+#from icecream import ic
+#ic.configureOutput(includeContext=True)
 
 
 class TransitionTypes(StrEnum):

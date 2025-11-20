@@ -8,8 +8,8 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
-import sys
-import pprint
+import signal
+import random
 
 import requests
 import rich.traceback
@@ -19,17 +19,18 @@ from PIL.Image import Resampling
 from telnetlib3 import telnetlib
 import configargparse
 
-import AnalogClockGenerator
-import flaschen
-import Transitions
+from . import AnalogClockGenerator
+from . import Transitions
+from . import flaschen
 
+args: argparse.Namespace
 
-def unixTimestamp():
+def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
 
-ic.configureOutput(includeContext=True, prefix=unixTimestamp)
-#ic.disable()
+ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+ic.disable()
 
 rich.traceback.install()
 
@@ -38,48 +39,47 @@ logger: logging.Logger
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
 
-
-def tt(string, query=False):
+def command_string(string, query=False):
     if query:
         string = string + " ?"
     return bytes(string + "\r\n", "ascii")
 
 
-def getLine(t):
-    r = t.read_until(b"\n")
-    return unquote(r)
+def getLine(tn_session):
+    return unquote(tn_session.read_until(b"\n")).strip()
 
 
-def getPlayerID(t, name):
+def getPlayerID(tn_session, name):
     count_cmd = "player count"
-    r = doQuery(t, count_cmd)
+    r = doQuery(tn_session, count_cmd)
     for i in range(int(r)):
-        n = doQuery(t, f"player name {i}")
+        n = doQuery(tn_session, f"player name {i}")
         if name == n.strip():
-            playerID = doQuery(t, f"player id {i}")
+            playerID = doQuery(tn_session, f"player id {i}")
             return playerID
     return None
 
 
-def getPlayingID(t):
+def getPlayingID(tn_session):
     count_cmd = "player count"
-    r = doQuery(t, count_cmd)
-    for i in range(int(r)):
-        playerID = doQuery(t, f"player id {i}")
+    line = doQuery(tn_session, count_cmd)
+    for i in range(int(line)):
+        playerID = doQuery(tn_session, f"player id {i}")
         # name = doQuery(t, f"player name {i}")
         # TODO: Parse the
-        status = doQuery(t, f"{playerID} status 0 1")
+        status = doQuery(tn_session, f"{playerID} status 0 1")
         return playerID
     return None
 
 
-def doQuery(t, query):
-    t.write(tt(query, True))
-    r = getLine(t)
-    if not r.startswith(query):
-        raise Exception(f"Invalid response: {r}")
-    r = r.removeprefix(query).strip()
-    return r
+def doQuery(tn_session, query):
+    tn_session.write(command_string(query, True))
+    line = getLine(tn_session)
+    if not line.startswith(query):
+        raise Exception(f"Invalid response: {line}")
+    line = line.removeprefix(query).strip()
+    ic(query, line)
+    return line
 
 
 def handleStatus(t, f, playerID, transitions):
@@ -93,10 +93,10 @@ def handleStatus(t, f, playerID, transitions):
     )
 
     # make it an infinite list
-    transitions = itertools.cycle(transitions)
+    #transitions = itertools.cycle(transitions)
 
     # Start the subscription
-    t.write(tt(subscribe_cmd))
+    t.write(command_string(subscribe_cmd))
 
     while True:
         line = getLine(t)
@@ -116,7 +116,7 @@ def handleStatus(t, f, playerID, transitions):
                 art = getCurrentArt(playerID)
 
             if art != lastimg and transitions:
-                transition = Transitions.getTransition(next(transitions))
+                transition = Transitions.getTransition(random.choice(transitions))
                 for i in transition(lastimg, art, 10):
                     sendArt(f, i)
                     time.sleep(0.15)
@@ -182,7 +182,9 @@ def process_cmdline():
     parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
-    parser.add_argument("--transitions", "-t", nargs="+", metavar = "Transition", default=[Transitions.TransitionTypes.none], choices=Transitions.TransitionTypes)
+    parser.add_argument("--transitions", "-t", nargs="+", metavar = "Transition",
+                        default=[Transitions.TransitionTypes.none], choices=Transitions.TransitionTypes,
+                        help = "A list of transitions to chose from")
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2,
                         help="Dimension of the display")
 
@@ -195,13 +197,21 @@ def process_cmdline():
 
     return args
 
-args: argparse.Namespace
+
+def reloadConfig(signum, frame):
+    global args
+    ic(signum, frame)
+    args = process_cmdline()
+    # clear the cache on getArt so we get changes to images immediately
+    getArt.cache_clear()
 
 def main():
     global args, logger
     args = process_cmdline()
     t = telnetlib.Telnet()
     backoff = 1
+
+    signal.signal(signal.SIGHUP, reloadConfig)
 
     logging.basicConfig(level=logging.INFO)
 
@@ -211,9 +221,11 @@ def main():
             t.open(args.lmsserver, args.lmsports[1])
 
             version = doQuery(t, "version")
+            ic(version)
             backoff = 1
 
             playerID = getPlayerID(t, args.player) if args.player else getPlayingID(t)
+            ic(playerID)
 
             handleStatus(t, f, playerID, args.transitions)
         except Exception as e:
