@@ -1,0 +1,12 @@
+[Unit]
+Description=LMS Cover Art Display server
+After=ft-server.service
+
+[Service]
+ExecStart=/usr/local/bin/lmsdisplay --config /etc/lmsdisplay.conf
+WorkingDirectory=/tmp
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
