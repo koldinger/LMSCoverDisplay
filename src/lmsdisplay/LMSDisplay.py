@@ -117,9 +117,9 @@ def handleStatus(t, f, playerID, transitions):
 
             if art != lastimg and transitions:
                 transition = Transitions.getTransition(random.choice(transitions))
-                for i in transition(lastimg, art, 10):
+                for i in transition(lastimg, art, args.steps):
                     sendArt(f, i)
-                    time.sleep(0.15)
+                    time.sleep(args.delay)
 
             sendArt(f, art)
             lastimg = art
@@ -190,6 +190,9 @@ def process_cmdline():
 
     parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
     parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
+
+    parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
+    parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
     parser.add_argument("--clock",      type=bool, const=True, nargs="?", default=False, help="Show Clock if not playing")
 
