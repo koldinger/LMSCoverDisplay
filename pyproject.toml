@@ -13,7 +13,7 @@ dependencies = [
     "icecream>=2.1.8",
     "pillow>=12.0.0",
     "requests>=2.32.3",
-    "rich>=14.2.0",
+    "rich>=13.9.4",
     "telnetlib3>=2.0.8",
 ]
 
