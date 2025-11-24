@@ -11,9 +11,8 @@ rich.traceback.install()
 #from icecream import ic
 #ic.configureOutput(includeContext=True)
 
-
 class TransitionTypes(StrEnum):
-    none = auto()
+    Instant = auto()
     PushLeft = auto()
     PushRight = auto()
     PushUp = auto()
@@ -435,12 +434,53 @@ def transporter(oimg, nimg, steps):
         yield img
 
 
-def noTransition(oimg, nimg, steps):
+def instant(oimg, nimg, steps):
+    """ Instantly transition to the new image. """
     yield nimg
 
 
 choices = list(TransitionTypes)[:-1]
 
+
+descriptions = {
+    TransitionTypes.Instant:            "Instant Transition",
+    TransitionTypes.PushLeft:           "Push the old image out to the left",
+    TransitionTypes.PushRight:          "Push the old image out to the right",
+    TransitionTypes.PushUp:             "Push the old image up from the bottom",
+    TransitionTypes.PushDown:           "Push the old image down from the top",
+    TransitionTypes.OverUp:             "Pull the new image up from the bottom",
+    TransitionTypes.OverDown:           "Pull the new image down from the top",
+    TransitionTypes.OverLeft:           "Pull the new image in from the right",
+    TransitionTypes.OverRight:          "Pull the new image in from the left",
+    TransitionTypes.WipeLeft:           "Wipe left from the right side",
+    TransitionTypes.WipeRight:          "Wipe right from the left side",
+    TransitionTypes.WipeUp:             "Wipe up from the bottom",
+    TransitionTypes.WipeDown:           "Wipe down from the top",
+    TransitionTypes.DownUp:             "Push the old image down, and the new image up",
+    TransitionTypes.SlideRightDown:     "Slide the new image down from the top left corner",
+    TransitionTypes.SlideRightUp:       "Slide the new image up from the bottom left corner",
+    TransitionTypes.SlideLeftDown:      "Slide the new image down from the top left corner",
+    TransitionTypes.SlideLeftUp:        "Slide the new image up from the bottom left corner",
+    TransitionTypes.ExpandRightDown:    "Expand the image down from the top left corner",
+    TransitionTypes.ExpandRightUp:      "Expand the image up from the bottom left corner",
+    TransitionTypes.ExpandLeftDown:     "Expand the image down from the top right corner",
+    TransitionTypes.ExpandLeftUp:       "Expand the image up from the bottom right corner",
+    TransitionTypes.CurtainHoriz:       "Pull the new image in from the left and right",
+    TransitionTypes.CurtainVert:        "Pull the new image in from the op and bottom",
+    TransitionTypes.CurtainOutHoriz:    "Push the old image out to both sides",
+    TransitionTypes.CurtainOutVert:     "Push the old image out to the top and bottom",
+    TransitionTypes.ZoomIn:             "Expand the new in from the center",
+    TransitionTypes.ZoomOut:            "Shrink the old image out to the center.",
+    TransitionTypes.ZoomOutIn:          "Zoom the old image out, then the new image in",
+    TransitionTypes.Fade:               "Fade from the old image to the new",
+    TransitionTypes.FadeOutIn:          "Fade the old image out, then the new one in",
+    TransitionTypes.SpinOut:            "Spin and expand the new image in to the center",
+    TransitionTypes.SpinIn:             "Spin and shrink the old image out from the center",
+    TransitionTypes.SpinInOut:          "Spin and shrink the old image to the center, then spin and expand the new image in",
+    TransitionTypes.Transporter:        "Replace the old image pixel by pixel, randomly",
+    TransitionTypes.Glimmer:            "Replace pixels randomly, switching between old and new until the new image is complete",
+    TransitionTypes.Random:             "Pick a random transition",
+}
 
 def getTransition(transition: TransitionTypes):
     match transition:
@@ -516,8 +556,8 @@ def getTransition(transition: TransitionTypes):
             return spinInOut
         case TransitionTypes.Random:
             return getTransition(random.choice(choices))
-        case TransitionTypes.none:
-            return noTransition
+        case TransitionTypes.Instant:
+            return instant
         case _:
             raise ValueError(transition)
 
@@ -526,7 +566,6 @@ if __name__ == "__main__":
     import flaschen
     import sys
     import itertools
-    import glob
     import random
     from pathlib import Path
 
@@ -535,7 +574,7 @@ if __name__ == "__main__":
     f = flaschen.Flaschen("coverpi.local", 1337, size, size)
 
     # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = list(Path("/srv/music/FLAC/Phil_Collins/").glob("**/cover.jpg"))
+    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
     random.shuffle(names)
 
     images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))
@@ -559,7 +598,7 @@ if __name__ == "__main__":
     cur = next(images)
     nxt = next(images)
     for i in transitions:
-        print(i)
+        print(f"{i:20}  - {descriptions[i]}")
         sendArt(f, cur)
         time.sleep(0.5)
         trans = getTransition(i)
