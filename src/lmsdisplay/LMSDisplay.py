@@ -1,6 +1,5 @@
 import argparse
 import functools
-import itertools
 import logging
 import re
 import time
@@ -11,6 +10,7 @@ from urllib.parse import unquote
 import signal
 import random
 
+from pid import PidFile
 import requests
 import rich.traceback
 from icecream import ic
@@ -22,6 +22,7 @@ import configargparse
 from . import AnalogClockGenerator
 from . import Transitions
 from . import flaschen
+from . import util
 
 args: argparse.Namespace
 
@@ -115,6 +116,10 @@ def handleStatus(t, f, playerID, transitions):
                 trackid = None
                 art = getCurrentArt(playerID)
 
+            # If we're in the dimming zone, dim the image
+            if args.dim is not None and util.betweentimes(datetime.now().time(), args.dimstart, args.dimend):
+                art = ImageEnhance.Brightness(art).enhance(args.dim)
+
             if art != lastimg and transitions:
                 transition = Transitions.getTransition(random.choice(transitions))
                 for i in transition(lastimg, art, args.steps):
@@ -183,10 +188,13 @@ def process_cmdline():
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
     parser.add_argument("--transitions", "-t", nargs="+", metavar = "Transition",
-                        default=[Transitions.TransitionTypes.none], choices=Transitions.TransitionTypes,
+                        default=[Transitions.TransitionTypes.Instant], choices=Transitions.TransitionTypes,
                         help = "A list of transitions to chose from")
-    parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2,
-                        help="Dimension of the display")
+    parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
+
+    parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
+    parser.add_argument("--dimstart", type=util.parsetime, default=None, help="Start dimming at this time")
+    parser.add_argument("--dimend", type=util.parsetime, default=None, help="End dimming at this time")
 
     parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
     parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
@@ -195,6 +203,8 @@ def process_cmdline():
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
     parser.add_argument("--clock",      type=bool, const=True, nargs="?", default=False, help="Show Clock if not playing")
+
+    parser.add_argument("--pidfile", type=Path, default=None, )
 
     args = parser.parse_args()
 
@@ -211,6 +221,7 @@ def reloadConfig(signum, frame):
 def main():
     global args, logger
     args = process_cmdline()
+
     t = telnetlib.Telnet()
     backoff = 1
 
@@ -218,23 +229,34 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    while True:
-        try:
-            f = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
-            t.open(args.lmsserver, args.lmsports[1])
+    pidfile = None
+    piddir = None
+    if args.pidfile:
+        if args.pidfile.is_dir():
+            piddir = args.pidfile
+        else:
+            piddir = args.pidfile.parent
+            pidfile = args.pidfile.name
 
-            version = doQuery(t, "version")
-            ic(version)
-            backoff = 1
+    with PidFile(piddir=piddir, pidname=pidfile) as p:
+        ic(p.filename)
+        while True:
+            try:
+                f = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
+                t.open(args.lmsserver, args.lmsports[1])
 
-            playerID = getPlayerID(t, args.player) if args.player else getPlayingID(t)
-            ic(playerID)
+                version = doQuery(t, "version")
+                ic(version)
+                backoff = 1
 
-            handleStatus(t, f, playerID, args.transitions)
-        except Exception as e:
-            ic(e)
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 300)
+                playerID = getPlayerID(t, args.player) if args.player else getPlayingID(t)
+                ic(playerID)
+
+                handleStatus(t, f, playerID, args.transitions)
+            except Exception as e:
+                ic(e)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 300)
 
 
 if __name__ == "__main__":
