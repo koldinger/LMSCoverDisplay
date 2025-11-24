@@ -91,5 +91,5 @@ lint.ignore = [
     "G004",     # Logging statement uses f-string
 ]
 
-[lint.pydocstyle]:w
+[lint.pydocstyle]
 convention = "pep257"
