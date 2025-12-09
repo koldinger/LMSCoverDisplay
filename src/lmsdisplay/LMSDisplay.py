@@ -13,6 +13,7 @@ import random
 from pid import PidFile
 import requests
 import rich.traceback
+from rich.console import Console
 from icecream import ic
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
@@ -202,12 +203,13 @@ def process_cmdline():
     parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
-    parser.add_argument("--clock",      type=bool, const=True, nargs="?", default=False, help="Show Clock if not playing")
+    parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if not playing")
 
     parser.add_argument("--pidfile", type=Path, default=None, )
 
     args = parser.parse_args()
 
+    ic(args)
     return args
 
 
@@ -221,6 +223,7 @@ def reloadConfig(signum, frame):
 def main():
     global args, logger
     args = process_cmdline()
+    console = Console()
 
     t = telnetlib.Telnet()
     backoff = 1
@@ -255,6 +258,7 @@ def main():
                 handleStatus(t, f, playerID, args.transitions)
             except Exception as e:
                 ic(e)
+                console.print_exception()
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 300)
 
