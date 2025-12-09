@@ -14,47 +14,6 @@ rich.traceback.install()
 from icecream import ic
 ic.configureOutput(includeContext=True)
 
-class TransitionTypes(StrEnum):
-    Instant = auto()
-    PushLeft = auto()
-    PushRight = auto()
-    PushUp = auto()
-    PushDown = auto()
-    OverUp = auto()
-    OverDown = auto()
-    OverLeft = auto()
-    OverRight = auto()
-    WipeLeft = auto()
-    WipeRight = auto()
-    WipeUp = auto()
-    WipeDown = auto()
-    DownUp = auto()
-    SlideRightDown = auto()
-    SlideRightUp = auto()
-    SlideLeftDown = auto()
-    SlideLeftUp = auto()
-    ExpandRightDown = auto()
-    ExpandRightUp = auto()
-    ExpandLeftDown = auto()
-    ExpandLeftUp = auto()
-    CurtainHoriz = auto()
-    CurtainVert = auto()
-    CurtainOutHoriz = auto()
-    CurtainOutVert = auto()
-    ZoomIn = auto()
-    ZoomOut = auto()
-    ZoomOutIn = auto()
-    Fade = auto()
-    FadeOutIn = auto()
-    SpinOut = auto()
-    SpinIn = auto()
-    SpinInOut = auto()
-    Transporter = auto()
-    Glimmer = auto()
-    LeanOut = auto()
-    LeanIn = auto()
-    LeanOutIn = auto()
-    Random = auto()
 
 
 def fade(oimg, nimg, steps):
@@ -503,138 +462,65 @@ def instant(oimg, nimg, _):
     yield oimg
     yield nimg
 
+def doRandom(oimg, nimg, steps):
+    transition = random.choice(list(TransitionTypes)[:-1]).function
+    return transition(oimg, nimg, steps)
+
+
+class TransitionTypes(StrEnum):
+    def __new__(cls, value, description, function):
+        member = str.__new__(cls, value)
+        member._value_ = value
+        member.description = description
+        member.function = function
+        return member
+
+    Instant = auto(), "Instant Transition", instant
+    PushLeft = auto(), "Push the old image out to the left", pushLeft
+    PushRight = auto(),"Push the old image out to the right", pushRight
+    PushUp = auto(), "Push the old image up from the bottom", pushUp
+    PushDown = auto(),"Push the old image down from the top", pushDown
+    OverUp = auto(),"Pull the new image up from the bottom", overUp
+    OverDown = auto(), "Pull the new image down from the top", overDown
+    OverLeft = auto(), "Pull the new image in from the right", overLeft
+    OverRight = auto(), "Pull the new image in from the left", overRight
+    WipeLeft = auto(), "Wipe left from the right side", wipeLeft
+    WipeRight = auto(), "Pull the new image in from the left", wipeRight
+    WipeUp = auto(), "Wipe up from the bottom", wipeUp
+    WipeDown = auto(), "Wipe down from the top", wipeDown
+    DownUp = auto(), "Push the old image down, and the new image up", downUp
+    SlideRightDown = auto(), "Slide the new image down from the top left corner", slideRightDown
+    SlideRightUp = auto(), "Slide the new image up from the bottom left corner", slideRightUp
+    SlideLeftDown = auto(), "Slide the new image down from the top left corner", slideLeftDown
+    SlideLeftUp = auto(), "Slide the new image up from the bottom left corner", slideLeftUp
+    ExpandRightDown = auto(), "Expand the image down from the top left corner", expandRightDown
+    ExpandRightUp = auto(), "Expand the image up from the bottom left corner", expandRightUp
+    ExpandLeftDown = auto(), "Expand the image down from the top right corner", expandLeftDown
+    ExpandLeftUp = auto(), "Expand the image up from the bottom right corner", expandLeftUp
+    CurtainHoriz = auto(), "Pull the new image in from the left and right", curtainHoriz
+    CurtainVert = auto(), "Pull the new image in from the op and bottom", curtainVert
+    CurtainOutHoriz = auto(), "Push the old image out to both sides", curtainOutHoriz
+    CurtainOutVert = auto(), "Push the old image out to the top and bottom", curtainOutVert
+    ZoomIn = auto(), "Expand the new in from the center", zoomIn
+    ZoomOut = auto(), "Shrink the old image out to the center.", zoomOut
+    ZoomOutIn = auto(), "Zoom the old image out, then the new image in", zoomOutIn
+    Fade = auto(), "Fade from the old image to the new", fade
+    FadeOutIn = auto(), "Fade the old image out, then the new one in", fadeOutIn
+    SpinOut = auto(), "Spin and expand the new image in to the center", spinOut
+    SpinIn = auto(), "Spin and shrink the old image out from the center", spinIn
+    SpinInOut = auto(), "Spin and shrink the old image to the center, then spin and expand the new image in", spinInOut
+    Transporter = auto(), "Replace the old image pixel by pixel, randomly", transporter
+    Glimmer = auto(), "Replace pixels randomly, switching between old and new until the new image is complete", glimmer
+    LeanOut = auto(), "Lean the image out to the back", leanOut
+    LeanIn = auto(),"Raise the image in from the back", leanIn
+    LeanOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", leanOutIn
+    # Make sure the Random transition goes last
+    Random = auto(), "Pick a random transition", doRandom
 
 choices = list(TransitionTypes)[:-1]
 
-
-descriptions = {
-    TransitionTypes.Instant:            "Instant Transition",
-    TransitionTypes.PushLeft:           "Push the old image out to the left",
-    TransitionTypes.PushRight:          "Push the old image out to the right",
-    TransitionTypes.PushUp:             "Push the old image up from the bottom",
-    TransitionTypes.PushDown:           "Push the old image down from the top",
-    TransitionTypes.OverUp:             "Pull the new image up from the bottom",
-    TransitionTypes.OverDown:           "Pull the new image down from the top",
-    TransitionTypes.OverLeft:           "Pull the new image in from the right",
-    TransitionTypes.OverRight:          "Pull the new image in from the left",
-    TransitionTypes.WipeLeft:           "Wipe left from the right side",
-    TransitionTypes.WipeRight:          "Wipe right from the left side",
-    TransitionTypes.WipeUp:             "Wipe up from the bottom",
-    TransitionTypes.WipeDown:           "Wipe down from the top",
-    TransitionTypes.DownUp:             "Push the old image down, and the new image up",
-    TransitionTypes.SlideRightDown:     "Slide the new image down from the top left corner",
-    TransitionTypes.SlideRightUp:       "Slide the new image up from the bottom left corner",
-    TransitionTypes.SlideLeftDown:      "Slide the new image down from the top left corner",
-    TransitionTypes.SlideLeftUp:        "Slide the new image up from the bottom left corner",
-    TransitionTypes.ExpandRightDown:    "Expand the image down from the top left corner",
-    TransitionTypes.ExpandRightUp:      "Expand the image up from the bottom left corner",
-    TransitionTypes.ExpandLeftDown:     "Expand the image down from the top right corner",
-    TransitionTypes.ExpandLeftUp:       "Expand the image up from the bottom right corner",
-    TransitionTypes.CurtainHoriz:       "Pull the new image in from the left and right",
-    TransitionTypes.CurtainVert:        "Pull the new image in from the op and bottom",
-    TransitionTypes.CurtainOutHoriz:    "Push the old image out to both sides",
-    TransitionTypes.CurtainOutVert:     "Push the old image out to the top and bottom",
-    TransitionTypes.ZoomIn:             "Expand the new in from the center",
-    TransitionTypes.ZoomOut:            "Shrink the old image out to the center.",
-    TransitionTypes.ZoomOutIn:          "Zoom the old image out, then the new image in",
-    TransitionTypes.Fade:               "Fade from the old image to the new",
-    TransitionTypes.FadeOutIn:          "Fade the old image out, then the new one in",
-    TransitionTypes.SpinOut:            "Spin and expand the new image in to the center",
-    TransitionTypes.SpinIn:             "Spin and shrink the old image out from the center",
-    TransitionTypes.SpinInOut:          "Spin and shrink the old image to the center, then spin and expand the new image in",
-    TransitionTypes.Transporter:        "Replace the old image pixel by pixel, randomly",
-    TransitionTypes.Glimmer:            "Replace pixels randomly, switching between old and new until the new image is complete",
-    TransitionTypes.LeanOut:            "Lean the image out to the back",
-    TransitionTypes.LeanIn:             "Raise the image in from the back",
-    TransitionTypes.LeanOutIn:          "Lower the image out to the back, then raise the new image in from the back",
-    TransitionTypes.Random:             "Pick a random transition",
-}
-
 def getTransition(transition: TransitionTypes):
-    match transition:
-        case TransitionTypes.PushUp:
-            return pushUp
-        case TransitionTypes.PushDown:
-            return pushDown
-        case TransitionTypes.PushLeft:
-            return pushLeft
-        case TransitionTypes.PushRight:
-            return pushRight
-        case TransitionTypes.OverUp:
-            return overUp
-        case TransitionTypes.OverDown:
-            return overDown
-        case TransitionTypes.OverLeft:
-            return overLeft
-        case TransitionTypes.OverRight:
-            return overRight
-        case TransitionTypes.WipeUp:
-            return wipeUp
-        case TransitionTypes.WipeDown:
-            return wipeDown
-        case TransitionTypes.WipeLeft:
-            return wipeLeft
-        case TransitionTypes.WipeRight:
-            return wipeRight
-        case TransitionTypes.DownUp:
-            return downUp
-        case TransitionTypes.SlideRightDown:
-            return slideRightDown
-        case TransitionTypes.SlideRightUp:
-            return slideRightUp
-        case TransitionTypes.SlideLeftDown:
-            return slideLeftDown
-        case TransitionTypes.SlideLeftUp:
-            return slideLeftUp
-        case TransitionTypes.ExpandRightDown:
-            return expandRightDown
-        case TransitionTypes.ExpandRightUp:
-            return expandRightUp
-        case TransitionTypes.ExpandLeftDown:
-            return expandLeftDown
-        case TransitionTypes.ExpandLeftUp:
-            return expandLeftUp
-        case TransitionTypes.CurtainHoriz:
-            return curtainHoriz
-        case TransitionTypes.CurtainVert:
-            return curtainVert
-        case TransitionTypes.CurtainOutHoriz:
-            return curtainOutHoriz
-        case TransitionTypes.CurtainOutVert:
-            return curtainOutVert
-        case TransitionTypes.ZoomIn:
-            return zoomIn
-        case TransitionTypes.ZoomOut:
-            return zoomOut
-        case TransitionTypes.ZoomOutIn:
-            return zoomOutIn
-        case TransitionTypes.Fade:
-            return fade
-        case TransitionTypes.FadeOutIn:
-            return fadeOutIn
-        case TransitionTypes.Transporter:
-            return transporter
-        case TransitionTypes.Glimmer:
-            return glimmer
-        case TransitionTypes.SpinOut:
-            return spinOut
-        case TransitionTypes.SpinIn:
-            return spinIn
-        case TransitionTypes.SpinInOut:
-            return spinInOut
-        case TransitionTypes.LeanOut:
-            return leanOut
-        case TransitionTypes.LeanIn:
-            return leanIn
-        case TransitionTypes.LeanOutIn:
-            return leanOutIn
-        case TransitionTypes.Random:
-            return getTransition(random.choice(choices))
-        case TransitionTypes.Instant:
-            return instant
-        case _:
-            raise ValueError(transition)
-
+    return transition.function
 
 if __name__ == "__main__":
     import flaschen
@@ -648,7 +534,8 @@ if __name__ == "__main__":
     f = flaschen.Flaschen("coverpi.local", 1337, size, size)
 
     # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
     images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))
@@ -667,15 +554,15 @@ if __name__ == "__main__":
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
-    transitions = sys.argv[1:] if len(sys.argv) > 1 else TransitionTypes
+    transitions = map(TransitionTypes, sys.argv[1:]) if len(sys.argv) > 1 else TransitionTypes
 
     cur = next(images)
     nxt = next(images)
     for i in transitions:
-        print(f"{i:20}  - {descriptions[i]}")
+        print(f"{i:20}  - {i.description}")
         sendArt(f, cur)
         time.sleep(0.5)
-        trans = getTransition(i)
+        trans = i.function
         doTransition(f, trans(cur, nxt, 21))
         cur = nxt
         nxt = next(images)
