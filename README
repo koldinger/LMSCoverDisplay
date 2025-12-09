@@ -1,0 +1,21 @@
+Installing program.
+
+1: Disable WiFi power management
+  sudo /sbin/iwconfig wlan0 power off
+  add to /etc/rc.local ???
+
+2: Clone flaschen-taschen
+  git clone --recursive https://github.com/hzeller/flaschen-taschen.git
+
+3: build and install ft-server:
+  cd flaschen-taschen/server 
+  make FT_BACKEND=rgb-matrix
+  cp ft-server /usr/local/bin
+
+4: install and start the flaschen tashech service
+  cp ft-server.service /usr/lib/systemd/system/
+  [ ln -s /usr/lib/systemd/system/ft-server.service /etc/systemd/system/multi-user.target.wants/ ]
+  systemctl enable ft-server.service
+  systemctl start ft-server.service
+
+5: Clone and install LMSDisplay
