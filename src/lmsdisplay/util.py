@@ -13,6 +13,8 @@ def parsetime(timestr):
     raise ValueError(f"Unable to parse time string: {timestr}")
 
 def betweentimes(now, start, end):
+    if not (start and end):
+        return False
     if start <= end:
         return start <= now <= end
     return now <= end or now >= start
