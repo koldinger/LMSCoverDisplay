@@ -1,15 +1,18 @@
 import random
 import time
 from enum import StrEnum, auto
+from contextlib import suppress
 
 from PIL import Image, ImageEnhance
+import numpy as np
 
+from numpy.linalg import LinAlgError
 import rich.traceback
 
 rich.traceback.install()
 
-#from icecream import ic
-#ic.configureOutput(includeContext=True)
+from icecream import ic
+ic.configureOutput(includeContext=True)
 
 class TransitionTypes(StrEnum):
     Instant = auto()
@@ -48,6 +51,9 @@ class TransitionTypes(StrEnum):
     SpinInOut = auto()
     Transporter = auto()
     Glimmer = auto()
+    LeanOut = auto()
+    LeanIn = auto()
+    LeanOutIn = auto()
     Random = auto()
 
 
@@ -92,19 +98,21 @@ def _doPush(oimg, nimg, steps):
                 respx[x, y] = cpx[x + shift, y]
 
         yield res
+    yield nimg
 
 
 def _doOver(oimg, nimg, steps):
     """Push an image over the previous."""
     width, height = oimg.size
     inc = int(width / steps)
-    for i in range(steps, -1, -1):
+    for i in range(steps, 0, -1):
         shift = inc * i
         img = oimg.copy()
 
         over = nimg.crop((shift, 0, width, height))
         img.paste(over, (0, 0))
         yield img
+    yield nimg
 
 
 def _doWipe(oimg, nimg, steps):
@@ -117,6 +125,7 @@ def _doWipe(oimg, nimg, steps):
         over = nimg.crop((0, 0, amt, height))
         img.paste(over, (0, 0))
         yield img
+    yield nimg
 
 
 def _doSlide(oimg, nimg, steps):
@@ -128,6 +137,7 @@ def _doSlide(oimg, nimg, steps):
         over = nimg.crop((width - amt, height - amt, width, height))
         img.paste(over, (0, 0))
         yield img
+    yield nimg
 
 
 def _doCurtain(oimg, nimg, steps):
@@ -147,6 +157,7 @@ def _doCurtain(oimg, nimg, steps):
         img.paste(rc, (img.width - width, 0))
 
         yield img
+    yield nimg
 
 
 def _doCurtainOut(oimg, nimg, steps):
@@ -175,7 +186,7 @@ def _doSpin(oimg, nimg, steps, out):
     oimga = oimg.convert("RGBA")
     nimga = nimg.convert("RGBA")
 
-    rng = range(1, steps + 1) if out else range(steps, 0, -1)
+    rng = range(1, steps + 1) if out else range(steps, 1, -1)
 
     for i in rng:
         x, y = nimg.size
@@ -183,6 +194,7 @@ def _doSpin(oimg, nimg, steps, out):
         y = int(y * i / steps)
 
         angle = int(360 * i / steps)
+
         # Rotate image A by 45 degrees
         rot = nimga.resize([x, y]).rotate(angle, expand=True)
 
@@ -208,6 +220,43 @@ def _doExpand(oimg, nimg, steps):
         over = nimg.resize((size, size))
         img.paste(over, (0, 0))
         yield img
+    yield nimg
+
+def _find_coeffs(pa, pb):
+    matrix = []
+    #ic(pa, pb)
+    for p1, p2 in zip(pb, pa):
+        matrix.append([p1[0], p1[1], 1, 0, 0, 0,
+                      -p2[0]*p1[0], -p2[0]*p1[1]])
+        matrix.append([0, 0, 0, p1[0], p1[1], 1,
+                      -p2[1]*p1[0], -p2[1]*p1[1]])
+    A = np.matrix(matrix, dtype=np.float32)
+    B = np.array(pa).reshape(8)
+    res = np.dot(np.linalg.inv(A.T * A) * A.T, B)
+    return np.array(res).reshape(8)
+
+def _doLean(oimg, nimg, steps, out):
+    if not steps % 2:
+        steps += 1
+    w, h = oimg.size
+    oimga = oimg.convert("RGBA")
+    nimga = nimg.convert("RGBA")
+    rng = range(0, steps+1) if out else range(steps-1, -1, -1)
+    with suppress(LinAlgError):
+        for i in rng:
+            percent = i / steps
+            chx = int(percent * w / 2)
+            chy = int(percent * h)
+            #ic(i, percent, chx, chy)
+
+            coeffs = _find_coeffs(
+                [(0, 0), (w, 0), (w, h), (0, h)],
+                [(chx, chy), (w - chx, chy), (w, h), (0, h)])
+            #ic(coeffs)
+            warped = oimga.transform((w, h), Image.Transform.PERSPECTIVE, coeffs, Image.Resampling.BICUBIC, fillcolor=(0, 0, 0, 0))
+            res = nimga.copy()
+            res.alpha_composite(warped)
+            yield res
 
 
 """
@@ -321,10 +370,17 @@ def spinIn(oimg, nimg, steps):
     yield nimg
 
 
+def leanOut(oimg, nimg, steps):
+    yield from _doLean(oimg, nimg, steps, True)
+    yield nimg
+
+def leanIn(oimg, nimg, steps):
+    yield from _doLean(nimg, oimg, steps, False)
+    yield nimg
+
 """
 Composite functions, which use multiple other effect tests.
 """
-
 
 def downUp(oimg, nimg, steps):
     """Lower the current image, and then raise the new image up."""
@@ -345,12 +401,17 @@ def spinInOut(oimg, nimg, steps):
     blank = Image.new("RGB", oimg.size)
     yield from spinIn(oimg, blank, int(steps / 2))
     yield from spinOut(blank, nimg, int(steps / 2))
+    yield nimg
 
+def leanOutIn(oimg, nimg, steps):
+    blank = Image.new("RGB", oimg.size)
+    yield from _doLean(oimg, blank, steps, True)
+    yield from _doLean(nimg, blank, steps, False)
+    yield nimg
 
 """
 Functions that do all the work wihout using a helper.
 """
-
 
 def zoomIn(oimg, nimg, steps):
     w = oimg.width / steps
@@ -364,7 +425,6 @@ def zoomIn(oimg, nimg, steps):
     for i in range(1, steps + 1):
         img = oimg.copy()
         cpos = (int(cw - (w * i / 2)), int(ch - (h * i / 2)))
-        csize = (int(nimg.width / steps * i), int(nimg.height / steps * i))
         cimg = nimg.resize((int(nimg.width / steps * i), int(nimg.height / steps * i)))
         img.paste(cimg, cpos)
         yield img
@@ -382,7 +442,6 @@ def zoomOut(oimg, nimg, steps):
     for i in range(steps, 0, -1):
         img = nimg.copy()
         cpos = (int(cw - (w * i / 2)), int(ch - (h * i / 2)))
-        csize = (int(nimg.width / steps * i), int(nimg.height / steps * i))
         cimg = oimg.resize((int(nimg.width / steps * i), int(nimg.height / steps * i)))
         img.paste(cimg, cpos)
         yield img
@@ -403,10 +462,14 @@ def fadeOutIn(oimg, nimg, steps):
         enhancer = ImageEnhance.Brightness(nimg)
         enchanced = enhancer.enhance(float(i / steps))
         yield enchanced
-
+    yield nimg
 
 def glimmer(oimg, nimg, steps):
-    """Change from one image to another by replacing pixels with pixels from the new image."""
+    """
+    Change from one image to another by replacing pixels with pixels from the new image.
+    Pixels can shift back and forth between the two images, with the percentage of new pixels
+    increasing until all pixels have changed.
+    """
     px = nimg.load()
     for i in range(steps + 1):
         threshold = i / steps
@@ -417,11 +480,11 @@ def glimmer(oimg, nimg, steps):
                 if random.random() < threshold:
                     ipx[x, y] = px[x, y]
         yield img
+    yield nimg
 
 
 def transporter(oimg, nimg, steps):
-    """Do a "beam in" effect where pixels are gradually replaced with pixels from the new image."""
-
+    """ Do a 'beam in' effect where pixels are gradually replaced with pixels from the new image. """
     px = nimg.load()
     img = oimg.copy()
     ipx = img.load()
@@ -432,10 +495,12 @@ def transporter(oimg, nimg, steps):
                 if random.random() < threshold:
                     ipx[x, y] = px[x, y]
         yield img
+    yield nimg
 
 
-def instant(oimg, nimg, steps):
+def instant(oimg, nimg, _):
     """ Instantly transition to the new image. """
+    yield oimg
     yield nimg
 
 
@@ -479,6 +544,9 @@ descriptions = {
     TransitionTypes.SpinInOut:          "Spin and shrink the old image to the center, then spin and expand the new image in",
     TransitionTypes.Transporter:        "Replace the old image pixel by pixel, randomly",
     TransitionTypes.Glimmer:            "Replace pixels randomly, switching between old and new until the new image is complete",
+    TransitionTypes.LeanOut:            "Lean the image out to the back",
+    TransitionTypes.LeanIn:             "Raise the image in from the back",
+    TransitionTypes.LeanOutIn:          "Lower the image out to the back, then raise the new image in from the back",
     TransitionTypes.Random:             "Pick a random transition",
 }
 
@@ -554,6 +622,12 @@ def getTransition(transition: TransitionTypes):
             return spinIn
         case TransitionTypes.SpinInOut:
             return spinInOut
+        case TransitionTypes.LeanOut:
+            return leanOut
+        case TransitionTypes.LeanIn:
+            return leanIn
+        case TransitionTypes.LeanOutIn:
+            return leanOutIn
         case TransitionTypes.Random:
             return getTransition(random.choice(choices))
         case TransitionTypes.Instant:
@@ -602,9 +676,10 @@ if __name__ == "__main__":
         sendArt(f, cur)
         time.sleep(0.5)
         trans = getTransition(i)
-        doTransition(f, trans(cur, nxt, 20))
+        doTransition(f, trans(cur, nxt, 21))
         cur = nxt
         nxt = next(images)
+
         time.sleep(2)
 
     sendArt(f, Image.new("RGB", cur.size))
