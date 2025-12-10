@@ -29,11 +29,11 @@ transition, and then rotated back to perform the operation in a certain directio
 """
 
 
-def _rotate(oimg, nimg, steps, angle, func):
+def _rotate(oimg, nimg, steps, angle, func, *moreargs):
     """Rotate 2 images by 'angle' degrees, perform the transition, and rotate the result back."""
     oimg = oimg.rotate(angle)
     nimg = nimg.rotate(angle)
-    return map(lambda x: x.rotate(-angle), func(oimg, nimg, steps))
+    return map(lambda x: x.rotate(-angle), func(oimg, nimg, steps, *moreargs))
 
 
 def _doPush(oimg, nimg, steps):
@@ -60,18 +60,20 @@ def _doPush(oimg, nimg, steps):
     yield nimg
 
 
-def _doOver(oimg, nimg, steps):
+def _doOver(oimg: Image, nimg: Image, steps: int, out: bool):
     """Push an image over the previous."""
     width, height = oimg.size
     inc = int(width / steps)
-    for i in range(steps, 0, -1):
+    rng = range(steps, 0, -1) if out else range(0, steps)
+
+    for i in rng:
         shift = inc * i
         img = oimg.copy()
 
         over = nimg.crop((shift, 0, width, height))
         img.paste(over, (0, 0))
         yield img
-    yield nimg
+    # yield nimg
 
 
 def _doWipe(oimg, nimg, steps):
@@ -170,16 +172,16 @@ def _doSpin(oimg, nimg, steps, out):
         yield result
 
 
-def _doExpand(oimg, nimg, steps):
+def _doExpand(oimg, nimg, steps, out):
     """Expand an image from the center out"""
     width = nimg.width
-    for i in range(1, steps + 1):
+    rng = range(1, steps+1) if out else range(steps, 0, -1)
+    for i in rng:
         size = int(i * width / steps)
         img = oimg.copy()
         over = nimg.resize((size, size))
         img.paste(over, (0, 0))
         yield img
-    yield nimg
 
 def _find_coeffs(pa, pb):
     matrix = []
@@ -241,19 +243,43 @@ def pushDown(oimg, nimg, steps):
 
 
 def overRight(oimg, nimg, steps):
-    return _doOver(oimg, nimg, steps)
+    yield from _doOver(oimg, nimg, steps, True)
+    yield nimg
 
 
 def overLeft(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 180, _doOver)
+    yield from _rotate(oimg, nimg, steps, 180, _doOver, True)
+    yield nimg
 
 
 def overUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, -90, _doOver)
+    yield from _rotate(oimg, nimg, steps, -90, _doOver, True)
+    yield nimg
 
 
 def overDown(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doOver)
+    yield from _rotate(oimg, nimg, steps, 90, _doOver, True)
+    yield nimg
+
+
+def unCoverLeft(oimg, nimg, steps):
+    yield from _doOver(nimg, oimg, steps, False)
+    yield nimg
+
+
+def unCoverRight(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, 180, _doOver, False)
+    yield nimg
+
+
+def unCoverUp(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, 90, _doOver, False)
+    yield nimg
+
+
+def unCoverDown(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, -90, _doOver, False)
+    yield nimg
 
 
 def wipeRight(oimg, nimg, steps):
@@ -289,19 +315,44 @@ def slideLeftUp(oimg, nimg, steps):
 
 
 def expandRightDown(oimg, nimg, steps):
-    return _doExpand(oimg, nimg, steps)
+    yield from _doExpand(oimg, nimg, steps, True)
+    yield nimg
 
 
 def expandRightUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, -90, _doExpand)
+    yield from _rotate(oimg, nimg, steps, -90, _doExpand, True)
+    yield nimg
 
 
 def expandLeftDown(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doExpand)
+    yield from _rotate(oimg, nimg, steps, 90, _doExpand, True)
+    yield nimg
 
 
 def expandLeftUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 180, _doExpand)
+    yield from _rotate(oimg, nimg, steps, 180, _doExpand, True)
+    yield nimg
+
+
+def shrinkLeftUp(oimg, nimg, steps):
+    yield from _doExpand(nimg, oimg, steps, False)
+    yield nimg
+
+
+def shrinkRightDown(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, 180, _doExpand, False)
+    yield nimg
+
+
+def shrinkRightUp(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, 90, _doExpand, False)
+    yield nimg
+
+
+def shrinkLeftDown(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, -90, _doExpand, False)
+    yield nimg
+
 
 
 def curtainHoriz(oimg, nimg, steps):
@@ -484,6 +535,10 @@ class TransitionTypes(StrEnum):
     OverDown = auto(), "Pull the new image down from the top", overDown
     OverLeft = auto(), "Pull the new image in from the right", overLeft
     OverRight = auto(), "Pull the new image in from the left", overRight
+    UncoverLeft = auto(), "Pull the old image away to the left", unCoverLeft
+    UncoverRight = auto(), "Pull the old image away to the right", unCoverRight
+    UncoverUp = auto(), "Pull the old image away to the top", unCoverUp
+    UncoverDown = auto(), "Pull the old image away to the bottom", unCoverDown
     WipeLeft = auto(), "Wipe left from the right side", wipeLeft
     WipeRight = auto(), "Pull the new image in from the left", wipeRight
     WipeUp = auto(), "Wipe up from the bottom", wipeUp
@@ -497,6 +552,10 @@ class TransitionTypes(StrEnum):
     ExpandRightUp = auto(), "Expand the image up from the bottom left corner", expandRightUp
     ExpandLeftDown = auto(), "Expand the image down from the top right corner", expandLeftDown
     ExpandLeftUp = auto(), "Expand the image up from the bottom right corner", expandLeftUp
+    ShrinkRightDown = auto(), "Shrink the image down from the top left corner", shrinkRightDown
+    ShrinkRightUp = auto(), "Shrink the image up from the bottom left corner", shrinkRightUp
+    ShrinkLeftDown = auto(), "Shrink the image down from the top right corner", shrinkLeftDown
+    ShrinkLeftUp = auto(), "Shrink the image up from the bottom right corner", shrinkLeftUp
     CurtainHoriz = auto(), "Pull the new image in from the left and right", curtainHoriz
     CurtainVert = auto(), "Pull the new image in from the op and bottom", curtainVert
     CurtainOutHoriz = auto(), "Push the old image out to both sides", curtainOutHoriz
