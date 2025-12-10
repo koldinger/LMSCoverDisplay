@@ -142,6 +142,8 @@ def handleStatus(t, f, playerID, transitions):
 
 
 def sendArt(f, art):
+    if art.mode not in ["RGB", "RGBA"]:
+        art = art.convert("RGB")
     px = art.load()
     for x in range(art.width):
         for y in range(art.height):
