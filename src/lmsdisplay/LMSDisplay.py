@@ -10,6 +10,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
+import importlib
 
 import configargparse
 import requests
@@ -83,7 +84,6 @@ def doQuery(tn_session, query):
     return line
 
 
-
 def handleStatus(t, f, playerID, transitions):
     lastimg = Image.new("RGB", (args.imagesize))
     subscribe_cmd = f"{playerID} status - 1 subscribe:30"
@@ -142,8 +142,6 @@ def handleStatus(t, f, playerID, transitions):
 
 
 def sendArt(f, art):
-    if art.mode not in ["RGB", "RGBA"]:
-        art = art.convert("RGB")
     px = art.load()
     for x in range(art.width):
         for y in range(art.height):
@@ -166,22 +164,34 @@ def enhanceImage(img: Image.Image) -> Image.Image:
 
 def getCurrentArt(playerID):
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/current/cover.jpg?player={playerID}"
-    resp = requests.get(url)
-    img = Image.open(BytesIO(resp.content))
-    rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
-    # rimg.save(f"{trackID}.jpg")
+    resp = requests.get(url, timeout=(5, 10))
+    if resp.status_code == requests.codes["ok"]:
+        img = Image.open(BytesIO(resp.content))
+        rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
+        rimg = enhanceImage(rimg)
+    else:
+        # TODO: Add a resource file containing a questionmark image
+        rimg = Image.new("RGB", tuple(args.imagesize), (0, 0, 160))
+
+    if rimg.mode not in ["RGB", "RGBA"]:
+        rimg = rimg.convert("RGB")
     return rimg
 
 
 @functools.lru_cache(maxsize=128)
 def getArt(trackID):
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
-    resp = requests.get(url)
-    img = Image.open(BytesIO(resp.content))
-    rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
-    rimg = enhanceImage(rimg)
+    resp = requests.get(url, timeout=(5, 10))
+    if resp.status_code == requests.codes["ok"]:
+        img = Image.open(BytesIO(resp.content))
+        rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
+        rimg = enhanceImage(rimg)
+    else:
+        # TODO: Add a resource file containing a questionmark image
+        rimg = Image.new("RGB", tuple(args.imagesize), (0, 0, 160))
 
-    # rimg.save(f"{trackID}.jpg")
+    if rimg.mode not in ["RGB", "RGBA"]:
+        rimg = rimg.convert("RGB")
     return rimg
 
 def process_cmdline():
