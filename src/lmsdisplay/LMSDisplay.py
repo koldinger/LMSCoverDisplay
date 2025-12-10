@@ -1,29 +1,27 @@
 import argparse
+import datetime as dt
 import functools
 import logging
+import random
 import re
+import signal
 import time
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
-import signal
-import random
 
-from pid import PidFile
+import configargparse
 import requests
 import rich.traceback
-from rich.console import Console
 from icecream import ic
+from pid import PidFile
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
+from rich.console import Console
 from telnetlib3 import telnetlib
-import configargparse
 
-from . import AnalogClockGenerator
-from . import Transitions
-from . import flaschen
-from . import util
+from . import AnalogClockGenerator, Transitions, flaschen, util
 
 rich.traceback.install()
 
@@ -68,8 +66,8 @@ def getPlayingID(tn_session):
     for i in range(int(line)):
         playerID = doQuery(tn_session, f"player id {i}")
         # name = doQuery(t, f"player name {i}")
-        # TODO: Parse the
-        status = doQuery(tn_session, f"{playerID} status 0 1")
+        # TODO: Parse the line
+        # status = doQuery(tn_session, f"{playerID} status 0 1")
         return playerID
     return None
 
@@ -95,9 +93,6 @@ def handleStatus(t, f, playerID, transitions):
         minute_hand_color=(0, 255, 0, 255),
         origin_color=(255, 0, 0, 255),
     )
-
-    # make it an infinite list
-    #transitions = itertools.cycle(transitions)
 
     # Start the subscription
     t.write(command_string(subscribe_cmd))
@@ -193,6 +188,8 @@ def process_cmdline():
                                            epilog=epilog)
                                            # formatter_class=argparse.RawTextHelpFormatter)
 
+    midnight = dt.time(0, 0)
+
     # TODO: Remove the required on this later, so we can find any player that's playing.
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
 
@@ -211,7 +208,7 @@ def process_cmdline():
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
     parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dimtimes", type=util.parsetime, default=[], nargs=2, help="Start dimming at this time")
+    parser.add_argument("--dimtimes", type=util.parsetime, default=[midnight, midnight], nargs=2, help="Start dimming at this time")
 
     parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
     parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
@@ -224,6 +221,8 @@ def process_cmdline():
     parser.add_argument("--pidfile", type=Path, default=None, )
 
     args = parser.parse_args()
+
+    ic(args)
 
     return args
 
