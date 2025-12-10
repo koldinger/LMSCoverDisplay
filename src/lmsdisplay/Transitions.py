@@ -519,8 +519,10 @@ class TransitionTypes(StrEnum):
 
 choices = list(TransitionTypes)[:-1]
 
-def getTransition(transition: TransitionTypes):
-    return transition.function
+def getTransition(name: str):
+    val = TransitionTypes(name)
+
+    return val.function
 
 if __name__ == "__main__":
     import flaschen
@@ -531,11 +533,12 @@ if __name__ == "__main__":
 
     size = 64
 
-    f = flaschen.Flaschen("coverpi.local", 1337, size, size)
+    #f = flaschen.Flaschen("coverpi.local", 1337, size, size)
+    f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
-    names = list(Path("art").glob("cover*.jpg"))
+    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
     images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))

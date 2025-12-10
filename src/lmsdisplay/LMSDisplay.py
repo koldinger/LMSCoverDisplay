@@ -25,16 +25,16 @@ from . import Transitions
 from . import flaschen
 from . import util
 
+rich.traceback.install()
+
 args: argparse.Namespace
 
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
-
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 ic.disable()
 
-rich.traceback.install()
 
 logger: logging.Logger
 
@@ -75,13 +75,15 @@ def getPlayingID(tn_session):
 
 
 def doQuery(tn_session, query):
+    """ Take a query, send it to the LMS server, and grab the response. """
     tn_session.write(command_string(query, True))
     line = getLine(tn_session)
     if not line.startswith(query):
-        raise Exception(f"Invalid response: {line}")
+        raise ValueError(f"Unexpected response: {line}")
     line = line.removeprefix(query).strip()
     ic(query, line)
     return line
+
 
 
 def handleStatus(t, f, playerID, transitions):
@@ -100,13 +102,15 @@ def handleStatus(t, f, playerID, transitions):
     # Start the subscription
     t.write(command_string(subscribe_cmd))
 
+    blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
+
     while True:
         line = getLine(t)
         ic(line)
         line = line.removeprefix(subscribe_cmd)
+
         playmatch = playpat.search(line)
-        if playmatch:
-            playing = playmatch.group(1)
+        playing = playmatch.group(1) if playmatch else "unknown"
 
         if playing == "play":
             idmatch = idpat.search(line)
@@ -118,20 +122,28 @@ def handleStatus(t, f, playerID, transitions):
                 art = getCurrentArt(playerID)
 
             # If we're in the dimming zone, dim the image
-            if args.dim is not None and util.betweentimes(datetime.now().time(), args.dimstart, args.dimend):
+            if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
                 art = ImageEnhance.Brightness(art).enhance(args.dim)
 
-            if art != lastimg and transitions:
-                transition = Transitions.getTransition(random.choice(transitions))
-                for i in transition(lastimg, art, args.steps):
-                    sendArt(f, i)
-                    time.sleep(args.delay)
+            if art != lastimg:
+                sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
+            else:
+                sendArt(f, art)
 
-            sendArt(f, art)
             lastimg = art
-        elif args.clock:
-            clk = clockgen.get_current_clock().resize(tuple(args.imagesize))
-            sendArt(f, clk)
+        elif playing == "pause":
+            if lastimg != blank:
+                sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+            else:
+                sendArt(f, blank)
+            lastimg = blank
+
+            #clk = clockgen.get_current_clock().resize(tuple(args.imagesize))
+            #sendArt(f, clk)
+        else:
+            print(line)
+
+        status = playing
 
 
 def sendArt(f, art):
@@ -141,6 +153,11 @@ def sendArt(f, art):
             pixel = tuple(px[x, y])
             f.set(x, y, pixel)
     f.send()
+
+def sendTransition(f, art, lastimg, transition):
+    for i in transition(lastimg, art, args.steps):
+        sendArt(f, i)
+        time.sleep(args.delay)
 
 
 def enhanceImage(img: Image.Image) -> Image.Image:
@@ -194,8 +211,7 @@ def process_cmdline():
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
     parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dimstart", type=util.parsetime, default=None, help="Start dimming at this time")
-    parser.add_argument("--dimend", type=util.parsetime, default=None, help="End dimming at this time")
+    parser.add_argument("--dimtimes", type=util.parsetime, default=[], nargs=2, help="Start dimming at this time")
 
     parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
     parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
@@ -209,7 +225,6 @@ def process_cmdline():
 
     args = parser.parse_args()
 
-    ic(args)
     return args
 
 
