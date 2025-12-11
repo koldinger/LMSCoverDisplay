@@ -130,7 +130,7 @@ def handleStatus(t, f, playerID, transitions):
             if args.clock:
                 clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
                 if status == "play":
-                    sendTransition(f, clk, lastimg, Transitions.getTransition(Transitions.TransitionTypes.Fade))
+                    sendTransition(f, clk, lastimg, Transitions.getTransition(random.choice(transitions)))
                 else:
                     sendArt(f, clk)
                 lastimg = clk
