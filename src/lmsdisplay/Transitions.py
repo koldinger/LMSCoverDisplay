@@ -474,7 +474,7 @@ def fadeOutIn(oimg, nimg, steps):
         yield enchanced
     yield nimg
 
-def glimmer(oimg, nimg, steps):
+def shimmer(oimg, nimg, steps):
     """
     Change from one image to another by replacing pixels with pixels from the new image.
     Pixels can shift back and forth between the two images, with the percentage of new pixels
@@ -569,7 +569,7 @@ class TransitionTypes(StrEnum):
     SpinIn = auto(), "Spin and shrink the old image out from the center", spinIn
     SpinInOut = auto(), "Spin and shrink the old image to the center, then spin and expand the new image in", spinInOut
     Transporter = auto(), "Replace the old image pixel by pixel, randomly", transporter
-    Glimmer = auto(), "Replace pixels randomly, switching between old and new until the new image is complete", glimmer
+    Shimmer = auto(), "Replace pixels randomly, switching between old and new until the new image is complete", shimmer
     LeanOut = auto(), "Lean the image out to the back", leanOut
     LeanIn = auto(),"Raise the image in from the back", leanIn
     LeanOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", leanOutIn
