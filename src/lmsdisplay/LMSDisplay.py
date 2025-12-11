@@ -10,7 +10,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
-import importlib
+import importlib.resources
 
 import configargparse
 import requests
@@ -33,7 +33,6 @@ def unix_timestamp():
 
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 ic.disable()
-
 
 logger: logging.Logger
 
@@ -98,6 +97,7 @@ def handleStatus(t, f, playerID, transitions):
     t.write(command_string(subscribe_cmd))
 
     blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
+    status = "pause"
 
     while True:
         line = getLine(t)
@@ -127,14 +127,20 @@ def handleStatus(t, f, playerID, transitions):
 
             lastimg = art
         elif playing == "pause":
-            if lastimg != blank:
-                sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+            if args.clock:
+                clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
+                if status == "play":
+                    sendTransition(f, clk, lastimg, Transitions.getTransition(Transitions.TransitionTypes.Fade))
+                else:
+                    sendArt(f, clk)
+                lastimg = clk
             else:
-                sendArt(f, blank)
-            lastimg = blank
+                if lastimg != blank:
+                    sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+                else:
+                    sendArt(f, blank)
+                lastimg = blank
 
-            #clk = clockgen.get_current_clock().resize(tuple(args.imagesize))
-            #sendArt(f, clk)
         else:
             print(line)
 
@@ -170,8 +176,7 @@ def getCurrentArt(playerID):
         rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
         rimg = enhanceImage(rimg)
     else:
-        # TODO: Add a resource file containing a questionmark image
-        rimg = Image.new("RGB", tuple(args.imagesize), (0, 0, 160))
+        rimg = getInternalArt("questionmark.jpg")
 
     if rimg.mode not in ["RGB", "RGBA"]:
         rimg = rimg.convert("RGB")
@@ -179,7 +184,7 @@ def getCurrentArt(playerID):
 
 
 @functools.lru_cache(maxsize=128)
-def getArt(trackID):
+def getArt(trackID: str) -> Image.Image:
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
@@ -187,12 +192,17 @@ def getArt(trackID):
         rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
         rimg = enhanceImage(rimg)
     else:
-        # TODO: Add a resource file containing a questionmark image
-        rimg = Image.new("RGB", tuple(args.imagesize), (0, 0, 160))
+        rimg = getInternalArt("questionmark.jpg")
 
     if rimg.mode not in ["RGB", "RGBA"]:
         rimg = rimg.convert("RGB")
     return rimg
+
+@functools.cache
+def getInternalArt(name: str) -> Image.Image:
+    data = importlib.resources.files().joinpath("art", name).read_bytes()
+    return Image.open(BytesIO(data))
+
 
 def process_cmdline():
     epilog = "Avaliable transitions:\n\n" + ", ".join(Transitions.TransitionTypes)
