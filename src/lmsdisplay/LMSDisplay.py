@@ -97,57 +97,83 @@ def handleStatus(t, f, playerID, transitions):
     t.write(command_string(subscribe_cmd))
 
     blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
-    status = "pause"
+
+    # Setup as if we're paused at the start.
+    playing = False
+    pausestart = datetime.now()
+    first_image = True
 
     while True:
         line = getLine(t)
-        ic(line)
         line = line.removeprefix(subscribe_cmd)
 
+        # Grab the current playing status from the stream
         playmatch = playpat.search(line)
-        playing = playmatch.group(1) if playmatch else "unknown"
+        mode = playmatch.group(1) if playmatch else "unknown"
 
-        if playing == "play":
-            idmatch = idpat.search(line)
-            if idmatch:
-                trackid = idmatch.group(1)
-                art = getArt(int(trackid))
-            else:
-                trackid = None
-                art = getCurrentArt(playerID)
-
-            # If we're in the dimming zone, dim the image
-            if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
-                art = ImageEnhance.Brightness(art).enhance(args.dim)
-
-            if art != lastimg:
-                sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
-            else:
-                sendArt(f, art)
-
-            lastimg = art
-        elif playing == "pause":
-            if args.clock:
-                clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
-                if status == "play":
-                    sendTransition(f, clk, lastimg, Transitions.getTransition(random.choice(transitions)))
+        match mode:
+            case "play":
+                playing = True
+                idmatch = idpat.search(line)
+                if idmatch:
+                    trackid = idmatch.group(1)
+                    art = getArt(int(trackid))
                 else:
-                    sendArt(f, clk)
-                lastimg = clk
-            else:
-                if lastimg != blank:
-                    sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+                    trackid = None
+                    art = getCurrentArt(playerID)
+
+
+                if art != lastimg:
+                    sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
                 else:
-                    sendArt(f, blank)
-                lastimg = blank
+                    sendArt(f, art)
 
-        else:
-            print(line)
+                lastimg = art
+            case "pause":
+                if playing:
+                    # If we just switched to pause timing, record the time we paused (roughly)
+                    pausestart = datetime.now()
+                    first_image = True
+                playing = False
 
-        status = playing
+                if (datetime.now() - pausestart).seconds >= args.pausedelay:
+                    # If we're past the pausedelay, switch to the pause display
+                    if args.clock:
+                        clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
 
+                        if first_image:
+                            sendTransition(f, clk, lastimg, Transitions.getTransition(random.choice(transitions)))
+                            first_image = False
+                        else:
+                            sendArt(f, clk)
+                        lastimg = clk
+                    else:
+                        if lastimg != blank:
+                            sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+                        else:
+                            sendArt(f, blank)
+                        lastimg = blank
+                else:
+                    # Else, still in the pause delay, just blast the last image
+                    sendArt(f, lastimg)
+            case _:
+                print(line)
+
+
+@functools.cache
+def dimImage(image):
+    """ Dim an image. """
+    image = ImageEnhance.Brightness(image).enhance(args.dim)
+    return image
 
 def sendArt(f, art):
+    """
+    Send art to the display, dimming it if necessary.
+
+    Sent via the flaschen-taschen library, but sent to via UDP to port 1337 (usually).
+    """
+    if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
+        art = dimImage(art)
     px = art.load()
     for x in range(art.width):
         for y in range(art.height):
@@ -162,6 +188,7 @@ def sendTransition(f, art, lastimg, transition):
 
 
 def enhanceImage(img: Image.Image) -> Image.Image:
+    """ Pump up the contrast and color if requested. """
     if args.contrast != 1.0:
         img = ImageEnhance.Contrast(img).enhance(args.contrast)
     if args.color != 1.0:
@@ -169,6 +196,11 @@ def enhanceImage(img: Image.Image) -> Image.Image:
     return img
 
 def getCurrentArt(playerID):
+    """
+    Get the art for the currently playing track.
+
+    Useful for when you're receiving from a streaming service.
+    """
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/current/cover.jpg?player={playerID}"
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
@@ -185,6 +217,7 @@ def getCurrentArt(playerID):
 
 @functools.lru_cache(maxsize=128)
 def getArt(trackID: str) -> Image.Image:
+    """ Get the art for a track ID. """
     url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
@@ -200,6 +233,7 @@ def getArt(trackID: str) -> Image.Image:
 
 @functools.cache
 def getInternalArt(name: str) -> Image.Image:
+    """ Retrieve artwork from the internal resource files. """
     data = importlib.resources.files().joinpath("art", name).read_bytes()
     return Image.open(BytesIO(data))
 
@@ -212,9 +246,9 @@ def process_cmdline():
 
     midnight = dt.time(0, 0)
 
-    # TODO: Remove the required on this later, so we can find any player that's playing.
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
 
+    # TODO: Remove the required on this later, so we can find any player that's playing.
     parser.add_argument( "--player", "-p", default=None, required=True, help="Player to monitor")
 
     parser.add_argument( "--displayhost", "-d", default="localhost", type=str, help="Display host")
@@ -238,18 +272,18 @@ def process_cmdline():
     parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
-    parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if not playing")
+    parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
+    parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if paused")
 
-    parser.add_argument("--pidfile", type=Path, default=None, )
+    parser.add_argument("--pidfile", type=Path, default=None, help="File to store PID into")
 
     args = parser.parse_args()
-
-    ic(args)
 
     return args
 
 
 def reloadConfig(signum, frame):
+    """ Receive a SIGHUP and reload the configuration file and command line. """
     global args
     ic(signum, frame)
     args = process_cmdline()
