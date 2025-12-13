@@ -28,6 +28,10 @@ def index():
     presets["dimstart"] = dimtimes[0] if len(dimtimes) > 0 else "0:00"
     presets["dimend"] = dimtimes[1] if len(dimtimes) > 1 else "0:00"
 
+    ports = presets.get("lmsports", [9000, 9090])
+    presets["lmsport_http"] = lmsports[0]
+    presets["lmsport_telnet"] = lmsports[1]
+
     return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
 
 @app.route("/", methods=["POST"])
@@ -47,16 +51,18 @@ def indexPost():
         with open(args.displayconfig, "w") as f:
             f.write(configargparse.DefaultConfigFileParser().serialize(output))
 
+    signal_display(output["pidfile"])
+
     presets["transitions"] = transitions
 
     return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
 
-def signal_display():
-    if args.pidfile:
+def signal_display(pidfile):
+    pidfile = pidfile or args.pidfile
+    if args.pidfile or pidfile:
         try:
-            with open(args.pidfile) as f:
-                input = f.readline().strip()
-                pid = int(input)
+            with open(pidfile) as f:
+                pid = int(f.readline().strip())
 
             os.kill(pid, signal.SIGHUP)
         except Exception as e:
@@ -65,7 +71,7 @@ def signal_display():
 def processCommandLine():
     parser = configargparse.ArgumentParser("LMS Display Configuration Web Interface")
     parser.add_argument("--pidfile", type=Path,         help="Signal the process to reread configurations")
-    parser.add_argument("--displayconfig", type=Path,   help="Signal the process to reread configurations")
+    parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
 
     return parser.parse_args()
 

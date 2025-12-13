@@ -47,9 +47,18 @@
    <h1>Welcome to the LMS Cover Art Display Configuration</h1>
    <form method="POST">
       <label for="lmsserver">
-        <h2> LMS Server Name (or IP Address)</h2>
+        <h2> LMS Server Name (or IP Address) </h2>
       </label>
       <input type="text" id="lmsserver" name="lmsserver" value="{{ presets.get('lmsserver', '')}}"><br><br>
+      <label for="lmsport_http">
+        <h3> LMS Server HTTP Port </h3>
+      </label>
+      <input type="number" id="lmsport_http" name="lmsport_http" min=0 max=65535 step=1 value="{{ presets.get('lmsport_http', '')}}"><br><br>
+
+      <label for="lmsport_telnet">
+        <h3> LMS Telnet Port </h3>
+      </label>
+      <input type="number" id="lmsport_telnet" name="lmsport_telnet" min=0 max=65535 step=1 value="{{ presets.get('lmsport_telnet', '')}}"><br><br>
 
       <label for="player">
         <h2>Select player.</h2>
@@ -91,16 +100,17 @@
       <input type="time", id="dimsend" name="dimend" value={{ presets.get('dimend', "0:00")}}>
 
       <br>
+      <h2> Display Options </h2>
 
-      <button id="toggleButton">Show Section</button>
-        <section id="advOptions">
-        <p>This is the content of the section that will be hidden or shown.</p>
-          <ul>
-            <li>Item 1</li>
-            <li>Item 2</li>
-          </ul>
-        </section>
+      <label for="displayhost">
+        <h3> Display Hostname (Or IP address) </h3>
+      </label>
+      <input type="text" id="displayhost" name="displayhost" value="{{ presets.get('displayhost', 'localhost')}}"><br><br>
 
+      <label for="displayport">
+        <h3> Display Port (UDP)
+      </label>
+      <input type="number" id="displayport" name="displayport" min=0 max=65535 value="{{ presets.get('displayport', 1337)}}"><br><br>
 
 
       <input type="submit" value="Submit">
