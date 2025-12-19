@@ -29,8 +29,8 @@ def index():
     presets["dimend"] = dimtimes[1] if len(dimtimes) > 1 else "0:00"
 
     ports = presets.get("lmsports", [9000, 9090])
-    presets["lmsport_http"] = lmsports[0]
-    presets["lmsport_telnet"] = lmsports[1]
+    presets["lmsport_http"] = ports[0]
+    presets["lmsport_telnet"] = ports[1]
 
     return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
 
@@ -45,6 +45,10 @@ def indexPost():
     presets = dict(request.form.items())        # Copy to use again
     output["transitions"] = transitions
     output["dimtimes"] = [output.pop("dimstart", "0:00"), output.pop("dimend", "0:00")]
+    output["lmsports"] = [output.pop("lmsport_http", 9000), output.pop("lmsport_telnet", 9090)]
+    if "clock" not in output:
+        output["clock"] = False
+
     print(output)
 
     if args.displayconfig:
