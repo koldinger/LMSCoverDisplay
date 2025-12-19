@@ -97,6 +97,8 @@ def handleStatus(t, f, playerID, transitions):
     t.write(command_string(subscribe_cmd))
 
     blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
+    #lyrionlogo = getInternalArt("logo.png")
+    lyrionlogo = blank
 
     # Setup as if we're paused at the start.
     playing = False
@@ -105,6 +107,7 @@ def handleStatus(t, f, playerID, transitions):
 
     while True:
         line = getLine(t)
+        ic(line)
         line = line.removeprefix(subscribe_cmd)
 
         # Grab the current playing status from the stream
@@ -135,6 +138,8 @@ def handleStatus(t, f, playerID, transitions):
                     pausestart = datetime.now()
                     first_image = True
                 playing = False
+                pause_img = blank if args.pauselogo else lyrionlogo
+                ic(pause_img)
 
                 if (datetime.now() - pausestart).seconds >= args.pausedelay:
                     # If we're past the pausedelay, switch to the pause display
@@ -149,10 +154,10 @@ def handleStatus(t, f, playerID, transitions):
                         lastimg = clk
                     else:
                         if lastimg != blank:
-                            sendTransition(f, blank, lastimg, Transitions.getTransition(random.choice(transitions)))
+                            sendTransition(f, pause_img, lastimg, Transitions.getTransition(random.choice(transitions)))
                         else:
-                            sendArt(f, blank)
-                        lastimg = blank
+                            sendArt(f, pause_img)
+                        lastimg = pause_img
                 else:
                     # Else, still in the pause delay, just blast the last image
                     sendArt(f, lastimg)
@@ -234,8 +239,9 @@ def getArt(trackID: str) -> Image.Image:
 @functools.cache
 def getInternalArt(name: str) -> Image.Image:
     """ Retrieve artwork from the internal resource files. """
-    data = importlib.resources.files().joinpath("art", name).read_bytes()
-    return Image.open(BytesIO(data))
+    fname = importlib.resources.files().joinpath("art", name).read_bytes()
+    ic(fname)
+    return Image.open(fname).convert("RGB").resize(tuple(args.imagesize))
 
 
 def process_cmdline():
@@ -274,6 +280,7 @@ def process_cmdline():
 
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if paused")
+    parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
     parser.add_argument("--pidfile", type=Path, default=None, help="File to store PID into")
 
