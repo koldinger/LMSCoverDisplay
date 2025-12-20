@@ -27,3 +27,6 @@ lmsdispcontrol = "lmsdisplay:Control.main"
 [tools.setuptools]
 package-dir = {"" = "src"}
 packages = [ "lmsdisplay" ]
+
+[tool.setuptools.package-data]
+my_package = ["*.css", "*.html"]
