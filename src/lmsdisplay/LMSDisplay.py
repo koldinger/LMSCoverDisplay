@@ -14,7 +14,7 @@ import importlib.resources
 
 import configargparse
 import requests
-import rich.traceback
+#import rich.traceback
 from icecream import ic
 from pid import PidFile
 from PIL import Image, ImageEnhance
@@ -22,10 +22,9 @@ from PIL.Image import Resampling
 from rich.console import Console
 from telnetlib3 import telnetlib
 
-from . import AnalogClockGenerator, Transitions, flaschen, util
+from . import AnalogClockGenerator, Transitions, flaschen, util, volume
 
-rich.traceback.install()
-
+#rich.traceback.install()
 args: argparse.Namespace
 
 def unix_timestamp():
@@ -38,6 +37,7 @@ logger: logging.Logger
 
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
+volpat = re.compile(r" volume:\s*(\d+)")
 
 def command_string(string, query=False):
     if query:
@@ -85,6 +85,7 @@ def doQuery(tn_session, query):
 
 def handleStatus(t, f, playerID, transitions):
     lastimg = Image.new("RGB", (args.imagesize))
+    lastvol = 0
     subscribe_cmd = f"{playerID} status - 1 subscribe:30"
     clockgen = AnalogClockGenerator.AnalogClockGenerator(
         show_second_hand=False,
@@ -113,6 +114,7 @@ def handleStatus(t, f, playerID, transitions):
         # Grab the current playing status from the stream
         playmatch = playpat.search(line)
         mode = playmatch.group(1) if playmatch else "unknown"
+        overlay = None
 
         match mode:
             case "play":
@@ -125,13 +127,23 @@ def handleStatus(t, f, playerID, transitions):
                     trackid = None
                     art = getCurrentArt(playerID)
 
+                if args.volume:
+                    volmatch = volpat.search(line)
+                    vol = int(volmatch.group(1)) if volmatch else 100
+                    ic(vol, lastvol)
 
+                    if vol != lastvol:
+                        lastvol = vol
+                        overlay = volume.drawVolume(vol, (500,500))
+                        ic(overlay)
+
+                ic(art, lastimg, overlay)
                 if art != lastimg:
                     sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
                 else:
-                    sendArt(f, art)
-
+                    sendArt(f, art, overlay=overlay)
                 lastimg = art
+
             case "pause":
                 if playing:
                     # If we just switched to pause timing, record the time we paused (roughly)
@@ -165,18 +177,23 @@ def handleStatus(t, f, playerID, transitions):
                 print(line)
 
 
-@functools.cache
 def dimImage(image):
     """ Dim an image. """
     image = ImageEnhance.Brightness(image).enhance(args.dim)
     return image
 
-def sendArt(f, art):
+def sendArt(f, art, overlay=None):
     """
     Send art to the display, dimming it if necessary.
 
+    If an overlay image is presented, it will be overlaid over the artwork before sending.
     Sent via the flaschen-taschen library, but sent to via UDP to port 1337 (usually).
     """
+    if overlay:
+        overlay = overlay.resize(art.size)
+        art = art.copy()
+        art.paste(overlay, (0, 0), overlay)
+
     if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
         art = dimImage(art)
     px = art.load()
@@ -265,7 +282,7 @@ def process_cmdline():
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
     parser.add_argument("--transitions", "-t", nargs="+", metavar = "Transition",
-                        default=[Transitions.TransitionTypes.Instant], choices=Transitions.TransitionTypes,
+                        default=[Transitions.TransitionTypes.Random], choices=Transitions.TransitionTypes,
                         help = "A list of transitions to chose from")
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
@@ -278,6 +295,7 @@ def process_cmdline():
     parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
+    parser.add_argument("--volume", "-V", action="store_true", default=False, help="Display the volume bar when volume changes")
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if paused")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
