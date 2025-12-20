@@ -1,8 +1,23 @@
 Installing program.
 
-1: Disable WiFi power management
-  sudo /sbin/iwconfig wlan0 power off
-  add to /etc/rc.local ???
+0: Setup the driver Hat/Bonnet
+  If using Adafruit RGB Matrices, on the backside of the bonnet, short the E jumper to 8.
+  If using another card, check your documentation, but you may need short the E jumper to 16.
+
+
+1: Configure the OS settings.
+  Disable WLAN Power Management
+    sudo /sbin/iwconfig wlan0 power off
+    add to /etc/rc.local ???
+
+  Disable the sound driver:
+    edit /boot/firmware/config.txt
+    Add the line:
+      dtparam=audio=off
+  Isolate CPUs
+      edit /boot/firmware/cmdline.txt
+          Add "isolcpus=3" to the command line
+        eg: "console=serial0,115200 console=tty1 root=PARTUUID=c32373bb-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=US isolcpus=3"
 
 2: Clone flaschen-taschen
   git clone --recursive https://github.com/hzeller/flaschen-taschen.git
