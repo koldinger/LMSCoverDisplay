@@ -163,14 +163,14 @@ def handleStatus(t, f, playerID, trans):
                         clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
 
                         if first_image:
-                            sendTransition(f, clk, lastimg, trans.getTransition(random.choice(trans)))
+                            sendTransition(f, clk, lastimg, transitions.getTransition(random.choice(trans)))
                             first_image = False
                         else:
                             sendArt(f, clk)
                         lastimg = clk
                     else:
                         if lastimg != blank:
-                            sendTransition(f, pause_img, lastimg, trans.getTransition(random.choice(trans)))
+                            sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                         else:
                             sendArt(f, pause_img)
                         lastimg = pause_img
