@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lmsdisplay = "lmsdisplay:LMSDisplay.main"
+lmsdisplay = "lmsdisplay:cover_display.main"
 lmsdispcontrol = "lmsdisplay:Control.main"
 
 [tools.setuptools]

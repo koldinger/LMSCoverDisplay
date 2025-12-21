@@ -1,7 +1,8 @@
 import argparse
 import datetime as dt
 import functools
-import logging
+import importlib.metadata
+import importlib.resources
 import random
 import re
 import signal
@@ -10,7 +11,6 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
-import importlib.resources
 
 import configargparse
 import requests
@@ -22,7 +22,8 @@ from PIL.Image import Resampling
 from rich.console import Console
 from telnetlib3 import telnetlib
 
-from . import AnalogClockGenerator, Transitions, flaschen, util, volume
+from . import transitions, util, volume
+from . import AnalogClockGenerator, flaschen # Code that's not mine that I copied here.
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -33,11 +34,17 @@ def unix_timestamp():
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 ic.disable()
 
-logger: logging.Logger
-
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
 volpat = re.compile(r" volume:\s*(\d+)")
+
+
+version = "Unknown"
+try:
+    # Replace 'your-package-name' with the actual distribution name of your package
+    version = importlib.metadata.version("your-package-name")
+except importlib.metadata.PackageNotFoundError:
+    print("Package not found or not installed.")
 
 def command_string(string, query=False):
     if query:
@@ -137,7 +144,7 @@ def handleStatus(t, f, playerID, transitions):
                         overlay = volume.drawVolume(vol, (500,500), color = (200, 200, 150, 200), xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
+                    sendTransition(f, art, lastimg, transitions.getTransition(random.choice(transitions)))
                 else:
                     sendArt(f, art, overlay=overlay)
                 lastimg = art
@@ -156,14 +163,14 @@ def handleStatus(t, f, playerID, transitions):
                         clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
 
                         if first_image:
-                            sendTransition(f, clk, lastimg, Transitions.getTransition(random.choice(transitions)))
+                            sendTransition(f, clk, lastimg, transitions.getTransition(random.choice(transitions)))
                             first_image = False
                         else:
                             sendArt(f, clk)
                         lastimg = clk
                     else:
                         if lastimg != blank:
-                            sendTransition(f, pause_img, lastimg, Transitions.getTransition(random.choice(transitions)))
+                            sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(transitions)))
                         else:
                             sendArt(f, pause_img)
                         lastimg = pause_img
@@ -259,7 +266,7 @@ def getInternalArt(name: str) -> Image.Image:
 
 
 def process_cmdline():
-    epilog = "Avaliable transitions:\n\n" + ", ".join(Transitions.TransitionTypes)
+    epilog = "Avaliable transitions:\n\n" + ", ".join(transitions.TransitionTypes)
     parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server",
                                            epilog=epilog)
                                            # formatter_class=argparse.RawTextHelpFormatter)
@@ -278,8 +285,8 @@ def process_cmdline():
     parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
-    parser.add_argument("--transitions", "-t", nargs="+", metavar = "Transition",
-                        default=[Transitions.TransitionTypes.Random], choices=Transitions.TransitionTypes,
+    parser.add_argument("--transitions", "-t", nargs="+", metavar = "transition",
+                        default=[transitions.TransitionTypes.Random], choices=transitions.TransitionTypes,
                         help = "A list of transitions to chose from")
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
@@ -300,6 +307,8 @@ def process_cmdline():
 
     parser.add_argument("--pidfile", type=Path, default=None, help="File to store PID into")
 
+    parser.add_argument("--version", action="version", version=version)
+
     args = parser.parse_args()
 
     return args
@@ -314,7 +323,8 @@ def reloadConfig(signum, frame):
     getArt.cache_clear()
 
 def main():
-    global args, logger
+    global args, version
+    print(f"Running.   Version: {version}")
     args = process_cmdline()
     console = Console()
 
@@ -322,8 +332,6 @@ def main():
     backoff = 1
 
     signal.signal(signal.SIGHUP, reloadConfig)
-
-    logging.basicConfig(level=logging.INFO)
 
     pidfile = None
     piddir = None
