@@ -9,12 +9,15 @@ from flask import Flask, config, render_template, request
 from . import Transitions
 from rich import print
 
+from pprint import pprint, pformat
+
 args: configargparse.Namespace
 
 app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def index():
+    print("Index - GET")
     presets = {}
     errmsg = ""
     if args.displayconfig:
@@ -32,12 +35,15 @@ def index():
     presets["lmsport_http"] = ports[0]
     presets["lmsport_telnet"] = ports[1]
 
+    print(presets)
+
     return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
 
 @app.route("/", methods=["POST"])
 def indexPost():
-    print(request.method)
-    print(request.form)
+    print("Index - POST")
+
+    pprint(request.form)
 
     transitions = [t for t in request.form.getlist("transitions") if t]
 
