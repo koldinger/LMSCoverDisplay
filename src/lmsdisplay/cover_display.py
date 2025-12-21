@@ -90,7 +90,7 @@ def doQuery(tn_session, query):
     return line
 
 
-def handleStatus(t, f, playerID, transitions):
+def handleStatus(t, f, playerID, trans):
     lastimg = Image.new("RGB", (args.imagesize))
     lastvol = 0
     subscribe_cmd = f"{playerID} status - 1 subscribe:30"
@@ -144,7 +144,7 @@ def handleStatus(t, f, playerID, transitions):
                         overlay = volume.drawVolume(vol, (500,500), color = (200, 200, 150, 200), xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    sendTransition(f, art, lastimg, transitions.getTransition(random.choice(transitions)))
+                    sendTransition(f, art, lastimg, transitions.getTransition(random.choice(trans)))
                 else:
                     sendArt(f, art, overlay=overlay)
                 lastimg = art
@@ -163,14 +163,14 @@ def handleStatus(t, f, playerID, transitions):
                         clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
 
                         if first_image:
-                            sendTransition(f, clk, lastimg, transitions.getTransition(random.choice(transitions)))
+                            sendTransition(f, clk, lastimg, trans.getTransition(random.choice(trans)))
                             first_image = False
                         else:
                             sendArt(f, clk)
                         lastimg = clk
                     else:
                         if lastimg != blank:
-                            sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(transitions)))
+                            sendTransition(f, pause_img, lastimg, trans.getTransition(random.choice(trans)))
                         else:
                             sendArt(f, pause_img)
                         lastimg = pause_img
