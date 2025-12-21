@@ -130,14 +130,12 @@ def handleStatus(t, f, playerID, transitions):
                 if args.volume:
                     volmatch = volpat.search(line)
                     vol = int(volmatch.group(1)) if volmatch else 100
-                    ic(vol, lastvol)
 
+                    # If the volume has changed,
                     if vol != lastvol:
                         lastvol = vol
-                        overlay = volume.drawVolume(vol, (500,500))
-                        ic(overlay)
+                        overlay = volume.drawVolume(vol, (500,500), color = (200, 200, 150, 200), xoffset=.05, yoffset=.9, yheight=.05)
 
-                ic(art, lastimg, overlay)
                 if art != lastimg:
                     sendTransition(f, art, lastimg, Transitions.getTransition(random.choice(transitions)))
                 else:
@@ -151,7 +149,6 @@ def handleStatus(t, f, playerID, transitions):
                     first_image = True
                 playing = False
                 pause_img = blank if args.pauselogo else lyrionlogo
-                ic(pause_img)
 
                 if (datetime.now() - pausestart).seconds >= args.pausedelay:
                     # If we're past the pausedelay, switch to the pause display
@@ -295,9 +292,10 @@ def process_cmdline():
     parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
-    parser.add_argument("--volume", "-V", action="store_true", default=False, help="Display the volume bar when volume changes")
-    parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
+    parser.add_argument("--volume", action="store_true", default=False, help="Display the volume bar when volume changes")
     parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if paused")
+
+    parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
     parser.add_argument("--pidfile", type=Path, default=None, help="File to store PID into")
