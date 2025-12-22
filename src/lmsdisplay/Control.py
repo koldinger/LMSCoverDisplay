@@ -6,18 +6,20 @@ import signal
 import configargparse
 from flask import Flask, config, render_template, request
 
-from . import Transitions
+from . import transitions
 from rich import print
+import rich.traceback
 
 from pprint import pprint, pformat
 
 args: configargparse.Namespace
+rich.traceback.install()
 
 app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def index():
-    print("Index - GET")
+    #print("Index - GET")
     presets = {}
     errmsg = ""
     if args.displayconfig:
@@ -35,27 +37,29 @@ def index():
     presets["lmsport_http"] = ports[0]
     presets["lmsport_telnet"] = ports[1]
 
-    print(presets)
+    #print(presets)
 
-    return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
+    return render_template("index.html", presets=presets, transitions=transitions.TransitionTypes)
 
 @app.route("/", methods=["POST"])
 def indexPost():
-    print("Index - POST")
+    #print("Index - POST")
 
-    pprint(request.form)
+    #pprint(request.form)
 
-    transitions = [t for t in request.form.getlist("transitions") if t]
+    trans = [t for t in request.form.getlist("transitions") if t]
 
     output = dict(request.form.items())
     presets = dict(request.form.items())        # Copy to use again
-    output["transitions"] = transitions
+    output["transitions"] = trans
     output["dimtimes"] = [output.pop("dimstart", "0:00"), output.pop("dimend", "0:00")]
     output["lmsports"] = [output.pop("lmsport_http", 9000), output.pop("lmsport_telnet", 9090)]
     if "clock" not in output:
-        output["clock"] = False
+        output["clock"] = '0'
+    if "volume" not in output:
+        output["volume"] = '0'
 
-    print(output)
+    #print(output)
 
     if args.displayconfig:
         with open(args.displayconfig, "w") as f:
@@ -63,9 +67,9 @@ def indexPost():
 
     signal_display(output["pidfile"])
 
-    presets["transitions"] = transitions
+    presets["transitions"] = trans
 
-    return render_template("index.html", presets=presets, transitions=Transitions.TransitionTypes)
+    return render_template("index.html", presets=presets, transitions=transitions.TransitionTypes)
 
 def signal_display(pidfile):
     pidfile = pidfile or args.pidfile
