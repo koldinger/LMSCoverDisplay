@@ -114,12 +114,12 @@
       <label for="volume">
         <h2>Show a volume bar when volume changes</h2>
       </label>
-      <input type="checkbox", id="volume" name="volume" value={{ presets.get('volume', 0) }}>
+      <input type="checkbox", id="volume" name="volume" value="1" {% if presets.get('volume', 0) %} checked {% endif %}>
 
       <label for="clock">
         <h2>Show clock when paused</h2>
       </label>
-      <input type="checkbox", id="clock" name="clock" value={{ presets.get('clock', 0) }}>
+      <input type="checkbox", id="clock" name="clock" value="1" {% if presets.get('clock', 0) %} checked {% endif %}>
 
       <label for="pausedelay">
         <h3> Delay before showing paused screen (Blank screen, or clock)
@@ -147,6 +147,7 @@
       <label for="delay">
          <h3>Delay between frames in transitions, in seconds</h3>
       </label>
+
       <input type="range" id="delay" name="delay" min=0 max=2 step=0.05 value="{{ presets.get('delay', 0.15)}}"><br><br>
 
       <input type="hidden" id="pidfile" name="pidfile" value="{{ presets.get('pidfile')}}">
