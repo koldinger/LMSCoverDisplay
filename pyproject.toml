@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools"]
-#build-backend = ["setuptools.build_meta"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmsdisplay"
@@ -22,7 +22,7 @@ dependencies = [
 
 [project.scripts]
 lmsdisplay = "lmsdisplay:cover_display.main"
-lmsdispcontrol = "lmsdisplay:Control.main"
+lmsdispcontrol = "lmsdisplay:control.main"
 
 [tools.setuptools]
 package-dir = {"" = "src"}
