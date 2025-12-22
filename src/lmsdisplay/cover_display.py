@@ -89,6 +89,18 @@ def doQuery(tn_session, query):
     ic(query, line)
     return line
 
+def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
+    try:
+        # Get the averoge color of the current screen.
+        # Do this by resizing the picture to 1 pixel, and grabbing the color
+        small = art.resize((1, 1), resample=Image.Resampling.LANCZOS).convert("RGB")
+        R, G, B = small.getpixel((0, 0))
+        # Compute the contrasting color, based on the luma
+        luma = 0.299*R + 0.587*G + 0.114*B
+        color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
+    except:
+        color = (255, 255, 255, 200)
+    return color
 
 def handleStatus(t, f, playerID, trans):
     lastimg = Image.new("RGB", (args.imagesize))
@@ -141,7 +153,8 @@ def handleStatus(t, f, playerID, trans):
                     # If the volume has changed,
                     if vol != lastvol:
                         lastvol = vol
-                        overlay = volume.drawVolume(vol, (500,500), color = (200, 200, 150, 200), xoffset=.05, yoffset=.9, yheight=.05)
+                        color = contrasting_color(art)
+                        overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
                     sendTransition(f, art, lastimg, transitions.getTransition(random.choice(trans)))
