@@ -286,10 +286,15 @@ def process_cmdline():
 
     midnight = dt.time(0, 0)
 
+    parser.suggest_on_error = True
+
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
 
     # TODO: Remove the required on this later, so we can find any player that's playing.
     parser.add_argument( "--player", "-p", default=None, required=True, help="Player to monitor")
+
+    parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
+    parser.add_argument( "--password", type=str, default=None, help="Password")
 
     parser.add_argument( "--displayhost", "-d", default="localhost", type=str, help="Display host")
     parser.add_argument( "--displayport", "-D", default=1337, type=int, help="Display port")
@@ -304,7 +309,7 @@ def process_cmdline():
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
     parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dimtimes", type=util.parsetime, default=[midnight, midnight], nargs=2, help="Start dimming at this time")
+    parser.add_argument("--dimtimes", type=util.parsetime, default=[midnight, midnight], nargs=2, metavar="Time", help="Start dimming at this time")
 
     parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
     parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
@@ -356,14 +361,15 @@ def main():
             pidfile = args.pidfile.name
 
     with PidFile(piddir=piddir, pidname=pidfile) as p:
-        ic(p.filename)
         while True:
             try:
                 f = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
                 t.open(args.lmsserver, args.lmsports[1])
 
-                version = doQuery(t, "version")
-                ic(version)
+                if args.login:
+                    t.write(f"login {args.login} {args.password}\n")
+                    getLine(t)
+
                 backoff = 1
 
                 playerID = getPlayerID(t, args.player) if args.player else getPlayingID(t)
@@ -374,8 +380,7 @@ def main():
                 ic(e)
                 console.print_exception()
                 time.sleep(backoff)
-                backoff = min(backoff * 2, 300)
-
+                backoff = min(backoff * 2, 120)
 
 if __name__ == "__main__":
     main()
