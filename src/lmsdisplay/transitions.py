@@ -525,10 +525,10 @@ def transporter(oimg, nimg, steps):
         yield img
     yield nimg
 
-def _makeSquares(chunk):
+def _makeSquares(chunk, size):
     squares = []
-    for y in range(0,  size, chunk):
-        for x in range(0, size, chunk):
+    for y in range(0,  size[1], chunk):
+        for x in range(0, size[0], chunk):
             squares.append((x, y, x + chunk, y + chunk))
     return squares
 
@@ -541,13 +541,13 @@ def _doBoxes(oimg, nimg, squares):
 
 
 def boxes(oimg, nimg, _):
-    squares = _makeSquares(16)
+    squares = _makeSquares(16, oimg.size)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
     yield nimg
 
 def boxesrandom(oimg, nimg, _):
-    squares = _makeSquares(16)
+    squares = _makeSquares(16, oimg.size)
     random.shuffle(squares)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
