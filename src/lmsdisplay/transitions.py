@@ -11,8 +11,8 @@ import rich.traceback
 
 rich.traceback.install()
 
-from icecream import ic
-ic.configureOutput(includeContext=True)
+#from icecream import ic
+#ic.configureOutput(includeContext=True)
 
 
 """
@@ -211,12 +211,22 @@ def _doLean(oimg, nimg, steps, out):
             res.alpha_composite(warped)
             yield res
 
+def _doPageTurn(oimg, nimg, steps):
+    blank = Image.new("RGBA", oimg.size)
+    left = _doLean(oimg, blank, steps, True)
+    right = _rotate(nimg, blank, steps, 180, _doLean, False)
+
+    for i in zip(left, right, strict=True):
+        res = i[1].copy()
+        res.alpha_composite(i[0])
+        yield res
+    yield nimg
+
 
 """
 Actual functions that do the work.   They'll either call the helper function directly, or use the _rotate function
 to make it go in a different direction
 """
-
 
 def pushLeft(oimg, nimg, steps):
     return _doPush(oimg, nimg, steps)
@@ -431,6 +441,10 @@ def leanfliphoriz(oimg, nimg, steps):
     yield blank
     yield from _rotate(nimg, blank, steps, 270, _doLean, False)
     yield nimg
+
+def pageturn(oimg, nimg, steps):
+    yield from _doPageTurn(oimg, nimg, steps)
+
 """
 Functions that do all the work wihout using a helper.
 """
@@ -624,6 +638,7 @@ class TransitionTypes(StrEnum):
     #FlipOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", flipOutIn
     LeanFlip = auto(), "Yeah, whatever", leanflip
     LeanFlipHoriz = auto(), "Yeah, whatever", leanfliphoriz
+    PageTurn = auto(), "Page Turn", pageturn
     Boxes = auto(), "Replace boxes one at a time", boxes
     BoxesRandom = auto(), "Replace boxes one at a time", boxesrandom
     # Make sure the Random transition goes last
@@ -646,10 +661,12 @@ if __name__ == "__main__":
     size = 64
 
     f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
-    #f = flaschen.Flaschen("jylland.local", 1337, size, size)
+    # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
-    # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
+    names = [Path("../..", x) for x in names]
+
+    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
     #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
@@ -676,7 +693,7 @@ if __name__ == "__main__":
     for i in transitions:
         print(f"{i:20}  - {i.description}")
         sendArt(f, cur)
-        time.sleep(0.5)
+        time.sleep(1.0)
         trans = i.function
         doTransition(f, trans(cur, nxt, 21))
         cur = nxt
