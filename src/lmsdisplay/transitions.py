@@ -15,14 +15,6 @@ from icecream import ic
 ic.configureOutput(includeContext=True)
 
 
-
-def fade(oimg, nimg, steps):
-    for i in range(steps + 1):
-        alpha = float(i / steps)  # Incremental alpha values
-        blended = Image.blend(oimg, nimg, alpha).convert("RGB")
-        yield blended
-
-
 """
 Helper functions.   Perform an action.   In many cases, the images can be rotated before the
 transition, and then rotated back to perform the operation in a certain direction.
@@ -388,9 +380,15 @@ def leanIn(oimg, nimg, steps):
     yield from _doLean(nimg, oimg, steps, False)
     yield nimg
 
-"""
-Composite functions, which use multiple other effect tests.
-"""
+def flipIn(oimg, nimg, steps):
+    yield from _rotate(oimg, nimg, steps, 180, _doLean, True)
+    yield nimg
+
+def flipOut(oimg, nimg, steps):
+    yield from _rotate(nimg, oimg, steps, 180, _doLean, False)
+    yield nimg
+
+""" Composite functions, which use multiple other effect tests. """
 
 def downUp(oimg, nimg, steps):
     """Lower the current image, and then raise the new image up."""
@@ -419,6 +417,20 @@ def leanOutIn(oimg, nimg, steps):
     yield from _doLean(nimg, blank, steps, False)
     yield nimg
 
+def leanflip(oimg, nimg, steps):
+    blank = Image.new("RGB", oimg.size)
+    yield from _doLean(oimg, blank, steps, True)
+    yield blank
+    yield from _rotate(nimg, blank, steps, 180, _doLean, False)
+    yield nimg
+
+
+def leanfliphoriz(oimg, nimg, steps):
+    blank = Image.new("RGB", oimg.size)
+    yield from _rotate(oimg, blank, steps, 90, _doLean,True)
+    yield blank
+    yield from _rotate(nimg, blank, steps, 270, _doLean, False)
+    yield nimg
 """
 Functions that do all the work wihout using a helper.
 """
@@ -458,6 +470,12 @@ def zoomOut(oimg, nimg, steps):
 
     yield nimg
 
+
+def fade(oimg, nimg, steps):
+    for i in range(steps + 1):
+        alpha = float(i / steps)  # Incremental alpha values
+        blended = Image.blend(oimg, nimg, alpha).convert("RGB")
+        yield blended
 
 def fadeOutIn(oimg, nimg, steps):
     """Fade the old image to black, and then fade the new image in."""
@@ -505,6 +523,34 @@ def transporter(oimg, nimg, steps):
                 if random.random() < threshold:
                     ipx[x, y] = px[x, y]
         yield img
+    yield nimg
+
+def _makeSquares(chunk):
+    squares = []
+    for y in range(0,  size, chunk):
+        for x in range(0, size, chunk):
+            squares.append((x, y, x + chunk, y + chunk))
+    return squares
+
+def _doBoxes(oimg, nimg, squares):
+    image = oimg.copy()
+    for i in squares:
+        chunk = nimg.crop(i)
+        image.paste(chunk, i)
+        yield image
+
+
+def boxes(oimg, nimg, _):
+    squares = _makeSquares(16)
+    yield oimg
+    yield from _doBoxes(oimg, nimg, squares)
+    yield nimg
+
+def boxesrandom(oimg, nimg, _):
+    squares = _makeSquares(16)
+    random.shuffle(squares)
+    yield oimg
+    yield from _doBoxes(oimg, nimg, squares)
     yield nimg
 
 
@@ -573,6 +619,13 @@ class TransitionTypes(StrEnum):
     LeanOut = auto(), "Lean the image out to the back", leanOut
     LeanIn = auto(),"Raise the image in from the back", leanIn
     LeanOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", leanOutIn
+    FlipOut = auto(), "Lean the image out to the back", flipOut
+    FlipIn = auto(),"Raise the image in from the back", flipIn
+    #FlipOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", flipOutIn
+    LeanFlip = auto(), "Yeah, whatever", leanflip
+    LeanFlipHoriz = auto(), "Yeah, whatever", leanfliphoriz
+    Boxes = auto(), "Replace boxes one at a time", boxes
+    BoxesRandom = auto(), "Replace boxes one at a time", boxesrandom
     # Make sure the Random transition goes last
     Random = auto(), "Pick a random transition", doRandom
 
@@ -592,8 +645,8 @@ if __name__ == "__main__":
 
     size = 64
 
-    #f = flaschen.Flaschen("coverpi.local", 1337, size, size)
-    f = flaschen.Flaschen("jylland.local", 1337, size, size)
+    f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
+    #f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     # names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
     names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
