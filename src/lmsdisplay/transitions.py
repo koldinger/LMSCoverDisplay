@@ -20,12 +20,12 @@ Helper functions.   Perform an action.   In many cases, the images can be rotate
 transition, and then rotated back to perform the operation in a certain direction.
 """
 
-
-def _rotate(oimg, nimg, steps, angle, func, *moreargs):
+def _rotate(angle: int, func, oimg: Image.Image, nimg: Image, steps: int, *moreargs):
     """Rotate 2 images by 'angle' degrees, perform the transition, and rotate the result back."""
-    oimg = oimg.rotate(angle)
-    nimg = nimg.rotate(angle)
-    return map(lambda x: x.rotate(-angle), func(oimg, nimg, steps, *moreargs))
+    r_oimg = oimg.rotate(angle)
+    r_nimg = nimg.rotate(angle)
+    #return map(lambda x: x.rotate(-angle), func(oimg, nimg, steps, *moreargs))
+    return (x.rotate(-angle) for x in func(r_oimg, r_nimg, steps, *moreargs))
 
 
 def _doPush(oimg, nimg, steps):
@@ -214,11 +214,26 @@ def _doLean(oimg, nimg, steps, out):
 def _doPageTurn(oimg, nimg, steps):
     blank = Image.new("RGBA", oimg.size)
     left = _doLean(oimg, blank, steps, True)
-    right = _rotate(nimg, blank, steps, 180, _doLean, False)
+    right = _rotate(180, _doLean, nimg, blank, steps, False)
 
     for i in zip(left, right, strict=True):
         res = i[1].copy()
         res.alpha_composite(i[0])
+        yield res
+    yield nimg
+
+def _doLowerFlip(oimg, nimg, steps):
+    blank = Image.new("RGBA", oimg.size)
+    oimg = oimg.convert("RGBA")
+    nimg = nimg.convert("RGBA")
+    lower = _rotate(270, _doPush, oimg, blank, steps)
+    flip  = _rotate(180, _doLean, nimg, blank, steps, False)
+
+    #yield from lower
+    #yield from flip
+    for i in zip(lower, flip, strict=True):
+        res = i[0].convert("RGBA")
+        res.alpha_composite(i[1].convert("RGBA"))
         yield res
     yield nimg
 
@@ -233,15 +248,15 @@ def pushLeft(oimg, nimg, steps):
 
 
 def pushRight(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 180, _doPush)
+    return _rotate(180, _doPush, oimg, nimg, steps)
 
 
 def pushUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doPush)
+    return _rotate(90, _doPush, oimg, nimg, steps)
 
 
 def pushDown(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, -90, _doPush)
+    return _rotate(270, _doPush, oimg, nimg, steps)
 
 
 def overRight(oimg, nimg, steps):
@@ -250,17 +265,17 @@ def overRight(oimg, nimg, steps):
 
 
 def overLeft(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, 180, _doOver, True)
+    yield from _rotate(180, _doOver, oimg, nimg, steps, True)
     yield nimg
 
 
 def overUp(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, -90, _doOver, True)
+    yield from _rotate(270, _doOver, oimg, nimg, steps, True)
     yield nimg
 
 
 def overDown(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, 90, _doOver, True)
+    yield from _rotate(90, _doOver, oimg, nimg, steps, True)
     yield nimg
 
 
@@ -270,17 +285,17 @@ def unCoverLeft(oimg, nimg, steps):
 
 
 def unCoverRight(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, 180, _doOver, False)
+    yield from _rotate(180, _doOver, nimg, oimg, steps, False)
     yield nimg
 
 
 def unCoverUp(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, 90, _doOver, False)
+    yield from _rotate(90, _doOver, nimg, oimg, steps, False)
     yield nimg
 
 
 def unCoverDown(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, -90, _doOver, False)
+    yield from _rotate(270, _doOver, nimg, oimg, steps, False)
     yield nimg
 
 
@@ -289,15 +304,15 @@ def wipeRight(oimg, nimg, steps):
 
 
 def wipeLeft(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 180, _doWipe)
+    return _rotate(180, _doWipe, oimg, nimg, steps)
 
 
 def wipeUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, -90, _doWipe)
+    return _rotate(270, _doWipe, oimg, nimg, steps)
 
 
 def wipeDown(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doWipe)
+    return _rotate(90, _doWipe, oimg, nimg, steps)
 
 
 def slideRightDown(oimg, nimg, steps):
@@ -305,15 +320,15 @@ def slideRightDown(oimg, nimg, steps):
 
 
 def slideRightUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, -90, _doSlide)
+    return _rotate(270, _doSlide, oimg, nimg, steps)
 
 
 def slideLeftDown(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doSlide)
+    return _rotate(90, _doSlide, oimg, nimg, steps)
 
 
 def slideLeftUp(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 180, _doSlide)
+    return _rotate(180, _doSlide, oimg, nimg, steps)
 
 
 def expandRightDown(oimg, nimg, steps):
@@ -322,17 +337,17 @@ def expandRightDown(oimg, nimg, steps):
 
 
 def expandRightUp(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, -90, _doExpand, True)
+    yield from _rotate(270, _doExpand, oimg, nimg, steps, True)
     yield nimg
 
 
 def expandLeftDown(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, 90, _doExpand, True)
+    yield from _rotate(90, _doExpand, oimg, nimg, steps, True)
     yield nimg
 
 
 def expandLeftUp(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, 180, _doExpand, True)
+    yield from _rotate(180, _doExpand, oimg, nimg, steps, True)
     yield nimg
 
 
@@ -342,17 +357,17 @@ def shrinkLeftUp(oimg, nimg, steps):
 
 
 def shrinkRightDown(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, 180, _doExpand, False)
+    yield from _rotate(180, _doExpand, nimg, oimg, steps, False)
     yield nimg
 
 
 def shrinkRightUp(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, 90, _doExpand, False)
+    yield from _rotate(90, _doExpand, nimg, oimg, steps, False)
     yield nimg
 
 
 def shrinkLeftDown(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, -90, _doExpand, False)
+    yield from _rotate(270, _doExpand, nimg, oimg, steps, False)
     yield nimg
 
 
@@ -362,7 +377,7 @@ def curtainHoriz(oimg, nimg, steps):
 
 
 def curtainVert(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doCurtain)
+    return _rotate(90, _doCurtain, oimg, nimg, steps)
 
 
 def curtainOutHoriz(oimg, nimg, steps):
@@ -370,7 +385,7 @@ def curtainOutHoriz(oimg, nimg, steps):
 
 
 def curtainOutVert(oimg, nimg, steps):
-    return _rotate(oimg, nimg, steps, 90, _doCurtainOut)
+    return _rotate(90, _doCurtainOut, oimg, nimg, steps)
 
 
 def spinOut(oimg, nimg, steps):
@@ -391,11 +406,11 @@ def leanIn(oimg, nimg, steps):
     yield nimg
 
 def flipIn(oimg, nimg, steps):
-    yield from _rotate(oimg, nimg, steps, 180, _doLean, True)
+    yield from _rotate(180, _doLean, oimg, nimg, steps, True)
     yield nimg
 
 def flipOut(oimg, nimg, steps):
-    yield from _rotate(nimg, oimg, steps, 180, _doLean, False)
+    yield from _rotate(180, _doLean, nimg, oimg, steps, False)
     yield nimg
 
 """ Composite functions, which use multiple other effect tests. """
@@ -431,19 +446,21 @@ def leanflip(oimg, nimg, steps):
     blank = Image.new("RGB", oimg.size)
     yield from _doLean(oimg, blank, steps, True)
     yield blank
-    yield from _rotate(nimg, blank, steps, 180, _doLean, False)
+    yield from _rotate(180, _doLean, nimg, blank, steps, False)
     yield nimg
-
 
 def leanfliphoriz(oimg, nimg, steps):
     blank = Image.new("RGB", oimg.size)
-    yield from _rotate(oimg, blank, steps, 90, _doLean,True)
+    yield from _rotate(90, _doLean, oimg, blank, steps,True)
     yield blank
-    yield from _rotate(nimg, blank, steps, 270, _doLean, False)
+    yield from _rotate(270, _doLean, nimg, blank, steps, False)
     yield nimg
 
 def pageturn(oimg, nimg, steps):
-    yield from _doPageTurn(oimg, nimg, steps)
+    yield from _rotate(90, _doPageTurn, oimg, nimg, steps)
+
+def lowerflip(oimg, nimg, steps):
+    yield from _doLowerFlip(oimg, nimg, steps)
 
 """
 Functions that do all the work wihout using a helper.
@@ -539,11 +556,14 @@ def transporter(oimg, nimg, steps):
         yield img
     yield nimg
 
-def _makeSquares(chunk, size):
+def _makeSquares(chunk, size, snake):
     squares = []
+    xseq = list(range(0, size[0], chunk))
     for y in range(0,  size[1], chunk):
-        for x in range(0, size[0], chunk):
+        for x in xseq:
             squares.append((x, y, x + chunk, y + chunk))
+        if snake:
+            xseq.reverse()
     return squares
 
 def _doBoxes(oimg, nimg, squares):
@@ -555,16 +575,62 @@ def _doBoxes(oimg, nimg, squares):
 
 
 def boxes(oimg, nimg, _):
-    squares = _makeSquares(16, oimg.size)
+    squares = _makeSquares(16, oimg.size, False)
+    yield oimg
+    yield from _doBoxes(oimg, nimg, squares)
+    yield nimg
+
+def boxessnake(oimg, nimg, _):
+    squares = _makeSquares(16, oimg.size, True)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
     yield nimg
 
 def boxesrandom(oimg, nimg, _):
-    squares = _makeSquares(16, oimg.size)
+    squares = _makeSquares(16, oimg.size, False)
     random.shuffle(squares)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
+    yield nimg
+
+def _slice(img, num):
+    w, h = img.size
+    s_h = int(h / num)
+
+    slices = []
+    for y in range(0, w, s_h):
+        slice = img.crop((0, y, w, y + s_h))
+        slices.append(slice)
+    return slices
+
+def _doBars(oimg, nimg, steps):
+    oslices = _slice(oimg, 4)
+    nslices = _slice(nimg, 4)
+
+    angle = 0
+    bars = []
+    for i in zip(oslices, nslices):
+        bar = _rotate(angle, _doPush, i[0], i[1], steps)
+        angle = (angle + 180) % 360
+        bars.append(bar)
+
+    res = Image.new("RGB", oimg.size)
+    for _ in range(steps):
+        chunks = [next(x) for x in bars]
+        y = 0
+        for chunk in chunks:
+            res.paste(chunk, (0, y))
+            y += chunk.height
+        yield res
+
+def barshoriz(oimg, nimg, steps):
+    yield oimg
+    yield from _doBars(oimg, nimg, steps)
+    yield nimg
+
+def barsvertical(oimg, nimg, steps):
+    yield oimg
+    yield from _rotate(90, _doBars, oimg, nimg, steps)
     yield nimg
 
 
@@ -638,9 +704,13 @@ class TransitionTypes(StrEnum):
     #FlipOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", flipOutIn
     LeanFlip = auto(), "Yeah, whatever", leanflip
     LeanFlipHoriz = auto(), "Yeah, whatever", leanfliphoriz
+    # LowerFlip = auto(), "Complicated", lowerflip
     PageTurn = auto(), "Page Turn", pageturn
-    Boxes = auto(), "Replace boxes one at a time", boxes
-    BoxesRandom = auto(), "Replace boxes one at a time", boxesrandom
+    Boxes = auto(), "Replace boxes one at a time, top to bottom", boxes
+    BoxesRandom = auto(), "Replace boxes one at a time, randomly", boxesrandom
+    BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
+    BarsHoriz = auto(), "Move bars of the image sideways", barshoriz
+    BarsVertical = auto(), "Move bars of the image vertically", barsvertical
     # Make sure the Random transition goes last
     Random = auto(), "Pick a random transition", doRandom
 
@@ -663,14 +733,14 @@ if __name__ == "__main__":
     f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
     # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
-    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = [Path("../..", x) for x in names]
+    #names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
+    #names = [Path("../..", x) for x in names]
 
-    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
     #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
-    images = itertools.cycle(map(lambda x: Image.open(x).resize([size, size]), names))
+    images = zip(itertools.cycle(Image.open(x).resize([size, size]) for x in names), itertools.cycle(names))
 
     def sendArt(f, i):
         px = i.load()
@@ -692,13 +762,14 @@ if __name__ == "__main__":
     nxt = next(images)
     for i in transitions:
         print(f"{i:20}  - {i.description}")
-        sendArt(f, cur)
+        print(f"\t=> {nxt[1]}")
+        sendArt(f, cur[0])
         time.sleep(1.0)
         trans = i.function
-        doTransition(f, trans(cur, nxt, 21))
+        doTransition(f, trans(cur[0], nxt[0], 21))
         cur = nxt
         nxt = next(images)
 
         time.sleep(2)
 
-    sendArt(f, Image.new("RGB", cur.size))
+    sendArt(f, Image.new("RGB", cur[0].size))
