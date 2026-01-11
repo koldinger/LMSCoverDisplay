@@ -8,6 +8,7 @@ import numpy as np
 
 from numpy.linalg import LinAlgError
 import rich.traceback
+import itertools
 
 rich.traceback.install()
 
@@ -213,8 +214,8 @@ def _doLean(oimg, nimg, steps, out):
 
 def _doPageTurn(oimg, nimg, steps):
     blank = Image.new("RGBA", oimg.size)
-    left = _doLean(oimg, blank, steps, True)
-    right = _rotate(180, _doLean, nimg, blank, steps, False)
+    left  = itertools.chain(_doLean(oimg, blank, steps, True), [blank])
+    right = itertools.chain([blank], _rotate(180, _doLean, nimg, blank, steps, False))
 
     for i in zip(left, right, strict=True):
         res = i[1].copy()
@@ -724,7 +725,6 @@ def getTransition(name: str):
 if __name__ == "__main__":
     import flaschen
     import sys
-    import itertools
     import random
     from pathlib import Path
 
@@ -740,12 +740,14 @@ if __name__ == "__main__":
     #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
-    images = zip(itertools.cycle(Image.open(x).resize([size, size]) for x in names), itertools.cycle(names))
+    #names = ["/srv/music/FLAC/Bob_Mould/The_Last_Dog_and_Pony_Show/cover.jpg", "/srv/music/FLAC/Porcupine_Tree/Recordings/cover.jpg"]
+
+    images = zip(itertools.cycle(Image.open(x).resize([size, size]).convert("RGB") for x in names), itertools.cycle(names))
 
     def sendArt(f, i):
         px = i.load()
-        for x in range(size):
-            for y in range(size):
+        for x in range(i.width):
+            for y in range(i.height):
                 f.set(x, y, px[x, y])
         f.send()
 
