@@ -14,8 +14,6 @@ from urllib.parse import unquote
 
 import configargparse
 import requests
-#import rich.traceback
-from icecream import ic
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
@@ -23,7 +21,7 @@ from rich.console import Console
 from telnetlib3 import telnetlib
 
 from . import transitions, util, volume
-from . import AnalogClockGenerator, flaschen # Code that's not mine that I copied here.
+from . import flaschen
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -31,6 +29,7 @@ args: argparse.Namespace
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
+from icecream import ic
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 ic.disable()
 
@@ -106,12 +105,6 @@ def handleStatus(t, f, playerID, trans):
     lastimg = Image.new("RGB", (args.imagesize))
     lastvol = 0
     subscribe_cmd = f"{playerID} status - 1 subscribe:30"
-    clockgen = AnalogClockGenerator.AnalogClockGenerator(
-        show_second_hand=False,
-        hour_hand_color=(0, 0, 255, 255),
-        minute_hand_color=(0, 255, 0, 255),
-        origin_color=(255, 0, 0, 255),
-    )
 
     # Start the subscription
     t.write(command_string(subscribe_cmd))
@@ -172,21 +165,11 @@ def handleStatus(t, f, playerID, trans):
 
                 if (datetime.now() - pausestart).seconds >= args.pausedelay:
                     # If we're past the pausedelay, switch to the pause display
-                    if args.clock:
-                        clk = clockgen.get_current_clock().resize(tuple(args.imagesize)).convert("RGB")
-
-                        if first_image:
-                            sendTransition(f, clk, lastimg, transitions.getTransition(random.choice(trans)))
-                            first_image = False
-                        else:
-                            sendArt(f, clk)
-                        lastimg = clk
+                    if lastimg != blank:
+                        sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                     else:
-                        if lastimg != blank:
-                            sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
-                        else:
-                            sendArt(f, pause_img)
-                        lastimg = pause_img
+                        sendArt(f, pause_img)
+                    lastimg = pause_img
                 else:
                     # Else, still in the pause delay, just blast the last image
                     sendArt(f, lastimg)
@@ -318,7 +301,6 @@ def process_cmdline():
     parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
 
     parser.add_argument("--volume", action="store_true", default=False, help="Display the volume bar when volume changes")
-    parser.add_argument("--clock",  action="store_true", default=False, help="Show Clock if paused")
 
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
