@@ -196,6 +196,10 @@ def sendArt(f, art, overlay=None):
 
     if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
         art = dimImage(art)
+
+    if args.orientation:
+        art = art.rotate(args.orientation)
+
     px = art.load()
     for x in range(art.width):
         for y in range(art.height):
@@ -285,6 +289,8 @@ def process_cmdline():
     parser.add_argument( "--lmsserver", "-l", default="localhost", type=str, help="Name of the LMS Server")
     parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
+
+    parser.add_argument( "--orientation", "-o", default=0, type=int, choices=[0, 90, 180, 270], help="Orientation of the display, in degrees")
 
     parser.add_argument("--transitions", "-t", nargs="+", metavar = "transition",
                         default=[transitions.TransitionTypes.Random], choices=transitions.TransitionTypes,
