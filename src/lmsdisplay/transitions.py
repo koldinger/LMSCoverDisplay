@@ -33,6 +33,7 @@ import time
 from contextlib import suppress
 from enum import StrEnum, auto
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 import rich.traceback
@@ -123,7 +124,7 @@ def _doSlide(oimg, nimg, steps):
     yield nimg
 
 
-def _doCurtain(oimg, nimg, steps, out=False):
+def _doCurtain(oimg, nimg, steps):
     """Perform a curtain, closing in with the new image from both sides."""
     left = nimg.crop((0, 0, int(nimg.width / 2), nimg.height))
     right = nimg.crop((int(nimg.width / 2), 0, nimg.width, nimg.height))
@@ -144,7 +145,7 @@ def _doCurtain(oimg, nimg, steps, out=False):
 
 
 def _doCurtainOut(oimg, nimg, steps):
-    """Perform a curtain, opening the old image to the new one"""
+    """ Perform a curtain, opening the old image to the new one. """
     left = oimg.crop((0, 0, int(nimg.width / 2), nimg.height))
     right = oimg.crop((int(nimg.width / 2), 0, nimg.width, nimg.height))
 
@@ -163,20 +164,21 @@ def _doCurtainOut(oimg, nimg, steps):
     yield nimg
 
 
-def _doSpin(oimg, nimg, steps, out):
-    """Spin an image in or out, shrinking or growing as it spins"""
+def _doSpin(oimg, nimg, steps, out, clockwise=True):
+    """ Spin an image in or out, shrinking or growing as it spins. """
     # Load two same-sized images
     oimga = oimg.convert("RGBA")
     nimga = nimg.convert("RGBA")
 
     rng = range(1, steps + 1) if out else range(steps, 1, -1)
+    rotation = 1 if clockwise else -1
 
     for i in rng:
         x, y = nimg.size
         x = int(x * i / steps)
         y = int(y * i / steps)
 
-        angle = int(360 * i / steps)
+        angle = int(360 * i / steps) * rotation
 
         # Rotate image A by 45 degrees
         rot = nimga.resize([x, y]).rotate(angle, expand=True)
@@ -306,15 +308,14 @@ def curtain(oimg, nimg, steps, rotation=0):
     return _rotate(rotation, _doCurtain, oimg, nimg, steps)
 
 def curtainOut(oimg, nimg, steps, rotation=0):
-    return _rotate(rotation, _doCurtain, oimg, nimg, steps)
+    return _rotate(rotation, _doCurtainOut, oimg, nimg, steps)
 
 def spinOut(oimg, nimg, steps):
-    return _doSpin(oimg, nimg, steps, True)
+    return _doSpin(oimg, nimg, steps, True, False)
 
 def spinIn(oimg, nimg, steps):
-    yield from _doSpin(nimg, oimg, steps, False)
+    yield from _doSpin(nimg, oimg, steps, False, True)
     yield nimg
-
 
 def leanOut(oimg, nimg, steps):
     yield from _doLean(oimg, nimg, steps, True)
@@ -351,14 +352,15 @@ def zoomOutIn(oimg, nimg, steps):
 def spinInOut(oimg, nimg, steps):
     """Spin one image out to black, and then spin the new one in."""
     blank = Image.new("RGB", oimg.size)
-    yield from spinIn(oimg, blank, int(steps / 2))
-    yield from spinOut(blank, nimg, int(steps / 2))
+    yield from _doSpin(blank, oimg, int(steps / 2), False, True)
+    yield blank
+    yield from _doSpin(blank, nimg, int(steps / 2), True, False)
     yield nimg
 
 def leanOutIn(oimg, nimg, steps):
     blank = Image.new("RGB", oimg.size)
-    yield from _doLean(oimg, blank, steps, True)
-    yield from _doLean(nimg, blank, steps, False)
+    yield from _doLean(oimg, blank, int(steps / 2), True)
+    yield from _doLean(nimg, blank, int(steps / 2), False)
     yield nimg
 
 def leanflip(oimg, nimg, steps):
@@ -451,11 +453,13 @@ def shimmer(oimg, nimg, steps, keep=False):
     px = nimg.load()
     img = oimg.copy()
     for i in range(steps + 1):
-        threshold = i / steps
+        threshold = float(i) / float(steps)
+        count = 0
         ipx = img.load()
         for x in range(oimg.width):
             for y in range(oimg.height):
                 if random.random() < threshold:
+                    count += 1
                     ipx[x, y] = px[x, y]
         yield img
         if not keep:
@@ -463,12 +467,13 @@ def shimmer(oimg, nimg, steps, keep=False):
     yield nimg
 
 
-def _makeSquares(chunk, size, snake):
+def _makeSquares(chunks, size, snake):
+    chunk = int(size[0] / chunks)
     squares = []
     xseq = list(range(0, size[0], chunk))
     for y in range(0,  size[1], chunk):
         for x in xseq:
-            squares.append((x, y, x + chunk, y + chunk))
+            squares.append((round(x), round(y), round(x + chunk), round(y + chunk)))
         if snake:
             xseq.reverse()
     return squares
@@ -482,19 +487,19 @@ def _doBoxes(oimg, nimg, squares):
 
 
 def boxes(oimg, nimg, _):
-    squares = _makeSquares(16, oimg.size, False)
+    squares = _makeSquares(4, oimg.size, False)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
     yield nimg
 
 def boxessnake(oimg, nimg, _):
-    squares = _makeSquares(16, oimg.size, True)
+    squares = _makeSquares(4, oimg.size, True)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
     yield nimg
 
 def boxesrandom(oimg, nimg, _):
-    squares = _makeSquares(16, oimg.size, False)
+    squares = _makeSquares(4, oimg.size, False)
     random.shuffle(squares)
     yield oimg
     yield from _doBoxes(oimg, nimg, squares)
@@ -623,22 +628,65 @@ def getTransition(name: str):
 
     return val.function
 
-if __name__ == "__main__":
-    import random
+def makeGif(outputdir: Path, images, transition):
+    print(f"Processing transition: {transition}")
+
+    results = []
+
+    for i in range(len(images)):
+        f = images[i % len(images)]
+        s = images[(i + 1) % len(images)]
+        # Do the transition, and then make a copy of all images.
+        # Have to do this because some transitions return the same object each time, which screws up
+        # the gif builder.
+        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        results.extend([s, s, s, s, s, s])   # add a couple extra copies, for a brief pause
+
+    outname = outputdir.joinpath(str(transition)).with_suffix(".gif")
+
+    print(f"Transition: {transition} {outname} {len(results)}")
+
+    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, loop=0, duration=1*len(results))
+
+
+def makeGifs(output: Path, images):
+    for i in TransitionTypes:
+        try:
+            makeGif(output, images, i)
+        except Exception as e:
+            print(f"{i} Failed: {e}")
+
+
+def doTheGifThing():
+    output = Path("output")
+    size = 256
+    if not output.exists():
+        output.mkdir()
+    elif not output.is_dir():
+        raise NotADirectoryError
+
+    names = ["test1.png", "test2.png", "test3.png"]
+    names = [Path("../..", x) for x in names]
+
+    images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
+
+    makeGifs(output, images)
+
+def test():
     import sys
-    from pathlib import Path
 
     import flaschen
 
     size = 64
 
-    f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
+    f = flaschen.Flaschen("coverpi3.local", 1337, size, size)
     # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     #names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    #names = [Path("../..", x) for x in names]
+    names = ["test1.png", "test2.png", "test3.png"]
+    names = [Path("../..", x) for x in names]
 
-    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
     #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
@@ -660,7 +708,7 @@ if __name__ == "__main__":
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
-    transitions = map(TransitionTypes, sys.argv[1:]) if len(sys.argv) > 1 else TransitionTypes
+    transitions = [TransitionTypes(x) for x in sys.argv[1:]] if len(sys.argv) > 1 else TransitionTypes
 
     cur = next(images)
     nxt = next(images)
@@ -677,3 +725,8 @@ if __name__ == "__main__":
         time.sleep(2)
 
     sendArt(f, Image.new("RGB", cur[0].size))
+
+if __name__ == "__main__":
+    #test()
+    doTheGifThing()
+
