@@ -628,53 +628,8 @@ def getTransition(name: str):
 
     return val.function
 
-def makeGif(outputdir: Path, images, transition):
-    print(f"Processing transition: {transition}")
-
-    results = []
-
-    for i in range(len(images)):
-        f = images[i % len(images)]
-        s = images[(i + 1) % len(images)]
-        # Do the transition, and then make a copy of all images.
-        # Have to do this because some transitions return the same object each time, which screws up
-        # the gif builder.
-        results.extend([i.copy() for i in transition.function(f, s, 16)])
-        results.extend([s, s, s, s, s, s])   # add a couple extra copies, for a brief pause
-
-    outname = outputdir.joinpath(str(transition)).with_suffix(".gif")
-
-    print(f"Transition: {transition} {outname} {len(results)}")
-
-    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, loop=0, duration=1*len(results))
-
-
-def makeGifs(output: Path, images):
-    for i in TransitionTypes:
-        try:
-            makeGif(output, images, i)
-        except Exception as e:
-            print(f"{i} Failed: {e}")
-
-
-def doTheGifThing():
-    output = Path("output")
-    size = 256
-    if not output.exists():
-        output.mkdir()
-    elif not output.is_dir():
-        raise NotADirectoryError
-
-    names = ["test1.png", "test2.png", "test3.png"]
-    names = [Path("../..", x) for x in names]
-
-    images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
-
-    makeGifs(output, images)
-
 def test():
     import sys
-
     import flaschen
 
     size = 64
@@ -727,6 +682,5 @@ def test():
     sendArt(f, Image.new("RGB", cur[0].size))
 
 if __name__ == "__main__":
-    #test()
-    doTheGifThing()
+    test()
 

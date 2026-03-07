@@ -27,42 +27,53 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from datetime import datetime
-from contextlib import suppress
+from PIL import Image
 from pathlib import Path
 
-def parsetime(timestr):
-    with suppress(ValueError):
-        return datetime.strptime(timestr, "%H:%M",).time()
-    with suppress(ValueError):
-        return datetime.strptime(timestr, "%I:%M%p").time()
-    with suppress(ValueError):
-        return datetime.strptime(timestr, "%H").time()
-    with suppress(ValueError):
-        return datetime.strptime(timestr, "%I%p").time()
-    raise ValueError(f"Unable to parse time string: {timestr}")
+import transitions
+import util
 
-def betweentimes(now, start, end):
-    if not (start and end):
-        return False
-    if start <= end:
-        return start <= now <= end
-    return now <= end or now >= start
+def makeGif(outputdir: Path, images, transition):
+    print(f"Processing transition: {transition}")
 
+    results = []
 
-def makedir(name: Path):
-    if not name.exists():
-        name.mkdir()
-    elif not name.is_dir():
-        raise NotADirectoryError
+    for i in range(len(images)):
+        f = images[i % len(images)]
+        s = images[(i + 1) % len(images)]
+        # Do the transition, and then make a copy of all images.
+        # Have to do this because some transitions return the same object each time, which screws up
+        # the gif builder.
+        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        results.extend([s, s, s, s, s, s])   # add a couple extra copies, for a brief pause
+
+    outname = outputdir.joinpath(str(transition)).with_suffix(".gif")
+
+    print(f"Transition: {transition} {outname} {len(results)}")
+
+    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, loop=0, duration=1*len(results))
+
+def makeGifs(output: Path, images):
+    for i in transitions.TransitionTypes:
+        try:
+            makeGif(output, images, i)
+        except Exception as e:
+            print(f"{i} Failed: {e}")
+
+def doTheGifThing():
+    output = Path("samples")
+    size = 256
+
+    util.makedir(output)
+
+    names = ["test1.png", "test2.png", "test3.png"]
+    names = [Path("../..", x) for x in names]
+
+    images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
+
+    makeGifs(output, images)
+
 
 if __name__ == "__main__":
-    for i in ["11pm", "23", "11:30pm", "11:30", "23:30", "24:30", "13pm"]:
-        try:
-            print(i, parsetime(i))
-        except ValueError as e:
-            print(e)
+    doTheGifThing()
 
-    print(betweentimes(parsetime("11"), parsetime("1"), parsetime("13")))
-    print(betweentimes(parsetime("11"), parsetime("13"), parsetime("1")))
-    print(betweentimes(parsetime("11"), parsetime("10"), parsetime("1")))
