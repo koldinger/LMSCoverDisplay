@@ -1,0 +1,128 @@
+# vim: set et sw=4 sts=4 fileencoding=utf-8:
+#
+# Copyright 2025-2026, Eric Koldinger, All Rights Reserved.
+# kolding@washington.edu
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the copyright holder nor the
+#       names of its contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import queue
+import re
+import threading
+import time
+from collections import namedtuple
+from urllib.parse import unquote
+
+from icecream import ic
+from telnetlib3 import telnetlib
+
+#from datetime import datetime
+# def time_format():
+#     now = datetime.now()
+#     return f'{now.strftime("%H:%M:%S")} --> '
+
+#$ic.configureOutput(includeContext=True)
+
+idpat = re.compile(r" id:\s*(\d+)")
+playpat = re.compile(r" mode:\s*(\w+)")
+volpat = re.compile(r" volume:\s*(\d+)")
+
+MAX_BACKOFF = 120
+
+def command_string(string, query=False):
+    if query:
+        string = string + " ?"
+    return string + "\r\n"
+
+PlayEvent = namedtuple("PlayEvent", ["mode", "song", "volume"])
+
+class PlayerMonitor(threading.Thread):
+    def __init__(self, player_id: str, server: str, queue: queue.Queue, login=None, password=None):
+        super().__init__()
+        ic(player_id, server, login, password)
+        self.player_id = player_id
+        self.server = server
+        self.queue = queue
+        self.login = login
+        self.password = password
+        self.tn: telnetlib.Telnet
+        self.backoff = 1
+        self.close = False
+
+    def getLine(self):
+        line = self.tn.read_until(b"\n")
+        if line:
+            line = unquote(line.strip())
+            return line
+
+        ic("EOF")
+        raise EOFError
+
+    def sendLine(self, line):
+        self.tn.write(bytes(line, "ascii"))
+
+    def run(self):
+        while True:
+            try:
+                self.tn = telnetlib.Telnet(self.server, 9090)
+                if self.login:
+                    self.sendLine(command_string(f"login {self.login} {self.password}"))
+                self.backoff = 1            # Reset the backoff time
+            except Exception as e:
+                print(e)
+                print(f"Could not make connenction.  Backing off for {self.backoff} seconds")
+                time.sleep(self.backoff)
+                self.backoff = min(MAX_BACKOFF, self.backoff * 2)
+                continue
+
+            try:
+                subscribe_cmd = command_string(f"{self.player_id} status - 1 subscribe:30")
+                self.sendLine(subscribe_cmd)
+
+                while True:
+                    line = self.getLine()
+                    # TODO: Check if we're the status command.
+
+                    playmatch = playpat.search(line)
+                    idmatch = idpat.search(line)
+                    volmatch = volpat.search(line)
+
+                    play = playmatch.group(1) if playmatch else None
+                    song_id = idmatch.group(1) if idmatch else None
+                    volume = volmatch.group(1) if volmatch else None
+
+                    p = PlayEvent(play, song_id, volume)
+                    self.queue.put(p)
+            except (EOFError, ConnectionResetError) as e:
+                print(f"Connection failed, retrying: {e}")
+
+
+if __name__ == "__main__":
+    q = queue.Queue()
+    mon = PlayerMonitor("d8:3a:dd:55:b2:c9", "localhost", q)
+    mon.start()
+
+    while True:
+        thing = q.get()
+        print(thing)
