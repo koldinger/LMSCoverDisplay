@@ -34,7 +34,6 @@ import time
 from collections import namedtuple
 from urllib.parse import unquote
 
-from icecream import ic
 from telnetlib3 import telnetlib
 
 #from datetime import datetime
@@ -42,6 +41,7 @@ from telnetlib3 import telnetlib
 #     now = datetime.now()
 #     return f'{now.strftime("%H:%M:%S")} --> '
 
+#from icecream import ic
 #$ic.configureOutput(includeContext=True)
 
 idpat = re.compile(r" id:\s*(\d+)")
@@ -60,7 +60,7 @@ PlayEvent = namedtuple("PlayEvent", ["mode", "song", "volume"])
 class PlayerMonitor(threading.Thread):
     def __init__(self, player_id: str, server: str, queue: queue.Queue, login=None, password=None):
         super().__init__()
-        ic(player_id, server, login, password)
+        # ic(player_id, server, login, password)
         self.player_id = player_id
         self.server = server
         self.queue = queue
@@ -76,7 +76,7 @@ class PlayerMonitor(threading.Thread):
             line = unquote(line.strip())
             return line
 
-        ic("EOF")
+        #ic("EOF")
         raise EOFError
 
     def sendLine(self, line):
@@ -84,20 +84,35 @@ class PlayerMonitor(threading.Thread):
 
     def run(self):
         while True:
+            # Try to connect with the server.  If not successful, try again,
+            # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
                 self.tn = telnetlib.Telnet(self.server, 9090)
                 if self.login:
                     self.sendLine(command_string(f"login {self.login} {self.password}"))
                 self.backoff = 1            # Reset the backoff time
+                print(f"Connection complete with {self.server}")
             except Exception as e:
                 print(e)
-                print(f"Could not make connenction.  Backing off for {self.backoff} seconds")
+                print(f"Could not make connection.  Backing off for {self.backoff} seconds")
                 time.sleep(self.backoff)
                 self.backoff = min(MAX_BACKOFF, self.backoff * 2)
                 continue
 
             try:
-                subscribe_cmd = command_string(f"{self.player_id} status - 1 subscribe:30")
+                # Try to get the player name for the player.
+                # This will return nothing until the player is recognized.
+                while True:
+                    name_cmd = f"player name {self.player_id}"
+                    self.sendLine(command_string(name_cmd, True))
+                    line = self.getLine()
+                    if line != name_cmd:
+                        # if the returned line does not equal the command, it's got a name, indicatirng the player exists
+                        #
+                        break
+                    time.sleep(.5)
+
+                subscribe_cmd = command_string(f"{self.player_id} status - 1 subscribe:10")
                 self.sendLine(subscribe_cmd)
 
                 while True:
@@ -114,8 +129,9 @@ class PlayerMonitor(threading.Thread):
 
                     p = PlayEvent(play, song_id, volume)
                     self.queue.put(p)
+
             except (EOFError, ConnectionResetError) as e:
-                print(f"Connection failed, retrying: {e}")
+                print(f"Connection ended, retrying: {e}, {type(e)}")
 
 
 if __name__ == "__main__":
