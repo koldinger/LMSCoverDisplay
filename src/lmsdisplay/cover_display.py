@@ -40,6 +40,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import unquote
+from queue import Queue
 
 import configargparse
 import requests
@@ -51,6 +52,7 @@ from telnetlib3 import telnetlib
 
 from . import transitions, util, volume
 from . import flaschen
+from . import lms_monitor
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -60,7 +62,7 @@ def unix_timestamp():
 
 from icecream import ic
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-ic.disable()
+#ic.disable()
 
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
@@ -130,13 +132,9 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
         color = (255, 255, 255, 200)
     return color
 
-def handleStatus(t, f, playerID, trans):
+def handleStatus(eventQ, display, playerID, trans):
     lastimg = Image.new("RGB", (args.imagesize))
     lastvol = 0
-    subscribe_cmd = f"{playerID} status - 1 subscribe:30"
-
-    # Start the subscription
-    t.write(command_string(subscribe_cmd))
 
     blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
     #lyrionlogo = getInternalArt("logo.png")
@@ -145,32 +143,26 @@ def handleStatus(t, f, playerID, trans):
     # Setup as if we're paused at the start.
     playing = False
     pausestart = datetime.now()
-    first_image = True
 
     while True:
-        line = getLine(t)
-        ic(line)
-        line = line.removeprefix(subscribe_cmd)
+        event = eventQ.get()
+        ic(event)
 
         # Grab the current playing status from the stream
-        playmatch = playpat.search(line)
-        mode = playmatch.group(1) if playmatch else "unknown"
         overlay = None
 
-        match mode:
+        match event.mode:
             case "play":
                 playing = True
-                idmatch = idpat.search(line)
-                if idmatch:
-                    trackid = idmatch.group(1)
+                if event.song:
+                    trackid = event.song
                     art = getArt(int(trackid))
                 else:
                     trackid = None
                     art = getCurrentArt(playerID)
 
                 if args.volume:
-                    volmatch = volpat.search(line)
-                    vol = int(volmatch.group(1)) if volmatch else 100
+                    vol = int(event.volume)
 
                     # If the volume has changed,
                     if vol != lastvol:
@@ -179,31 +171,30 @@ def handleStatus(t, f, playerID, trans):
                         overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    sendTransition(f, art, lastimg, transitions.getTransition(random.choice(trans)))
+                    sendTransition(display, art, lastimg, transitions.getTransition(random.choice(trans)))
                 else:
-                    sendArt(f, art, overlay=overlay)
+                    sendArt(display, art, overlay=overlay)
                 lastimg = art
 
-            case "pause":
+            case "pause" | "stop":
                 if playing:
                     # If we just switched to pause timing, record the time we paused (roughly)
                     pausestart = datetime.now()
-                    first_image = True
                 playing = False
                 pause_img = blank if args.pauselogo else lyrionlogo
 
                 if (datetime.now() - pausestart).seconds >= args.pausedelay:
                     # If we're past the pausedelay, switch to the pause display
                     if lastimg != blank:
-                        sendTransition(f, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
+                        sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                     else:
-                        sendArt(f, pause_img)
+                        sendArt(display, pause_img)
                     lastimg = pause_img
                 else:
                     # Else, still in the pause delay, just blast the last image
-                    sendArt(f, lastimg)
+                    sendArt(display, lastimg)
             case _:
-                print(line)
+                print(event)
 
 
 def dimImage(image):
@@ -363,7 +354,6 @@ def main():
     args = process_cmdline()
     console = Console()
 
-    t = telnetlib.Telnet()
     backoff = 1
 
     signal.signal(signal.SIGHUP, reloadConfig)
@@ -377,22 +367,16 @@ def main():
             piddir = args.pidfile.parent
             pidfile = args.pidfile.name
 
-    with PidFile(piddir=piddir, pidname=pidfile) as p:
+    with PidFile(piddir=piddir, pidname=pidfile):
         while True:
             try:
-                f = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
-                t.open(args.lmsserver, args.lmsports[1])
+                disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
+                eventQ = Queue()
 
-                if args.login:
-                    t.write(f"login {args.login} {args.password}\n")
-                    getLine(t)
+                mon = lms_monitor.PlayerMonitor(args.player, args.lmsserver, eventQ, args.login, args.password)
+                mon.start()
 
-                backoff = 1
-
-                playerID = getPlayerID(t, args.player) if args.player else getPlayingID(t)
-                ic(playerID)
-
-                handleStatus(t, f, playerID, args.transitions)
+                handleStatus(eventQ, disp, args.player, args.transitions)
             except Exception as e:
                 ic(e)
                 console.print_exception()
