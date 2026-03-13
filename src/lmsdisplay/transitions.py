@@ -486,10 +486,10 @@ def _doBoxes(oimg, nimg, squares):
         yield image
 
 
-def boxes(oimg, nimg, _):
+def boxes(oimg, nimg, _, rotation=0):
     squares = _makeSquares(4, oimg.size, False)
     yield oimg
-    yield from _doBoxes(oimg, nimg, squares)
+    yield from _rotate(rotation, _doBoxes, oimg, nimg, squares)
     yield nimg
 
 def boxessnake(oimg, nimg, _):
@@ -614,6 +614,7 @@ class TransitionTypes(StrEnum):
     # LowerFlip = auto(), "Complicated", lowerflip
     #P ageTurn = auto(), "Page Turn", pageturn
     Boxes = auto(), "Replace boxes one at a time, top to bottom", boxes
+    BoxesUp = auto(), "Replace boxes one at a time, bottom to top", partial(boxes, rotation=180)
     BoxesRandom = auto(), "Replace boxes one at a time, randomly", boxesrandom
     BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
     BarsHoriz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
@@ -634,7 +635,7 @@ def test():
 
     size = 64
 
-    f = flaschen.Flaschen("coverpi3.local", 1337, size, size)
+    f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
     # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     #names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
