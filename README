@@ -18,6 +18,9 @@ Installing program.
       edit /boot/firmware/cmdline.txt
           Add "isolcpus=3" to the command line
         eg: "console=serial0,115200 console=tty1 root=PARTUUID=c32373bb-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=US isolcpus=3"
+        
+2: install uv 
+  sudo pip install [--break-system-packages] uv
 
 2: Clone flaschen-taschen
   git clone --recursive https://github.com/hzeller/flaschen-taschen.git
@@ -36,13 +39,13 @@ Installing program.
 5: Clone and install LMSDisplay.   Note, if you get errors about "externally managed environment", add the "--break-system-packages"
   git clone REPOSITORY/LMSDisplay
   cd LMSDisplay
-  sudo pip install . [--break-system-packages]
+  sudo uv pip install --system . [--break-system-packages]
 
 6: Install and start the LMSDisplay services
-  cp lmsdisplay.service lmsdisplaycontrol.service /usr/lib/systemd/system/
-  [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsdisplaycontrol}.service /etc/systemd/system/multi-user.target.wants/ ]
-  systemctl enable lmsdisplay.service lmsdisplaycontrol.service
-  systemctl start lmsdisplay.service lmsdisplaycontrol.service
+  cp lmsdisplay.service lmsdispcontrol.service /usr/lib/systemd/system/
+  [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsdispcontrol}.service /etc/systemd/system/multi-user.target.wants/ ]
+  systemctl enable lmsdisplay.service lmsdispcontrol.service
+  systemctl start lmsdisplay.service lmsdispcontrol.service
 
 5: Configure the display.
   Use a browser to connect to http://[DISPLAYMACHINE]:5000
