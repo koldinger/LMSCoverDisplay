@@ -12,6 +12,7 @@ dependencies = [
     "configargparse>=1.7.1",
     "flask>=3.1.2",
     "icecream>=2.1.8",
+    "lmstools",
     "numpy>=2.3.5",
     "pid>=3.0.4",
     "pillow>=12.0.0",
@@ -30,3 +31,6 @@ packages = [ "lmsdisplay" ]
 
 [tool.setuptools.package-data]
 my_package = ["*.css", "*.html"]
+
+[tool.uv.sources]
+lmstools = { git = "https://github.com/koldinger/LMSTools.git" }
