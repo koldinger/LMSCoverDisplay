@@ -39,8 +39,10 @@ import time
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
 from queue import Queue
+
+from LMSTools import server, player
 
 import configargparse
 import requests
@@ -52,7 +54,7 @@ from telnetlib3 import telnetlib
 
 from . import transitions, util, volume
 from . import flaschen
-from . import lms_monitor
+from . import lms_monitor, discovery
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -60,8 +62,8 @@ args: argparse.Namespace
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
-from icecream import ic
-ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+#from icecream import ic
+#ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 #ic.disable()
 
 idpat = re.compile(r" id:\s*(\d+)")
@@ -76,49 +78,6 @@ try:
 except importlib.metadata.PackageNotFoundError:
     print("Package not found or not installed.")
 
-def command_string(string, query=False):
-    if query:
-        string = string + " ?"
-    return bytes(string + "\r\n", "ascii")
-
-
-def getLine(tn_session):
-    return unquote(tn_session.read_until(b"\n")).strip()
-
-
-def getPlayerID(tn_session, name):
-    count_cmd = "player count"
-    r = doQuery(tn_session, count_cmd)
-    for i in range(int(r)):
-        n = doQuery(tn_session, f"player name {i}")
-        if name == n.strip():
-            playerID = doQuery(tn_session, f"player id {i}")
-            return playerID
-    return None
-
-
-def getPlayingID(tn_session):
-    count_cmd = "player count"
-    line = doQuery(tn_session, count_cmd)
-    for i in range(int(line)):
-        playerID = doQuery(tn_session, f"player id {i}")
-        # name = doQuery(t, f"player name {i}")
-        # TODO: Parse the line
-        # status = doQuery(tn_session, f"{playerID} status 0 1")
-        return playerID
-    return None
-
-
-def doQuery(tn_session, query):
-    """ Take a query, send it to the LMS server, and grab the response. """
-    tn_session.write(command_string(query, True))
-    line = getLine(tn_session)
-    if not line.startswith(query):
-        raise ValueError(f"Unexpected response: {line}")
-    line = line.removeprefix(query).strip()
-    ic(query, line)
-    return line
-
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
         # Get the averoge color of the current screen.
@@ -132,7 +91,7 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
         color = (255, 255, 255, 200)
     return color
 
-def handleStatus(eventQ, display, playerID, trans):
+def handleEvents(eventQ, display, playerID, trans, baseUrl):
     lastimg = Image.new("RGB", (args.imagesize))
     lastvol = 0
 
@@ -146,7 +105,6 @@ def handleStatus(eventQ, display, playerID, trans):
 
     while True:
         event = eventQ.get()
-        ic(event)
 
         # Grab the current playing status from the stream
         overlay = None
@@ -156,10 +114,10 @@ def handleStatus(eventQ, display, playerID, trans):
                 playing = True
                 if event.song:
                     trackid = event.song
-                    art = getArt(int(trackid))
+                    art = getArt(int(trackid), baseUrl)
                 else:
                     trackid = None
-                    art = getCurrentArt(playerID)
+                    art = getCurrentArt(playerID, baseUrl)
 
                 if args.volume:
                     vol = int(event.volume)
@@ -232,7 +190,6 @@ def sendTransition(f, art, lastimg, transition):
         sendArt(f, i)
         time.sleep(args.delay)
 
-
 def enhanceImage(img: Image.Image) -> Image.Image:
     """ Pump up the contrast and color if requested. """
     if args.contrast != 1.0:
@@ -241,13 +198,13 @@ def enhanceImage(img: Image.Image) -> Image.Image:
         img = ImageEnhance.Color(img).enhance(args.color)
     return img
 
-def getCurrentArt(playerID):
+def getCurrentArt(playerID, baseUrl):
     """
     Get the art for the currently playing track.
 
     Useful for when you're receiving from a streaming service.
     """
-    url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/current/cover.jpg?player={playerID}"
+    url = urljoin(baseUrl, f"music/current/cover.jpg?player={playerID}")
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
         img = Image.open(BytesIO(resp.content))
@@ -262,9 +219,9 @@ def getCurrentArt(playerID):
 
 
 @functools.lru_cache(maxsize=128)
-def getArt(trackID: str) -> Image.Image:
+def getArt(trackID: str, baseUrl):
     """ Get the art for a track ID. """
-    url = f"http://{args.lmsserver}:{args.lmsports[0]}/music/{trackID}/cover.jpg"
+    url = urljoin(baseUrl, f"music/{trackID}/cover.jpg")
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
         img = Image.open(BytesIO(resp.content))
@@ -281,9 +238,7 @@ def getArt(trackID: str) -> Image.Image:
 def getInternalArt(name: str) -> Image.Image:
     """ Retrieve artwork from the internal resource files. """
     fname = importlib.resources.files().joinpath("art", name).read_bytes()
-    ic(fname)
     return Image.open(fname).convert("RGB").resize(tuple(args.imagesize))
-
 
 def process_cmdline():
     epilog = "Avaliable transitions:\n\n" + ", ".join(transitions.TransitionTypes)
@@ -306,7 +261,7 @@ def process_cmdline():
     parser.add_argument( "--displayhost", "-d", default="localhost", type=str, help="Display host")
     parser.add_argument( "--displayport", "-D", default=1337, type=int, help="Display port")
 
-    parser.add_argument( "--lmsserver", "-l", default="localhost", type=str, help="Name of the LMS Server")
+    parser.add_argument( "--lmsserver", "-l", default=None, type=str, help="Name of the LMS Server")
     parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
@@ -343,10 +298,36 @@ def process_cmdline():
 def reloadConfig(signum, frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args
-    ic(signum, frame)
     args = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     getArt.cache_clear()
+
+def getServerInfo():
+    # If server is specified, use that.
+    if args.lmsserver:
+        return args.lmsserver, args.lmsports[0]
+
+    # Else, perform discovery, and choose the first one
+    servers = discovery.discover_lms()
+    if servers:
+        return servers[0]['host'], servers[0]['port']
+
+    return None, None
+
+def getServer():
+    s, p = getServerInfo()
+    srv = server.LMSServer(s, p)
+    return srv
+
+def getPlayer(srv: server.LMSServer, name):
+    players = srv.get_players()
+    for plr in players:
+        if plr.name == name:
+            return plr
+    return None
+
+def serverPlayer(server, player):
+    pass
 
 def main():
     global args, version
@@ -357,6 +338,20 @@ def main():
     backoff = 1
 
     signal.signal(signal.SIGHUP, reloadConfig)
+
+    while True:
+        try:
+            lms_server = getServer()
+            plr = getPlayer(lms_server, args.player)
+            if plr and lms_server:
+                break
+        except Exception as e:
+            console.print_exception()
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 120)
+
+    backoff = 1
+    base_url = f"http://{lms_server.host}:{lms_server.port}"
 
     pidfile = None
     piddir = None
@@ -373,12 +368,13 @@ def main():
                 disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
                 eventQ = Queue()
 
-                mon = lms_monitor.PlayerMonitor(args.player, args.lmsserver, eventQ, args.login, args.password)
+                mon = lms_monitor.PlayerMonitor(plr.ref, lms_server.host, eventQ, args.login, args.password)
                 mon.start()
 
-                handleStatus(eventQ, disp, args.player, args.transitions)
+                backoff = 1
+
+                handleEvents(eventQ, disp, args.player, args.transitions, base_url)
             except Exception as e:
-                ic(e)
                 console.print_exception()
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 120)
