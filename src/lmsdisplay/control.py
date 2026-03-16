@@ -27,21 +27,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from pathlib import Path
-
 import os
 import signal
+from pathlib import Path
 
 import configargparse
-from flask import Flask, config, render_template, request
-
-from . import transitions
-from rich import print
 import rich.traceback
+from flask import Flask, config, render_template, request
+from rich import print
 
-from pprint import pprint, pformat
+from . import discovery, transitions
 
 args: configargparse.Namespace
+servers = discovery.discover_lms()
 rich.traceback.install()
 
 app = Flask(__name__)
@@ -53,7 +51,8 @@ def index():
     errmsg = ""
     if args.displayconfig:
         try:
-            presets = configargparse.DefaultConfigFileParser().parse(open(args.displayconfig))
+            with open(args.displayconfig) as conf:
+                presets = configargparse.DefaultConfigFileParser().parse(conf)
         except FileNotFoundError:
             errmsg = f"{args.displayconfig} does not exist"
             print(errmsg)
@@ -65,6 +64,8 @@ def index():
     ports = presets.get("lmsports", [9000, 9090])
     presets["lmsport_http"] = ports[0]
     presets["lmsport_telnet"] = ports[1]
+
+    presets["servers"] = servers
 
     #print(presets)
 
