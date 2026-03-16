@@ -68,16 +68,21 @@ class PlayerMonitor(threading.Thread):
         self.password = password
         self.tn: telnetlib.Telnet
         self.backoff = 1
-        self.close = False
+        self.closed = False
 
     def getLine(self):
-        line = self.tn.read_until(b"\n")
-        if line:
-            line = unquote(line.strip())
-            return line
+        try:
+            line = self.tn.read_until(b"\n")
+            if line:
+                line = unquote(line.strip())
+                return line
 
-        #ic("EOF")
-        raise EOFError
+            #ic("EOF")
+            raise EOFError
+        except AttributeError:
+            # This is where we end up when the telnet session has been closed by another
+            # thread.   Doesn't quite seem right, but it's what happens.
+            raise ConnectionError("Closed")
 
     def sendLine(self, line):
         self.tn.write(bytes(line, "ascii"))
@@ -132,6 +137,16 @@ class PlayerMonitor(threading.Thread):
 
             except (EOFError, ConnectionResetError) as e:
                 print(f"Connection ended, retrying: {e}, {type(e)}")
+            except ConnectionError as e:
+                print(f"Other connection error: {e}")
+            finally:
+                if self.closed:
+                    return
+
+
+    def close(self):
+        self.closed = True
+        self.tn.close()
 
 
 if __name__ == "__main__":
@@ -139,6 +154,9 @@ if __name__ == "__main__":
     mon = PlayerMonitor("d8:3a:dd:55:b2:c9", "localhost", q)
     mon.start()
 
-    while True:
+    for i in range(5):
         thing = q.get()
         print(thing)
+
+    mon.close()
+
