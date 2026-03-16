@@ -35,14 +35,15 @@ import importlib.resources
 import random
 import re
 import signal
+import sys
 import time
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import unquote, urljoin
+from urllib.parse import urljoin
 from queue import Queue
 
-from LMSTools import server, player
+from LMSTools import server
 
 import configargparse
 import requests
@@ -50,7 +51,6 @@ from pid import PidFile
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
 from rich.console import Console
-from telnetlib3 import telnetlib
 
 from . import transitions, util, volume
 from . import flaschen
@@ -70,11 +70,14 @@ idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
 volpat = re.compile(r" volume:\s*(\d+)")
 
-
 version = "Unknown"
+
+
+event_q = Queue()
+
 try:
     # Replace 'your-package-name' with the actual distribution name of your package
-    version = importlib.metadata.version("your-package-name")
+    version = importlib.metadata.version("lmsdisplay")
 except importlib.metadata.PackageNotFoundError:
     print("Package not found or not installed.")
 
@@ -91,7 +94,7 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
         color = (255, 255, 255, 200)
     return color
 
-def handleEvents(eventQ, display, playerID, trans, baseUrl):
+def handleEvents(display, playerID, trans, baseUrl):
     lastimg = Image.new("RGB", (args.imagesize))
     lastvol = 0
 
@@ -104,7 +107,7 @@ def handleEvents(eventQ, display, playerID, trans, baseUrl):
     pausestart = datetime.now()
 
     while True:
-        event = eventQ.get()
+        event = event_q.get()
 
         # Grab the current playing status from the stream
         overlay = None
@@ -286,7 +289,7 @@ def process_cmdline():
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
-    parser.add_argument("--pidfile", type=Path, default=None, help="File to store PID into")
+    parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -295,12 +298,16 @@ def process_cmdline():
     return args
 
 
-def reloadConfig(signum, frame):
+class ReloadEvent:
+    pass
+
+def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args
     args = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     getArt.cache_clear()
+    event_q.put(ReloadEvent())
 
 def getServerInfo():
     # If server is specified, use that.
@@ -335,45 +342,30 @@ def main():
     args = process_cmdline()
     console = Console()
 
-    backoff = 1
+    piddir = args.pidfile.parent
+    pidfile = args.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
-    while True:
-        try:
-            lms_server = getServer()
-            plr = getPlayer(lms_server, args.player)
-            if plr and lms_server:
-                break
-        except Exception as e:
-            console.print_exception()
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 120)
-
-    backoff = 1
-    base_url = f"http://{lms_server.host}:{lms_server.port}"
-
-    pidfile = None
-    piddir = None
-    if args.pidfile:
-        if args.pidfile.is_dir():
-            piddir = args.pidfile
-        else:
-            piddir = args.pidfile.parent
-            pidfile = args.pidfile.name
-
     with PidFile(piddir=piddir, pidname=pidfile):
+        backoff = 1
         while True:
             try:
-                disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
-                eventQ = Queue()
+                lms_server = getServer()
+                plr = getPlayer(lms_server, args.player)
+                if not (plr and lms_server):
+                    raise Exception()
 
-                mon = lms_monitor.PlayerMonitor(plr.ref, lms_server.host, eventQ, args.login, args.password)
+                base_url = f"http://{lms_server.host}:{lms_server.port}"
+
+                disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
+
+                mon = lms_monitor.PlayerMonitor(plr.ref, lms_server.host, event_q, args.login, args.password)
                 mon.start()
 
                 backoff = 1
 
-                handleEvents(eventQ, disp, args.player, args.transitions, base_url)
+                handleEvents(disp, args.player, args.transitions, base_url)
             except Exception as e:
                 console.print_exception()
                 time.sleep(backoff)
