@@ -148,8 +148,8 @@ def handleEvents(display, playerID, trans, baseUrl):
                     # If we're past the pausedelay, switch to the pause display
                     if lastimg != blank:
                         sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
-                    else:
-                        sendArt(display, pause_img)
+                    #else:
+                    #    sendArt(display, pause_img)
                     lastimg = pause_img
                 else:
                     # Else, still in the pause delay, just blast the last image
