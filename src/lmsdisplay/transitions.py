@@ -546,11 +546,6 @@ def instant(oimg, nimg, _):
     yield oimg
     yield nimg
 
-def doRandom(oimg, nimg, steps):
-    transition = random.choice(list(TransitionTypes)[:-1]).function
-    return transition(oimg, nimg, steps)
-
-
 class TransitionTypes(StrEnum):
     def __new__(cls, value, description, function):
         member = str.__new__(cls, value)
@@ -579,8 +574,8 @@ class TransitionTypes(StrEnum):
     DownUp = auto(), "Push the old image down, and the new image up", downUp
     SlideRightDown = auto(), "Slide the new image down from the top left corner", partial(slide, rotation=0)
     SlideRightUp = auto(), "Slide the new image up from the bottom left corner", partial(slide, rotation=270)
-    SlideLeftDown = auto(), "Slide the new image down from the top left corner", partial(slide, rotation=90)
-    SlideLeftUp = auto(), "Slide the new image up from the bottom left corner", partial(slide, rotation=180)
+    SlideLeftDown = auto(), "Slide the new image down from the top right corner", partial(slide, rotation=90)
+    SlideLeftUp = auto(), "Slide the new image up from the bottom right corner", partial(slide, rotation=180)
     ExpandRightDown = auto(), "Expand the image down from the top left corner", partial(expand, rotation=0)
     ExpandRightUp = auto(), "Expand the image up from the bottom left corner", partial(expand, rotation=270)
     ExpandLeftDown = auto(), "Expand the image down from the top right corner", partial(expand, rotation=90)
@@ -619,8 +614,6 @@ class TransitionTypes(StrEnum):
     BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
     BarsHoriz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
     BarsVertical = auto(), "Move bars of the image vertically", partial(bars, rotation=90)
-    # Make sure the Random transition goes last
-    Random = auto(), "Pick a random transition", doRandom
 
 choices = list(TransitionTypes)[:-1]
 
