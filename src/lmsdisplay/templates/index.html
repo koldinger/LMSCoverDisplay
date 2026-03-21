@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <title>LMS Cover Art Display</title>
     <style>
       .grid-list {
@@ -24,6 +24,23 @@
     #advOptions {
       display: none; /* Hides the section initially */
     }
+    .popup-image-wrapper {
+        display: none; /* Hide the popup wrapper by default */
+        position: absolute; /* Position it absolutely so it doesn't affect page layout */
+        z-index: 10; /* Ensure it appears on top of other content */
+        /* Add styling for the popup container (e.g., background, border, shadow) */
+    }
+
+    .image-hover-container:hover .popup-image-wrapper {
+        display: block; /* Show the popup wrapper when the container is hovered */
+    }
+
+    /* Optional: Style the image itself */
+    .popup-image {
+        width: 256px; /* Adjust size as needed */
+        height: auto;
+    }
+
 
     </style>
     <script>
@@ -57,25 +74,30 @@
 </head>
 <body>
    <h1>Welcome to the LMS Cover Art Display Configuration</h1>
-   <form method="POST">
-      <label for="lmsserver">
-        <h2> LMS Server Name (or IP Address) </h2>
-      </label>
-      <input type="text" id="lmsserver" name="lmsserver" value="{{ presets.get('lmsserver', '')}}">
-      <label for="lmsport_http">
-        <h3> LMS Server HTTP Port </h3>
-      </label>
-      <input type="number" id="lmsport_http" name="lmsport_http" min=0 max=65535 step=1 value="{{ presets.get('lmsport_http', '')}}">
 
-      <label for="lmsport_telnet">
-        <h3> LMS Telnet Port </h3>
-      </label>
-      <input type="number" id="lmsport_telnet" name="lmsport_telnet" min=0 max=65535 step=1 value="{{ presets.get('lmsport_telnet', '')}}">
+   <form method="POST">
+      <!-- 
+        <label for="lmsserver">
+          <h2> LMS Server Name (or IP Address) </h2>
+        </label>
+      -->
+      <!-- <input type="text" id="server" name="server" value="{{ presets.get('server', '')}}"><br><br> -->
 
       <label for="player">
         <h2>Select player</h2>
       </label>
-      <input type="text" id="player" name="player" value="{{ presets.get('player', '')}}"><br><br>
+
+      <!-- <input type="text" id="player" name="player" value="{{ presets.get('player', '')}}"><br><br> -->
+      <select name="player" id="players">
+        {% for s in servers %}
+          <optgroup label={{ s.host }}>
+            {% for p in players[s.host] %}
+              <option value="{{ p.ref }}" {% if p.ref == presets.get("player") or p.name == presets.get("player") %} selected {% endif %}>{{ p.name }} </option>
+            {% endfor %}
+          </optgroup>
+         {% endfor %}
+      </select>
+
 
       <div>
       <label for="transitions">
@@ -85,8 +107,15 @@
             <ul class="grid-list">
             {% for trans in transitions %}
               <li>
+                <div class="image-hover-container">
                 <input type="checkbox" id="{{ trans }}" name="transitions" value="{{ trans }}" {% if trans in presets.get("transitions", []) %} checked {% endif %}>
                 <label for="{{ trans }}">{{ trans }} </label>
+                <!-- <img src="samples/{{ trans }}.gif" alt="thumbnail" class="thumbnail" /> -->
+                  <span class="popup-image-wrapper">
+                    <!-- <img src=" url_for('static/samples', filename=f'{trans}.gif' }}" alt="{{ trans }} sample" class="popup-image" /> -->
+                  <img src="{{ url_for('static', filename='samples/' + trans +'.gif') }}" alt="{{ trans }} sample" class="popup-image" />
+                  </span>
+                </div>
               </li>
             {% endfor %}
           </ul>
@@ -115,11 +144,6 @@
         <h2>Show a volume bar when volume changes</h2>
       </label>
       <input type="checkbox", id="volume" name="volume" value="1" {% if presets.get('volume', 0) %} checked {% endif %}>
-
-      <label for="clock">
-        <h2>Show clock when paused</h2>
-      </label>
-      <input type="checkbox", id="clock" name="clock" value="1" {% if presets.get('clock', 0) %} checked {% endif %}>
 
       <label for="pausedelay">
         <h3> Delay before showing paused screen (Blank screen, or clock)

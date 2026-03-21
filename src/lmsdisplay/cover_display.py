@@ -70,16 +70,19 @@ idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
 volpat = re.compile(r" volume:\s*(\d+)")
 
-version = "Unknown"
+__version__ = "Unknown"
 
+class PlayerNotFoundError(Exception):
+    pass
 
 event_q = Queue()
 
 try:
     # Replace 'your-package-name' with the actual distribution name of your package
-    version = importlib.metadata.version("lmsdisplay")
+    __version__ = importlib.metadata.version("lmsdisplay")
 except importlib.metadata.PackageNotFoundError:
-    print("Package not found or not installed.")
+    pass
+    #print("Package not found or not installed.")
 
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
@@ -101,6 +104,9 @@ def handleEvents(display, playerID, trans, baseUrl):
     blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
     #lyrionlogo = getInternalArt("logo.png")
     lyrionlogo = blank
+
+    if not trans:
+        trans = list(transitions.TransitionTypes)
 
     # Setup as if we're paused at the start.
     playing = False
@@ -270,8 +276,8 @@ def process_cmdline():
 
     parser.add_argument( "--orientation", "-o", default=0, type=int, choices=[0, 90, 180, 270], help="Orientation of the display, in degrees")
 
-    parser.add_argument("--transitions", "-t", nargs="+", metavar = "transition",
-                        default=[transitions.TransitionTypes.Random], choices=transitions.TransitionTypes,
+    parser.add_argument("--transitions", "-t", nargs="*", metavar = "transition",
+                        default=[], choices=transitions.TransitionTypes,
                         help = "A list of transitions to chose from")
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
@@ -289,9 +295,9 @@ def process_cmdline():
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
-    parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
+    # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
 
-    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("--version", action="version", version=__version__)
 
     args = parser.parse_args()
 
@@ -309,58 +315,43 @@ def reloadConfig(_signum, _frame):
     getArt.cache_clear()
     event_q.put(ReloadEvent())
 
-def getServerInfo():
-    # If server is specified, use that.
-    if args.lmsserver:
-        return args.lmsserver, args.lmsports[0]
-
-    # Else, perform discovery, and choose the first one
-    servers = discovery.discover_lms()
-    if servers:
-        return servers[0]['host'], servers[0]['port']
-
-    return None, None
-
-def getServer():
-    s, p = getServerInfo()
-    srv = server.LMSServer(s, p)
-    return srv
-
-def getPlayer(srv: server.LMSServer, name):
-    players = srv.get_players()
-    for plr in players:
-        if plr.name == name:
-            return plr
+def getPlayer(servers, name):
+    for srv in servers:
+        s = server.LMSServer(srv["host"], int(srv["port"]))
+        if s:
+            players = s.get_players()
+            for plr in players:
+                if name in (plr.ref ,plr.name):
+                    return plr
     return None
 
-def serverPlayer(server, player):
-    pass
 
 def main():
-    global args, version
-    print(f"Running.   Version: {version}")
+    global args, __version__
+    print(f"Running.   Version: {__version__}")
     args = process_cmdline()
     console = Console()
 
-    piddir = args.pidfile.parent
-    pidfile = args.pidfile.name
+    #piddir = args.pidfile.parent
+    #pidfile = args.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
-    with PidFile(piddir=piddir, pidname=pidfile):
+    with PidFile("lmsdisplay"):
         backoff = 1
         while True:
             try:
-                lms_server = getServer()
-                plr = getPlayer(lms_server, args.player)
-                if not (plr and lms_server):
-                    raise Exception()
+                servers = discovery.discover_lms()
+                plr = getPlayer(servers, args.player)
+                print(plr)
+                if not (plr):
+                    raise PlayerNotFoundError(args.player)
 
-                base_url = f"http://{lms_server.host}:{lms_server.port}"
+                base_url = f"http://{plr.server.host}:{plr.server.port}"
 
                 disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
 
-                mon = lms_monitor.PlayerMonitor(plr.ref, lms_server.host, event_q, args.login, args.password)
+                mon = lms_monitor.PlayerMonitor(plr.ref, plr.server.host, event_q, args.login, args.password)
                 mon.start()
 
                 backoff = 1
