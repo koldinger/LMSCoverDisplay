@@ -62,9 +62,9 @@ args: argparse.Namespace
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
-#from icecream import ic
-#ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-#ic.disable()
+from icecream import ic
+ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+ic.disable()
 
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
@@ -114,9 +114,14 @@ def handleEvents(display, playerID, trans, baseUrl):
 
     while True:
         event = event_q.get()
+        ic(event)
 
         # Grab the current playing status from the stream
         overlay = None
+
+        # Handle a reload event and break out of the loop
+        if type(event) is ReloadEvent:
+            break
 
         match event.mode:
             case "play":
@@ -310,6 +315,7 @@ class ReloadEvent:
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args
+    ic()
     args = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     getArt.cache_clear()
@@ -343,7 +349,7 @@ def main():
             try:
                 servers = discovery.discover_lms()
                 plr = getPlayer(servers, args.player)
-                print(plr)
+                print(f"Monitoring: {plr}")
                 if not (plr):
                     raise PlayerNotFoundError(args.player)
 
@@ -357,6 +363,7 @@ def main():
                 backoff = 1
 
                 handleEvents(disp, args.player, args.transitions, base_url)
+                mon.close()
             except Exception as e:
                 console.print_exception()
                 time.sleep(backoff)

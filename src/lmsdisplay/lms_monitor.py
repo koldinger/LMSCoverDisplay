@@ -50,6 +50,8 @@ volpat = re.compile(r" volume:\s*(\d+)")
 
 MAX_BACKOFF = 120
 
+LMS_TELNET_PORT = 9090
+
 def command_string(string, query=False):
     if query:
         string = string + " ?"
@@ -92,7 +94,7 @@ class PlayerMonitor(threading.Thread):
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
-                self.tn = telnetlib.Telnet(self.server, 9090)
+                self.tn = telnetlib.Telnet(self.server, LMS_TELNET_PORT)
                 if self.login:
                     self.sendLine(command_string(f"login {self.login} {self.password}"))
                 self.backoff = 1            # Reset the backoff time

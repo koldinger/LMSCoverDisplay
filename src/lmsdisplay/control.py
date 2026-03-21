@@ -39,6 +39,9 @@ from rich import print
 from LMSTools import server, player
 from . import discovery, transitions
 
+from icecream import ic
+ic.configureOutput(includeContext=True)
+
 args: configargparse.Namespace
 servers = discovery.discover_lms()
 rich.traceback.install()
@@ -47,6 +50,7 @@ app = Flask(__name__, static_url_path="/static")
 
 servers = []
 players = {}
+
 
 # Collect all the servers and players
 def getServersAndPlayers():
@@ -108,16 +112,17 @@ def indexPost():
         with open(args.displayconfig, "w") as f:
             f.write(configargparse.DefaultConfigFileParser().serialize(output))
 
-    signal_display(output["pidfile"])
+    signal_display()
 
     presets["transitions"] = trans
 
     return render_template("index.html", presets=presets, players=players, servers=servers, transitions=transitions.TransitionTypes)
 
-def signal_display(pidfile):
-    pidfile = pidfile or args.pidfile
-    if args.pidfile or pidfile:
+def signal_display():
+    pidfile = args.pidfile
+    if pidfile:
         try:
+            ic(pidfile)
             with open(pidfile) as f:
                 pid = int(f.readline().strip())
 
