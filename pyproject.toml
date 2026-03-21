@@ -30,7 +30,7 @@ package-dir = {"" = "src"}
 packages = [ "lmsdisplay" ]
 
 [tool.setuptools.package-data]
-my_package = ["*.css", "*.html"]
+lmsdisplay = ["static/*", "static/samples/*", "templates/*", "art/*"]
 
 [tool.uv.sources]
 lmstools = { git = "https://github.com/koldinger/LMSTools.git" }
