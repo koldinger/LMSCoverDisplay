@@ -23,9 +23,10 @@ dependencies = [
 
 [project.scripts]
 lmsdisplay = "lmsdisplay:cover_display.main"
-lmsdispcontrol = "lmsdisplay:control.main"
+lmsconfig  = "lmsdisplay:control.main"
+lmsremote = "lmsdisplay:remote_control.main"
 
-[tools.setuptools]
+[tool.setuptools]
 package-dir = {"" = "src"}
 packages = [ "lmsdisplay" ]
 
