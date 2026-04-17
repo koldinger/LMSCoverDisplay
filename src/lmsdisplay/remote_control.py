@@ -29,31 +29,28 @@
 
 import argparse
 import datetime as dt
-import functools
 import importlib.metadata
-import importlib.resources
-import re
 import signal
+import threading
 import time
 from datetime import datetime
-from io import BytesIO
-from pathlib import Path
-from urllib.parse import urljoin
-from queue import Queue
 from enum import Enum, auto
-
-from LMSTools import server, player
+from pathlib import Path
+from queue import Queue
 
 import configargparse
-import requests
+from digitalio import Direction, Pull
 from pid import PidFile
-from PIL import Image, ImageEnhance
-from PIL.Image import Resampling
 from rich.console import Console
 
-from . import transitions, util, volume
-from . import flaschen
-from . import lms_monitor, discovery
+from LMSTools import player, server
+
+import board
+import busio
+from adafruit_mcp230xx.mcp23008 import MCP23017
+from RPi import GPIO
+
+from . import discovery
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -62,19 +59,14 @@ def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
 from icecream import ic
+
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 ic.disable()
-
-idpat = re.compile(r" id:\s*(\d+)")
-playpat = re.compile(r" mode:\s*(\w+)")
-volpat = re.compile(r" volume:\s*(\d+)")
 
 __version__ = "Unknown"
 
 class PlayerNotFoundError(Exception):
     pass
-
-event_q = Queue()
 
 try:
     # Replace 'your-package-name' with the actual distribution name of your package
@@ -84,9 +76,8 @@ except importlib.metadata.PackageNotFoundError:
     #print("Package not found or not installed.")
 
 def process_cmdline():
-    epilog = "Avaliable transitions:\n\n" + ", ".join(transitions.TransitionTypes)
-    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server",
-                                           epilog=epilog)
+    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server")
+                                          
                                            # formatter_class=argparse.RawTextHelpFormatter)
 
     midnight = dt.time(0, 0)
@@ -101,33 +92,9 @@ def process_cmdline():
     parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
     parser.add_argument( "--password", type=str, default=None, help="Password")
 
-    parser.add_argument( "--displayhost", "-d", default="localhost", type=str, help="Display host")
-    parser.add_argument( "--displayport", "-D", default=1337, type=int, help="Display port")
-
     parser.add_argument( "--lmsserver", "-l", default=None, type=str, help="Name of the LMS Server")
     parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
                         help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
-
-    parser.add_argument( "--orientation", "-o", default=0, type=int, choices=[0, 90, 180, 270], help="Orientation of the display, in degrees")
-
-    parser.add_argument("--transitions", "-t", nargs="*", metavar = "transition",
-                        default=[], choices=transitions.TransitionTypes,
-                        help = "A list of transitions to chose from")
-    parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
-
-    parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dimtimes", type=util.parsetime, default=[midnight, midnight], nargs=2, metavar="Time", help="Start dimming at this time")
-
-    parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
-    parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
-
-    parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
-    parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
-
-    parser.add_argument("--volume", action="store_true", default=False, help="Display the volume bar when volume changes")
-
-    parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
-    parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
     # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
 
@@ -142,29 +109,62 @@ class ReloadEvent:
     pass
 
 class KeyEvents(Enum):
-    SKIP_FORWARD = auto()
-    SKIP_BACK = auto()
-    PLAY_PAUSE = auto()
-    VOL_UP = auto()
-    VOL_DOWN = auto()
+    SKIP_BACK = 0
+    PLAY_PAUSE = 1
+    SKIP_FORWARD = 2
+    VOL_DOWN = 3
+    VOL_UP = 4
+    RELOAD_CONFIG = 99
+
+pins = []
+mcp: MCP23017
+event_q = Queue()
+
+INTERRUPT_PIN = 17
+MCP23017_ADDR = 0x27
+
+def initI2C():
+    global mcp
+    i2c = busio.I2C(board.SCL, board.SDA)
+    mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
+
+    # Only initiasize the pins we use, namely A0-A4
+    for pin in range(0, 5):
+        pins.append(mcp.get_pin(pin))
+
+    for pin in pins:
+        pin.direction = Direction.INPUT
+        pin.pull = Pull.UP
+
+    # Set up to check all the port B pins (pins 8-15) w/interrupts!
+    mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
+    # If intcon is set to 0's we will get interrupts on
+    # both button presses and button releases
+    mcp.interrupt_configuration = 0x0000  # interrupt on any change
+    mcp.io_control = 0x44  # Interrupt as open drain and mirrored
+    mcp.clear_ints()  # Interrupts need to be cleared initially
+
+    # connect either interrupt pin to the Raspberry pi's pin 17.
+    # They were previously configured as mirrored.
+    GPIO.setmode(GPIO.BCM)
+    interrupt = INTERRUPT_PIN
+    GPIO.setup(interrupt, GPIO.IN, GPIO.PUD_UP)  # Set up Pi's pin as input, pull up
+
+    # The add_event_detect fuction will call our print_interrupt callback function
+    # every time an interrupt gets triggered.
+    GPIO.add_event_detect(interrupt, GPIO.FALLING, callback=checkPins, bouncetime=10)
 
 
-def getEvent():
-    while True:
-        x = input()
-        match x:
-            case 'n':
-                return KeyEvents.SKIP_FORWARD
-            case 'p':
-                return KeyEvents.SKIP_BACK
-            case '':
-                return KeyEvents.PLAY_PAUSE
-            case 'u':
-                return KeyEvents.VOL_UP
-            case 'd':
-                return KeyEvents.VOL_DOWN
-            case _:
-                print(f"Unknown key {x}")
+def checkPins(_):
+    for pin in mcp.int_flag:
+        value = pins[pin].value
+        if value:
+            try:
+                event_q.put(KeyEvents(pin))
+            except ValueError:
+                print(f"Unknown button {pin}")
+
+    mcp.clear_ints()
 
 reload = False
 
@@ -173,6 +173,7 @@ def reloadConfig(_signum, _frame):
     global args, reload
     ic()
     args = process_cmdline()
+    event_q.put(KeyEvents.RELOAD_CONFIG)
     # clear the cache on getArt so we get changes to images immediately
 
 
