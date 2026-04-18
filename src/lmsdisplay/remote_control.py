@@ -47,7 +47,7 @@ from LMSTools import player, server
 
 import board
 import busio
-from adafruit_mcp230xx.mcp23008 import MCP23017
+from adafruit_mcp230xx.mcp23017 import MCP23017
 from RPi import GPIO
 
 from . import discovery
@@ -61,7 +61,7 @@ def unix_timestamp():
 from icecream import ic
 
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-ic.disable()
+#ic.disable()
 
 __version__ = "Unknown"
 
@@ -76,7 +76,7 @@ except importlib.metadata.PackageNotFoundError:
     #print("Package not found or not installed.")
 
 def process_cmdline():
-    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server")
+    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server", ignore_unknown_config_file_keys=True)
                                           
                                            # formatter_class=argparse.RawTextHelpFormatter)
 
@@ -120,16 +120,18 @@ pins = []
 mcp: MCP23017
 event_q = Queue()
 
-INTERRUPT_PIN = 17
+INTERRUPT_PIN = board.D17
 MCP23017_ADDR = 0x27
 
 def initI2C():
     global mcp
+    ic()
+
     i2c = busio.I2C(board.SCL, board.SDA)
     mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
 
     # Only initiasize the pins we use, namely A0-A4
-    for pin in range(0, 5):
+    for pin in range(0, 16):
         pins.append(mcp.get_pin(pin))
 
     for pin in pins:
@@ -140,24 +142,29 @@ def initI2C():
     mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
     # If intcon is set to 0's we will get interrupts on
     # both button presses and button releases
+
     mcp.interrupt_configuration = 0x0000  # interrupt on any change
     mcp.io_control = 0x44  # Interrupt as open drain and mirrored
     mcp.clear_ints()  # Interrupts need to be cleared initially
 
     # connect either interrupt pin to the Raspberry pi's pin 17.
     # They were previously configured as mirrored.
+
     GPIO.setmode(GPIO.BCM)
-    interrupt = INTERRUPT_PIN
-    GPIO.setup(interrupt, GPIO.IN, GPIO.PUD_UP)  # Set up Pi's pin as input, pull up
+
+    # Enable the following to use interrupts
+    #GPIO.setup(INTERRUPT_PIN, GPIO.IN, GPIO.PUD_UP)  # Set up Pi's pin as input, pull up
 
     # The add_event_detect fuction will call our print_interrupt callback function
     # every time an interrupt gets triggered.
-    GPIO.add_event_detect(interrupt, GPIO.FALLING, callback=checkPins, bouncetime=10)
+    #GPIO.add_event_detect(INTERRUPT_PIN, GPIO.FALLING, callback=checkPins, bouncetime=10)
 
 
-def checkPins(_):
+def checkPins(port):
+    ic(port)
     for pin in mcp.int_flag:
         value = pins[pin].value
+        ic(pin, value)
         if value:
             try:
                 event_q.put(KeyEvents(pin))
@@ -165,6 +172,15 @@ def checkPins(_):
                 print(f"Unknown button {pin}")
 
     mcp.clear_ints()
+
+pin_value = {}
+
+def pollPins():
+    while True:
+        for pin in pins:
+            pin_value[pin] = pin.value
+        ic(pin_value)
+        time.sleep(1)
 
 reload = False
 
@@ -178,12 +194,14 @@ def reloadConfig(_signum, _frame):
 
 
 def getPlayer(servers, name) -> player.LMSPlayer:
+    ic()
     for srv in servers:
         s = server.LMSServer(srv["host"], int(srv["port"]))
         if s:
             players = s.get_players()
             for plr in players:
                 if name in (plr.ref ,plr.name):
+                    ic(name, plr)
                     return plr
     return None
 
@@ -194,20 +212,30 @@ def main():
     args = process_cmdline()
     console = Console()
 
+    initI2C()
+
     #piddir = args.pidfile.parent
     #pidfile = args.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
     with PidFile("lmscontrol"):
+        polling_thread = threading.Thread(target=pollPins)
+        polling_thread.run()
+        threading.run
+
         backoff = 1
         while True:
             try:
                 servers = discovery.discover_lms()
+                ic(servers)
                 plr = getPlayer(servers, args.player)
+                ic(plr)
 
                 while not reload:
-                    event = getEvent()
+                    event = event_q.get()
+                    ic(event)
+		
                     match event:
                         case KeyEvents.SKIP_FORWARD:
                             plr.__next__()
