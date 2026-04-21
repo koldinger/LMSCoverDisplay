@@ -9,6 +9,9 @@ description = "Display cover art from Lyrion Music Server to an RGB Matrix displ
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "adafruit-blinka>=9.0.4",
+    "adafruit-circuitpython-debouncer>=2.0.14",
+    "adafruit-circuitpython-mcp230xx>=2.6.1",
     "configargparse>=1.7.1",
     "flask>=3.1.2",
     "icecream>=2.1.8",
@@ -18,6 +21,7 @@ dependencies = [
     "pillow>=12.0.0",
     "requests>=2.32.3",
     "rich>=13.9.4",
+    "rpi-gpio>=0.7.1",
     "telnetlib3>=2.0.8",
 ]
 

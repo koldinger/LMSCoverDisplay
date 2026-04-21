@@ -60,7 +60,7 @@ def unix_timestamp():
 
 from icecream import ic
 
-ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+#ic.configureOutput(includeContext=True, prefix=unix_timestamp)
 #ic.disable()
 
 __version__ = "Unknown"
@@ -131,21 +131,22 @@ def initI2C():
     mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
 
     # Only initiasize the pins we use, namely A0-A4
-    for pin in range(0, 16):
+    for pin in range(0, 5):
         pins.append(mcp.get_pin(pin))
 
     for pin in pins:
         pin.direction = Direction.INPUT
         pin.pull = Pull.UP
+        ic(pin, pin._pin)
 
     # Set up to check all the port B pins (pins 8-15) w/interrupts!
-    mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
+    #mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
     # If intcon is set to 0's we will get interrupts on
     # both button presses and button releases
 
-    mcp.interrupt_configuration = 0x0000  # interrupt on any change
-    mcp.io_control = 0x44  # Interrupt as open drain and mirrored
-    mcp.clear_ints()  # Interrupts need to be cleared initially
+    #mcp.interrupt_configuration = 0x0000  # interrupt on any change
+    #mcp.io_control = 0x44  # Interrupt as open drain and mirrored
+    #mcp.clear_ints()  # Interrupts need to be cleared initially
 
     # connect either interrupt pin to the Raspberry pi's pin 17.
     # They were previously configured as mirrored.
@@ -164,8 +165,8 @@ def checkPins(port):
     ic(port)
     for pin in mcp.int_flag:
         value = pins[pin].value
-        ic(pin, value)
-        if value:
+        if not value:
+            ic()
             try:
                 event_q.put(KeyEvents(pin))
             except ValueError:
@@ -178,9 +179,15 @@ pin_value = {}
 def pollPins():
     while True:
         for pin in pins:
-            pin_value[pin] = pin.value
-        ic(pin_value)
-        time.sleep(1)
+            value = pin.value
+            if value != pin_value.get(pin, True):
+                #ic(pin, value, pin_value.get(pin, True))
+                if not value:
+                    ic(KeyEvents(pin._pin))
+                    event_q.put(KeyEvents(pin._pin))
+            pin_value[pin] = value
+        #ic(pin_value.values())
+        time.sleep(0.1)
 
 reload = False
 
@@ -221,8 +228,8 @@ def main():
 
     with PidFile("lmscontrol"):
         polling_thread = threading.Thread(target=pollPins)
-        polling_thread.run()
-        threading.run
+        polling_thread.start()
+        ic()
 
         backoff = 1
         while True:
@@ -247,6 +254,7 @@ def main():
                             plr.volume_up()
                         case KeyEvents.VOL_DOWN:
                             plr.volume_down()
+                    ic("------")
 
             except Exception as e:
                 console.print_exception()
