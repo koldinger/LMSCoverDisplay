@@ -4,7 +4,6 @@ Installing program.
   If using Adafruit RGB Matrices, on the backside of the bonnet, short the E jumper to 8.
   If using another card, check your documentation, but you may need short the E jumper to 16.
 
-
 1: Configure the OS settings.
   Disable WLAN Power Management
     sudo /sbin/iwconfig wlan0 power off
@@ -14,6 +13,12 @@ Installing program.
     edit /boot/firmware/config.txt
     Add the line:
       dtparam=audio=off
+
+  Blacklist the sound driver (the above is sometimes insufficient):
+    edit /etc/modprobe.d/blacklist-custom.conf
+    Add the line:
+      blacklist snd_bcm2835
+  
   Isolate CPUs
       edit /boot/firmware/cmdline.txt
           Add "isolcpus=3" to the command line
@@ -36,16 +41,19 @@ Installing program.
   systemctl enable ft-server.service
   systemctl start ft-server.service
 
+  Note: If the screen shows strange behavior, add the switch --led-slowdown-gpio=x where x is a number between 1 and 4.
+  1 is the default, 2 seems to work for many screens.   Adjust as needed.
+
 5: Clone and install LMSDisplay.   Note, if you get errors about "externally managed environment", add the "--break-system-packages"
   git clone REPOSITORY/LMSDisplay
   cd LMSDisplay
   sudo uv pip install --system . [--break-system-packages]
 
 6: Install and start the LMSDisplay services
-  cp lmsdisplay.service lmsdispcontrol.service /usr/lib/systemd/system/
-  [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsdispcontrol}.service /etc/systemd/system/multi-user.target.wants/ ]
-  systemctl enable lmsdisplay.service lmsdispcontrol.service
-  systemctl start lmsdisplay.service lmsdispcontrol.service
+  cp lmsdisplay.service lmsconfig.service /usr/lib/systemd/system/
+  [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsconfig}.service /etc/systemd/system/multi-user.target.wants/ ]
+  systemctl enable lmsdisplay.service lmsconfig.service
+  systemctl start lmsdisplay.service lmsconfig.service
 
 5: Configure the display.
   Use a browser to connect to http://[DISPLAYMACHINE]:5000
