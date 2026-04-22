@@ -48,6 +48,7 @@ from LMSTools import player, server
 import board
 import busio
 from adafruit_mcp230xx.mcp23017 import MCP23017
+from adafruit_debouncer import Debouncer, Button
 from RPi import GPIO
 
 from . import discovery
@@ -117,6 +118,7 @@ class KeyEvents(Enum):
     RELOAD_CONFIG = 99
 
 pins = []
+buttons = {}
 mcp: MCP23017
 event_q = Queue()
 
@@ -132,12 +134,16 @@ def initI2C():
 
     # Only initiasize the pins we use, namely A0-A4
     for pin in range(0, 5):
-        pins.append(mcp.get_pin(pin))
+        pin = mcp.get_pin(pin)
 
-    for pin in pins:
         pin.direction = Direction.INPUT
         pin.pull = Pull.UP
-        ic(pin, pin._pin)
+        #ic(pin, pin._pin)
+        button = Button(pin, long_duration_ms=500)
+        print(button.value)
+        pins.append(pin)
+        buttons[pin] = button
+
 
     # Set up to check all the port B pins (pins 8-15) w/interrupts!
     #mcp.interrupt_enable = 0xFFFF  # Enable Interrupts in all pins
@@ -189,6 +195,16 @@ def pollPins():
         #ic(pin_value.values())
         time.sleep(0.1)
 
+def pollButtons():
+    while True:
+        for pin, button in buttons.items():
+            button.update()
+            #print(button.pressed, button.released, button.value, button.rose, button.fell, button.long_press)
+            if button.pressed:
+                ic(KeyEvents(pin._pin))
+                event_q.put(KeyEvents(pin._pin))
+        time.sleep(0.05)
+
 reload = False
 
 def reloadConfig(_signum, _frame):
@@ -227,7 +243,8 @@ def main():
     signal.signal(signal.SIGHUP, reloadConfig)
 
     with PidFile("lmscontrol"):
-        polling_thread = threading.Thread(target=pollPins)
+        polling_thread = threading.Thread(target=pollButtons)
+        polling_thread.daemon = True
         polling_thread.start()
         ic()
 
@@ -247,14 +264,16 @@ def main():
                         case KeyEvents.SKIP_FORWARD:
                             plr.__next__()
                         case KeyEvents.SKIP_BACK:
-                            plr.prev()
+                            if plr.time_elapsed > 4.0:
+                                plr.seek_to(0)
+                            else:
+                                plr.prev()
                         case KeyEvents.PLAY_PAUSE:
                             plr.toggle()
                         case KeyEvents.VOL_UP:
                             plr.volume_up()
                         case KeyEvents.VOL_DOWN:
                             plr.volume_down()
-                    ic("------")
 
             except Exception as e:
                 console.print_exception()
