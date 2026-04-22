@@ -38,7 +38,7 @@ packages = [ "lmsdisplay" ]
 lmsdisplay = ["static/*", "static/samples/*", "templates/*", "art/*"]
 
 [tool.setuptools.data-files]
-"/usr/lib/systemd/system" = ["lmsdisplay.service", "lmsconfig.service", "lmsremote.service"]
+"/usr/lib/systemd/system" = ["ft-server.serivce", "lmsdisplay.service", "lmsconfig.service", "lmsremote.service"]
 
 [tool.uv.sources]
 lmstools = { git = "https://github.com/koldinger/LMSTools.git" }
