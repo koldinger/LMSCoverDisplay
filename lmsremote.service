@@ -1,0 +1,12 @@
+[Unit]
+Description=LMS Remote Control
+After=ft-server.service
+
+[Service]
+ExecStart=/usr/local/bin/lmsremote --config /etc/lmsdisplay.conf
+WorkingDirectory=/tmp
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
