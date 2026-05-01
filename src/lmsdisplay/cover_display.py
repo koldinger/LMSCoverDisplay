@@ -35,7 +35,6 @@ import importlib.resources
 import random
 import re
 import signal
-import sys
 import time
 from datetime import datetime
 from io import BytesIO
@@ -267,7 +266,7 @@ def process_cmdline():
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
 
     # TODO: Remove the required on this later, so we can find any player that's playing.
-    parser.add_argument( "--player", "-p", default=None, required=True, help="Player to monitor")
+    parser.add_argument( "--player", "-p", default=None, help="Player to monitor")
 
     parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
     parser.add_argument( "--password", type=str, default=None, help="Password")
