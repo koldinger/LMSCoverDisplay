@@ -27,6 +27,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+
 from PIL import Image
 from pathlib import Path
 
@@ -53,8 +55,11 @@ def makeGif(outputdir: Path, images, transition):
 
     results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, loop=0, duration=1*len(results))
 
-def makeGifs(output: Path, images):
-    for i in transitions.TransitionTypes:
+def makeGifs(output: Path, images, trans=None):
+    if not trans:
+        trans = list(transitions.TransitionTypes)
+
+    for i in trans:
         try:
             makeGif(output, images, i)
         except Exception as e:
@@ -64,14 +69,18 @@ def doTheGifThing():
     output = Path("samples")
     size = 256
 
+    trans = sys.argv
+    trans.pop(0)
+    trans = [transitions.TransitionTypes(i) for i in trans]
+
     util.makedir(output)
 
     names = ["test1.png", "test2.png", "test3.png"]
-    names = [Path("../..", x) for x in names]
+    names = [Path("art", x) for x in names]
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
 
-    makeGifs(output, images)
+    makeGifs(output, images, trans)
 
 
 if __name__ == "__main__":

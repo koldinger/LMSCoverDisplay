@@ -516,8 +516,8 @@ def _slice(img, num):
     return slices
 
 def _doBars(oimg, nimg, steps):
-    oslices = _slice(oimg, 4)
-    nslices = _slice(nimg, 4)
+    oslices = _slice(oimg, 8)
+    nslices = _slice(nimg, 8)
 
     angle = 0
     bars = []
@@ -580,10 +580,10 @@ class TransitionTypes(StrEnum):
     ExpandRightUp = auto(), "Expand the image up from the bottom left corner", partial(expand, rotation=270)
     ExpandLeftDown = auto(), "Expand the image down from the top right corner", partial(expand, rotation=90)
     ExpandLeftUp = auto(), "Expand the image up from the bottom right corner", partial(expand, rotation=180)
-    ShrinkRightDown = auto(), "Shrink the image down from the top left corner", partial(shrink, rotation=0)
-    ShrinkRightUp = auto(), "Shrink the image up from the bottom left corner", partial(shrink, rotation=270)
-    ShrinkLeftDown = auto(), "Shrink the image down from the top right corner", partial(shrink, rotation=90)
-    ShrinkLeftUp = auto(), "Shrink the image up from the bottom right corner", partial(shrink, rotation=180)
+    ShrinkRightDown = auto(), "Shrink the image down from the top left corner", partial(shrink, rotation=180)
+    ShrinkRightUp = auto(), "Shrink the image up from the bottom left corner", partial(shrink, rotation=90)
+    ShrinkLeftDown = auto(), "Shrink the image down from the top right corner", partial(shrink, rotation=270)
+    ShrinkLeftUp = auto(), "Shrink the image up from the bottom right corner", partial(shrink, rotation=0)
     CurtainHoriz = auto(), "Pull the new image in from the left and right", partial(curtain, rotation=0)
     CurtainVert = auto(), "Pull the new image in from the op and bottom", partial(curtain, rotation=90)
     CurtainOutHoriz = auto(), "Push the old image out to both sides", partial(curtainOut, rotation=0)
@@ -628,14 +628,14 @@ def test():
 
     size = 64
 
-    f = flaschen.Flaschen("coverpi2.local", 1337, size, size)
+    f = flaschen.Flaschen("coverpi1.local", 1337, size, size)
     # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     #names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
-    names = ["test1.png", "test2.png", "test3.png"]
-    names = [Path("../..", x) for x in names]
+    #names = ["test1.png", "test2.png", "test3.png", "qrcode.png"]
+    #names = [Path("art", x) for x in names]
 
-    #names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
+    names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
     #names = list(Path("art").glob("cover*.jpg"))
     random.shuffle(names)
 
