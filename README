@@ -5,9 +5,9 @@ Installing program.
   If using another card, check your documentation, but you may need short the E jumper to 16.
 
 1: Configure the OS settings.
-  Disable WLAN Power Management
-    sudo /sbin/iwconfig wlan0 power off
-    add to /etc/rc.local ???
+  #Disable WLAN Power Management
+  #  sudo /sbin/iwconfig wlan0 power off
+  #  add to /etc/rc.local ???
 
   Disable the sound driver:
     edit /boot/firmware/config.txt
@@ -15,7 +15,7 @@ Installing program.
       dtparam=audio=off
 
   Blacklist the sound driver (the above is sometimes insufficient):
-    edit /etc/modprobe.d/blacklist-custom.conf
+    edit (or create) /etc/modprobe.d/blacklist-custom.conf
     Add the line:
       blacklist snd_bcm2835
   
@@ -23,19 +23,34 @@ Installing program.
       edit /boot/firmware/cmdline.txt
           Add "isolcpus=3" to the command line
         eg: "console=serial0,115200 console=tty1 root=PARTUUID=c32373bb-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=US isolcpus=3"
-        
-2: install uv 
+
+  Enable i2c (if using the remote functionality)
+      sudo raspi-config
+      select Interfaces
+      select I2C
+      select Enable
+
+2: Install git and some other things
+    sudo apt install git i2c-tools python3-pip python3-setuptools
+    [sudo apt install procs btop fd-find bat]
+
+3: install uv.   Note, if you get errors about "externally managed environment", add the "--break-system-packages"
   sudo pip install [--break-system-packages] uv
 
-2: Clone flaschen-taschen
+4: Clone flaschen-taschen
   git clone --recursive https://github.com/hzeller/flaschen-taschen.git
 
-3: Build and install ft-server:
+5: Build and install ft-server:
   cd flaschen-taschen/server 
   make FT_BACKEND=rgb-matrix
   cp ft-server /usr/local/bin
 
-4: Install and start the flaschen taschen service
+6: Clone and install LMSDisplay.  Note, if you get errors about "externally managed environment", add the "--break-system-packages"
+  git clone REPOSITORY/LMSDisplay
+  cd LMSDisplay
+  sudo uv pip install --system . [--break-system-packages]
+
+6: Install and start the flaschen taschen service
   cp ft-server.service /usr/lib/systemd/system/
   [ ln -s /usr/lib/systemd/system/ft-server.service /etc/systemd/system/multi-user.target.wants/ ]
   systemctl enable ft-server.service
@@ -43,18 +58,12 @@ Installing program.
 
   Note: If the screen shows strange behavior, add the switch --led-slowdown-gpio=x where x is a number between 1 and 4.
   1 is the default, 2 seems to work for many screens.   Adjust as needed.
+8: Install and start the LMSDisplay services
+  # cp lmsdisplay.service lmsconfig.service /usr/lib/systemd/system/
+  # [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsconfig}.service /etc/systemd/system/multi-user.target.wants/ ]
+  systemctl enable lmsdisplay.service lmsconfig.service lmsremote.service
+  systemctl start lmsdisplay.service lmsconfig.service lmsremote.service
 
-5: Clone and install LMSDisplay.   Note, if you get errors about "externally managed environment", add the "--break-system-packages"
-  git clone REPOSITORY/LMSDisplay
-  cd LMSDisplay
-  sudo uv pip install --system . [--break-system-packages]
-
-6: Install and start the LMSDisplay services
-  cp lmsdisplay.service lmsconfig.service /usr/lib/systemd/system/
-  [ ln -s /usr/lib/systemd/system/{lmsdisplay,lmsconfig}.service /etc/systemd/system/multi-user.target.wants/ ]
-  systemctl enable lmsdisplay.service lmsconfig.service
-  systemctl start lmsdisplay.service lmsconfig.service
-
-5: Configure the display.
+9: Configure the display.
   Use a browser to connect to http://[DISPLAYMACHINE]:5000
   Set, at a minimum, the LMS Server and Player you wish to monitor.
