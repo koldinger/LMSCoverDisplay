@@ -548,11 +548,12 @@ def _delay(oimg, nimg, frames, trans):
 def _hashImg(img):
     return md5(img.tobytes()).hexdigest()
 
-def _doDrip(oimg, nimg, steps, func, shuffle, grpsize):
+def _doDrip(oimg, nimg, steps, func, shuffle, numgrps):
     w, h = oimg.size
     rows = list(range(w))
     if shuffle:
         random.shuffle(rows)
+    grpsize = int(h / numgrps)
     groups = [rows[i:i + grpsize] for i in range(0, len(rows), grpsize)]
     o_rows = _slice(oimg, h)
     n_rows = _slice(nimg, h)
@@ -594,7 +595,7 @@ def rip(oimg, nimg, steps, rotation=0):
 
 def diagonal(oimg, nimg, steps, rotation=0):
     yield oimg
-    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doPush, False, 4)
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doPush, False, 8)
     yield nimg
 
 def bars(oimg, nimg, steps, rotation=0):
