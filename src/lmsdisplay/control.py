@@ -33,10 +33,11 @@ from pathlib import Path
 
 import configargparse
 import rich.traceback
-from flask import Flask, url_for, render_template, request
+from flask import Flask, render_template, request
 from rich import print
+from pid import PidFile
 
-from LMSTools import server, player
+from LMSTools import server
 from . import discovery, transitions
 
 from icecream import ic
@@ -63,10 +64,11 @@ def getServersAndPlayers():
     players = l_players
     servers = l_servers
 
-
 @app.route("/", methods=["GET"])
 def index():
     #print("Index - GET")
+    getServersAndPlayers()
+
     presets = {}
     errmsg = ""
     if args.displayconfig:
@@ -100,11 +102,13 @@ def indexPost():
 
     output = dict(request.form.items())
     presets = dict(request.form.items())        # Copy to use again
+
     output["transitions"] = trans
-    output["dimtimes"] = [output.pop("dimstart", "0:00"), output.pop("dimend", "0:00")]
+    output["dimtimes"] = [output.pop("dimstart", "0:10"), output.pop("dimend", "0:01")]
     output["lmsports"] = [output.pop("lmsport_http", 9000), output.pop("lmsport_telnet", 9090)]
+
     if "volume" not in output:
-        output["volume"] = '0'
+        output["volume"] = "0"
 
     #print(output)
 
@@ -112,14 +116,14 @@ def indexPost():
         with open(args.displayconfig, "w") as f:
             f.write(configargparse.DefaultConfigFileParser().serialize(output))
 
-    signal_display()
+    signal_proc(args.disppid)
+    signal_proc(args.remotepid)
 
     presets["transitions"] = trans
 
     return render_template("index.html", presets=presets, players=players, servers=servers, transitions=transitions.TransitionTypes)
 
-def signal_display():
-    pidfile = args.pidfile
+def signal_proc(pidfile):
     if pidfile:
         try:
             ic(pidfile)
@@ -132,17 +136,17 @@ def signal_display():
 
 def processCommandLine():
     parser = configargparse.ArgumentParser("LMS Display Configuration Web Interface")
-    parser.add_argument("--pidfile", type=Path,         help="Signal the process to reread configurations")
+    parser.add_argument("--disppid",    type=Path,         help="Signal the display process to reread configurations")
+    parser.add_argument("--remotepid",  type=Path,         help="Signal the remote process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
 
     return parser.parse_args()
 
 def main():
     global args
-    args = processCommandLine()
-    getServersAndPlayers()
-    app.run(host="0.0.0.0")
+    with PidFile("lmsconfig"):
+        args = processCommandLine()
+        app.run(host="0.0.0.0")
 
 if __name__ == "__main__":
     main()
-
