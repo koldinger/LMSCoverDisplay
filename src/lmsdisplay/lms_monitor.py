@@ -72,6 +72,8 @@ class PlayerMonitor(threading.Thread):
         self.backoff = 1
         self.closed = False
 
+        self.daemon = True
+
     def getLine(self):
         try:
             line = self.tn.read_until(b"\n")
