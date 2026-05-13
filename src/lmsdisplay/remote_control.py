@@ -122,6 +122,8 @@ buttons = {}
 mcp: MCP23017
 event_q = Queue()
 
+RESET_PERIOD = 4.0          # Number of seconds in a song during which we'll go back to the previous song, else we just go back to the start of this one.
+
 INTERRUPT_PIN = board.D17
 MCP23017_ADDR = 0x27
 
@@ -242,7 +244,7 @@ def main():
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
-    with PidFile("lmscontrol"):
+    with PidFile("lmsremote"):
         polling_thread = threading.Thread(target=pollButtons)
         polling_thread.daemon = True
         polling_thread.start()
@@ -259,12 +261,12 @@ def main():
                 while not reload:
                     event = event_q.get()
                     ic(event)
-		
+
                     match event:
                         case KeyEvents.SKIP_FORWARD:
                             plr.__next__()
                         case KeyEvents.SKIP_BACK:
-                            if plr.time_elapsed > 4.0:
+                            if plr.time_elapsed > RESET_PERIOD:
                                 plr.seek_to(0)
                             else:
                                 plr.prev()
