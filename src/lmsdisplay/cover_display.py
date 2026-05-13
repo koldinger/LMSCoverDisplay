@@ -28,6 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import contextlib
 import datetime as dt
 import functools
 import importlib.metadata
@@ -76,12 +77,8 @@ class PlayerNotFoundError(Exception):
 
 event_q = Queue()
 
-try:
-    # Replace 'your-package-name' with the actual distribution name of your package
+with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     __version__ = importlib.metadata.version("lmsdisplay")
-except importlib.metadata.PackageNotFoundError:
-    pass
-    #print("Package not found or not installed.")
 
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
@@ -299,6 +296,8 @@ def process_cmdline():
     parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
+    parser.add_argument("--configure", action="store_true", default=False, help="Show a configuration QR Code and wait until a configuration takes place")
+
     # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
 
     parser.add_argument("--version", action="version", version=__version__)
@@ -346,8 +345,11 @@ def main():
         backoff = 1
         while True:
             try:
+                ic("Looking for servers")
                 servers = discovery.discover_lms()
+                ic(servers)
                 plr = getPlayer(servers, args.player)
+                ic(plr)
                 print(f"Monitoring: {plr}")
                 if not (plr):
                     raise PlayerNotFoundError(args.player)
@@ -363,8 +365,9 @@ def main():
 
                 handleEvents(disp, args.player, args.transitions, base_url)
                 mon.close()
-            except Exception as e:
+            except Exception:
                 console.print_exception()
+                print(f"Backing off for {backoff}")
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 120)
 
