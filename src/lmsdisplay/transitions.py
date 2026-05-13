@@ -34,6 +34,8 @@ from contextlib import suppress
 from enum import StrEnum, auto
 from functools import partial
 from pathlib import Path
+from hashlib import md5
+from math import ceil
 
 import numpy as np
 import rich.traceback
@@ -42,8 +44,8 @@ from PIL import Image, ImageEnhance
 
 rich.traceback.install()
 
-#from icecream import ic
-#ic.configureOutput(includeContext=True)
+from icecream import ic
+ic.configureOutput(includeContext=True)
 
 
 """
@@ -61,23 +63,23 @@ def _rotate(angle: int, func, oimg: Image.Image, nimg: Image.Image, steps: int, 
 
 def _doPush(oimg, nimg, steps):
     """Push an image out from one side to the other."""
-    inc = oimg.width / steps
-
     width, height = oimg.size
+    inc = width / steps
 
+    # Create a big image, twice as wide as a single one, and put the two 
+    # base images side by side.
     cimage = Image.new("RGB", (width * 2, height))
     cimage.paste(oimg, (0, 0))
     cimage.paste(nimg, (width, 0))
-    cpx = cimage.load()
 
+    # Now, scan across the combined image, from left to right
+    # Selecting a square subsection of the image.
     for i in range(steps + 1):
-        res = Image.new("RGB", oimg.size)
-        respx = res.load()
-
         shift = i * inc
-        for x in range(width):
-            for y in range(height):
-                respx[x, y] = cpx[x + shift, y]
+        res = cimage.crop((shift, 0, width + shift, height))
+        #for x in range(width):
+        #   for y in range(height):
+        #       respx[x, y] = cpx[x + shift, y]
 
         yield res
     yield nimg
@@ -516,8 +518,8 @@ def _slice(img, num):
     return slices
 
 def _doBars(oimg, nimg, steps):
-    oslices = _slice(oimg, 8)
-    nslices = _slice(nimg, 8)
+    oslices = _slice(oimg, 4)
+    nslices = _slice(nimg, 4)
 
     angle = 0
     bars = []
@@ -534,6 +536,56 @@ def _doBars(oimg, nimg, steps):
             res.paste(chunk, (0, y))
             y += chunk.height
         yield res
+
+
+def _delay(oimg, nimg, frames, trans):
+    for _ in range(frames):
+        yield oimg
+    yield from trans
+    while True:
+        yield nimg
+
+def _hashImg(img):
+    return md5(img.tobytes()).hexdigest()
+
+def _doDrip(oimg, nimg, steps, shuffle, grpsize):
+    w, h = oimg.size
+    rows = list(range(w))
+    if shuffle:
+        random.shuffle(rows)
+    groups = [rows[i:i + grpsize] for i in range(0, len(rows), grpsize)]
+    o_rows = _slice(oimg, h)
+    n_rows = _slice(nimg, h)
+    strips = [None] * h
+    delay = 0
+    # Create the groups
+    for delay, grp in enumerate(groups):
+        for row in grp:
+            strips[row] = _delay(o_rows[row], n_rows[row], delay, _doPush(o_rows[row], n_rows[row], steps))
+
+    # print(delay, strips)
+
+    for i in range(steps + ceil(h / grpsize)):
+        # print(f"Iteration {i} {'-' * 20}")
+        out = Image.new("RGB", (w, h))
+        for row, strp in enumerate(strips):
+            strip_img = next(strp)
+            # print(row, _hashImg(strip_img), strip_img)
+            out.paste(strip_img, (0, row))
+        yield(out)
+
+    for strp in strips:
+        strp.close()
+
+def drip(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, True, 8)
+    yield nimg
+
+def diagonal(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, False, 4)
+    yield nimg
 
 def bars(oimg, nimg, steps, rotation=0):
     yield oimg
@@ -568,7 +620,7 @@ class TransitionTypes(StrEnum):
     UncoverUp = auto(), "Pull the old image away to the top", partial(unCover, rotation=90)
     UncoverDown = auto(), "Pull the old image away to the bottom", partial(unCover, rotation=270)
     WipeLeft = auto(), "Wipe left from the right side", partial(wipe, rotation=180)
-    WipeRight = auto(), "Pull the new image in from the left", partial(wipe, rotation=0)
+    WipeRight = auto(), "Wipe right from the left side", partial(wipe, rotation=0)
     WipeUp = auto(), "Wipe up from the bottom", partial(wipe, rotation=270)
     WipeDown = auto(), "Wipe down from the top", partial(wipe, rotation=90)
     DownUp = auto(), "Push the old image down, and the new image up", downUp
@@ -614,6 +666,14 @@ class TransitionTypes(StrEnum):
     BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
     BarsHoriz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
     BarsVertical = auto(), "Move bars of the image vertically", partial(bars, rotation=90)
+    DripDown = auto(), "Drip columns from the top to bottom", partial(drip, rotation=270)
+    DripUp = auto(), "Drip columns from the top to bottom", partial(drip, rotation=90)
+    DripLeft = auto(), "Drip columns from the top to bottom", partial(drip, rotation=0)
+    DripRight = auto(), "Drip columns from the top to bottom", partial(drip, rotation=180)
+    DiagonalUp = auto(), "Diagonal", partial(diagonal, rotation=90)
+    DiagonalDown = auto(), "Diagonal", partial(diagonal, rotation=270)
+    DiagonalLeft = auto(), "Diagonal", partial(diagonal, rotation=0)
+    DiagonalRight = auto(), "Diagonal", partial(diagonal, rotation=180)
 
 choices = list(TransitionTypes)[:-1]
 
@@ -628,7 +688,11 @@ def test():
 
     size = 64
 
-    f = flaschen.Flaschen("coverpi1.local", 1337, size, size)
+    sys.argv.pop(0)
+    # print(sys.argv)
+    display = sys.argv.pop(0) if len(sys.argv) > 0 else "localhost"
+
+    f = flaschen.Flaschen(display, 1337, size, size)
     # f = flaschen.Flaschen("jylland.local", 1337, size, size)
 
     #names = ["cover1.jpg", "cover2.jpg", "cover3.jpg","cover4.jpg","cover5.jpg","cover6.jpg"]
@@ -636,7 +700,7 @@ def test():
     #names = [Path("art", x) for x in names]
 
     names = list(Path("/srv/music/FLAC/").glob("**/cover.jpg"))
-    #names = list(Path("art").glob("cover*.jpg"))
+    #names = list(Path("art").glob("cover*.png"))
     random.shuffle(names)
 
     #names = ["/srv/music/FLAC/Bob_Mould/The_Last_Dog_and_Pony_Show/cover.jpg", "/srv/music/FLAC/Porcupine_Tree/Recordings/cover.jpg"]
@@ -657,7 +721,7 @@ def test():
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
-    transitions = [TransitionTypes(x) for x in sys.argv[1:]] if len(sys.argv) > 1 else TransitionTypes
+    transitions = [TransitionTypes(x) for x in sys.argv] if len(sys.argv) > 0 else TransitionTypes
 
     cur = next(images)
     nxt = next(images)
@@ -665,7 +729,7 @@ def test():
         print(f"{i:20}  - {i.description}")
         print(f"\t=> {nxt[1]}")
         sendArt(f, cur[0])
-        time.sleep(1.0)
+        time.sleep(2.0)
         trans = i.function
         doTransition(f, trans(cur[0], nxt[0], 21))
         cur = nxt
