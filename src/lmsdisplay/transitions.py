@@ -85,7 +85,7 @@ def _doPush(oimg, nimg, steps):
     yield nimg
 
 
-def _doOver(oimg: Image, nimg: Image, steps: int, out: bool):
+def _doOver(oimg: Image.Image, nimg: Image.Image, steps: int, out: bool):
     """Push an image over the previous."""
     width, height = oimg.size
     inc = int(width / steps)
@@ -548,7 +548,7 @@ def _delay(oimg, nimg, frames, trans):
 def _hashImg(img):
     return md5(img.tobytes()).hexdigest()
 
-def _doDrip(oimg, nimg, steps, shuffle, grpsize):
+def _doDrip(oimg, nimg, steps, func, shuffle, grpsize):
     w, h = oimg.size
     rows = list(range(w))
     if shuffle:
@@ -561,11 +561,11 @@ def _doDrip(oimg, nimg, steps, shuffle, grpsize):
     # Create the groups
     for delay, grp in enumerate(groups):
         for row in grp:
-            strips[row] = _delay(o_rows[row], n_rows[row], delay, _doPush(o_rows[row], n_rows[row], steps))
+            strips[row] = _delay(o_rows[row], n_rows[row], delay, func(o_rows[row], n_rows[row], steps))
 
     # print(delay, strips)
 
-    for i in range(steps + ceil(h / grpsize)):
+    for _ in range(steps + ceil(h / grpsize)):
         # print(f"Iteration {i} {'-' * 20}")
         out = Image.new("RGB", (w, h))
         for row, strp in enumerate(strips):
@@ -577,14 +577,24 @@ def _doDrip(oimg, nimg, steps, shuffle, grpsize):
     for strp in strips:
         strp.close()
 
+def streak(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doPush, True, 8)
+    yield nimg
+
 def drip(oimg, nimg, steps, rotation=0):
     yield oimg
-    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, True, 8)
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doWipe, True, 8)
+    yield nimg
+
+def rip(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doCurtainOut, True, 8)
     yield nimg
 
 def diagonal(oimg, nimg, steps, rotation=0):
     yield oimg
-    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, False, 4)
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doPush, False, 4)
     yield nimg
 
 def bars(oimg, nimg, steps, rotation=0):
@@ -658,22 +668,28 @@ class TransitionTypes(StrEnum):
     # FlipOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", flipOutIn
     LeanFlip = auto(), "Lean the old image out at the bottom, and flip the new one in from the top", leanflip
     LeanFlipHoriz = auto(), "Lean the old image out to the left, and flip the new one in from the right", leanfliphoriz
-    # LowerFlip = auto(), "Complicated", lowerflip
-    #P ageTurn = auto(), "Page Turn", pageturn
+    #LowerFlip = auto(), "Complicated", lowerflip
+    #PageTurn = auto(), "Page Turn", pageturn
     Boxes = auto(), "Replace boxes one at a time, top to bottom", boxes
     BoxesUp = auto(), "Replace boxes one at a time, bottom to top", partial(boxes, rotation=180)
     BoxesRandom = auto(), "Replace boxes one at a time, randomly", boxesrandom
     BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
     BarsHoriz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
     BarsVertical = auto(), "Move bars of the image vertically", partial(bars, rotation=90)
-    DripDown = auto(), "Drip columns from the top to bottom", partial(drip, rotation=270)
-    DripUp = auto(), "Drip columns from the top to bottom", partial(drip, rotation=90)
-    DripLeft = auto(), "Drip columns from the top to bottom", partial(drip, rotation=0)
-    DripRight = auto(), "Drip columns from the top to bottom", partial(drip, rotation=180)
+    StreakDown = auto(), "Streak columns from the top to bottom", partial(streak, rotation=270)
+    StreakUp = auto(), "Streak columns from the top to bottom", partial(streak, rotation=90)
+    StreakLeft = auto(), "Streak columns from the top to bottom", partial(streak, rotation=0)
+    StreakRight = auto(), "Streak columns from the top to bottom", partial(streak, rotation=180)
+    DripDown = auto(), "Drip columns from the top to bottom", partial(drip, rotation=90)
+    DripUp = auto(), "Drip columns from the top to bottom", partial(drip, rotation=270)
+    DripLeft = auto(), "Drip columns from the top to bottom", partial(drip, rotation=180)
+    DripRight = auto(), "Drip columns from the top to bottom", partial(drip, rotation=0)
     DiagonalUp = auto(), "Diagonal", partial(diagonal, rotation=90)
     DiagonalDown = auto(), "Diagonal", partial(diagonal, rotation=270)
     DiagonalLeft = auto(), "Diagonal", partial(diagonal, rotation=0)
     DiagonalRight = auto(), "Diagonal", partial(diagonal, rotation=180)
+    RipHoriz = auto(), "Rip apart horizontally", partial(rip, rotation=0)
+    RipVert = auto(), "Rip apart horizontally", partial(rip, rotation=90)
 
 choices = list(TransitionTypes)[:-1]
 
