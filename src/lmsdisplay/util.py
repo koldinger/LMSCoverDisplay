@@ -27,22 +27,26 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from datetime import datetime
+import datetime
+
 from contextlib import suppress
 from pathlib import Path
 
 def parsetime(timestr):
+    """ Parse a time string, with different possible formats. """
     with suppress(ValueError):
-        return datetime.strptime(timestr, "%H:%M",).time()
+        return datetime.datetime.strptime(timestr, "%H:%M",).time()
     with suppress(ValueError):
-        return datetime.strptime(timestr, "%I:%M%p").time()
+        return datetime.datetime.strptime(timestr, "%I:%M%p").time()
     with suppress(ValueError):
-        return datetime.strptime(timestr, "%H").time()
+        return datetime.datetime.strptime(timestr, "%H").time()
     with suppress(ValueError):
-        return datetime.strptime(timestr, "%I%p").time()
-    raise ValueError(f"Unable to parse time string: {timestr}")
+        return datetime.datetime.strptime(timestr, "%I%p").time()
+    return datetime.time(0, 0)
+
 
 def betweentimes(now, start, end):
+    """ Determine if now is between start and end on a 24 hour clock. """
     if not (start and end):
         return False
     if start <= end:
