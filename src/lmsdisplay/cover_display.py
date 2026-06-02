@@ -129,7 +129,7 @@ def handleEvents(display, playerID, trans, baseUrl):
                     trackid = None
                     art = getCurrentArt(playerID, baseUrl)
 
-                if args.volume:
+                if args.show_volume_bar:
                     vol = int(event.volume)
 
                     # If the volume has changed,
@@ -151,7 +151,7 @@ def handleEvents(display, playerID, trans, baseUrl):
                 playing = False
                 pause_img = blank if args.pauselogo else lyrionlogo
 
-                if (datetime.now() - pausestart).seconds >= args.pausedelay:
+                if (datetime.now() - pausestart).seconds >= args.pause_delay:
                     # If we're past the pausedelay, switch to the pause display
                     if lastimg != blank:
                         sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
@@ -167,7 +167,8 @@ def handleEvents(display, playerID, trans, baseUrl):
 
 def dimImage(image):
     """ Dim an image. """
-    image = ImageEnhance.Brightness(image).enhance(args.dim)
+    if args.dim_at_night:
+        image = ImageEnhance.Brightness(image).enhance(args.dimmed_brightness)
     return image
 
 def sendArt(f, art, overlay=None):
@@ -182,7 +183,7 @@ def sendArt(f, art, overlay=None):
         art = art.copy()
         art.paste(overlay, (0, 0), overlay)
 
-    if args.dim is not None and util.betweentimes(datetime.now().time(), *args.dimtimes):
+    if args.dim_at_night is not None and util.betweentimes(datetime.now().time(), args.dim_start_time, args.dim_end_time):
         art = dimImage(art)
 
     if args.orientation:
@@ -196,16 +197,16 @@ def sendArt(f, art, overlay=None):
     f.send()
 
 def sendTransition(f, art, lastimg, transition):
-    for i in transition(lastimg, art, args.steps):
+    for i in transition(lastimg, art, args.transition_frames):
         sendArt(f, i)
-        time.sleep(args.delay)
+        time.sleep(args.frame_delay)
 
 def enhanceImage(img: Image.Image) -> Image.Image:
     """ Pump up the contrast and color if requested. """
-    if args.contrast != 1.0:
-        img = ImageEnhance.Contrast(img).enhance(args.contrast)
-    if args.color != 1.0:
-        img = ImageEnhance.Color(img).enhance(args.color)
+    if args.contrast_enhancement != 1.0:
+        img = ImageEnhance.Contrast(img).enhance(args.contrast_enhancement)
+    if args.color_saturation != 1.0:
+        img = ImageEnhance.Color(img).enhance(args.color_saturation)
     return img
 
 def getCurrentArt(playerID, baseUrl):
@@ -263,17 +264,10 @@ def process_cmdline():
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
 
     # TODO: Remove the required on this later, so we can find any player that's playing.
-    parser.add_argument( "--player", "-p", default=None, help="Player to monitor")
+    parser.add_argument("--player", "-p", default=None, help="Player to monitor")
 
     parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
     parser.add_argument( "--password", type=str, default=None, help="Password")
-
-    parser.add_argument( "--displayhost", "-d", default="localhost", type=str, help="Display host")
-    parser.add_argument( "--displayport", "-D", default=1337, type=int, help="Display port")
-
-    parser.add_argument( "--lmsserver", "-l", default=None, type=str, help="Name of the LMS Server")
-    parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
-                        help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
 
     parser.add_argument( "--orientation", "-o", default=0, type=int, choices=[0, 90, 180, 270], help="Orientation of the display, in degrees")
 
@@ -282,27 +276,33 @@ def process_cmdline():
                         help = "A list of transitions to chose from")
     parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
 
-    parser.add_argument("--dim", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dimtimes", type=util.parsetime, default=[midnight, midnight], nargs=2, metavar="Time", help="Start dimming at this time")
+    parser.add_argument("--dim_at_night", dest="dim_at_night", action=argparse.BooleanOptionalAction, default=False, help="Dim the screen to this amount")
+    parser.add_argument("--dimmed_brightness", dest="dimmed_brightness", type=float, default=1.0, help="Dim the screen to this amount")
+    parser.add_argument("--dim_start_time", dest="dim_start_time", type=util.parsetime, default=midnight, metavar="Time", help="Start dimming at this time")
+    parser.add_argument("--dim_end_time", dest="dim_end_time", type=util.parsetime, default=midnight, metavar="Time", help="End dimming at this time")
 
-    parser.add_argument("--contrast", "-c", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
-    parser.add_argument("--color", "-C", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
+    parser.add_argument("--contrast_enhancement", "-c", dest="contrast_enhancement", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
+    parser.add_argument("--color_saturation", "-C", dest="color_saturation", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
 
-    parser.add_argument("--delay", type=float, default=0.15, help="Delay between frames during transitions")
-    parser.add_argument("--steps", type=int, default=10, help="Number of interim images in the transitions")
+    parser.add_argument("--frame_delay", type=float, default=0.15, help="Delay between frames during transitions")
+    parser.add_argument("--transition_frames", type=int, default=10, help="Number of interim images in the transitions")
 
-    parser.add_argument("--volume", action="store_true", default=False, help="Display the volume bar when volume changes")
+    parser.add_argument("--show_volume_bar", action="store_true", default=False, help="Display the volume bar when volume changes")
 
-    parser.add_argument("--pausedelay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
+    parser.add_argument("--pause_delay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
     parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
 
-    parser.add_argument("--configure", action="store_true", default=False, help="Show a configuration QR Code and wait until a configuration takes place")
+    parser.add_argument( "--display_host", "-d", dest="display_host", default="localhost", type=str, help="Display host")
+    parser.add_argument( "--display_port", "-D", dest="display_port", default=1337, type=int, help="Display port")
+
+
 
     # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
 
     parser.add_argument("--version", action="version", version=__version__)
 
     args = parser.parse_args()
+    ic(args)
 
     return args
 
@@ -356,7 +356,7 @@ def main():
 
                 base_url = f"http://{plr.server.host}:{plr.server.port}"
 
-                disp = flaschen.Flaschen(args.displayhost, args.displayport, args.imagesize[0], args.imagesize[1])
+                disp = flaschen.Flaschen(args.display_host, args.display_port, args.imagesize[0], args.imagesize[1])
 
                 mon = lms_monitor.PlayerMonitor(plr.ref, plr.server.host, event_q, args.login, args.password)
                 mon.start()
