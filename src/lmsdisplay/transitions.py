@@ -31,7 +31,7 @@ import itertools
 import random
 import time
 from contextlib import suppress
-from enum import StrEnum, auto
+from enum import auto
 from functools import partial
 from pathlib import Path
 from hashlib import md5
@@ -41,6 +41,7 @@ import numpy as np
 import rich.traceback
 from numpy.linalg import LinAlgError
 from PIL import Image, ImageEnhance
+from strenum import StrEnum
 
 rich.traceback.install()
 
@@ -126,7 +127,7 @@ def _doSlide(oimg, nimg, steps):
     yield nimg
 
 
-def _doCurtain(oimg, nimg, steps):
+def _doCurtainIn(oimg, nimg, steps):
     """Perform a curtain, closing in with the new image from both sides."""
     left = nimg.crop((0, 0, int(nimg.width / 2), nimg.height))
     right = nimg.crop((int(nimg.width / 2), 0, nimg.width, nimg.height))
@@ -306,8 +307,8 @@ def shrink(oimg, nimg, steps, rotation=0):
     yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False)
     yield nimg
 
-def curtain(oimg, nimg, steps, rotation=0):
-    return _rotate(rotation, _doCurtain, oimg, nimg, steps)
+def curtainIn(oimg, nimg, steps, rotation=0):
+    return _rotate(rotation, _doCurtainIn, oimg, nimg, steps)
 
 def curtainOut(oimg, nimg, steps, rotation=0):
     return _rotate(rotation, _doCurtainOut, oimg, nimg, steps)
@@ -340,8 +341,8 @@ def flipOut(oimg, nimg, steps):
 def downUp(oimg, nimg, steps):
     """Lower the current image, and then raise the new image up."""
     blank = Image.new("RGB", oimg.size)
-    yield from _rotate(270, push, oimg, blank, int(steps / 2))
-    yield from _rotate(90, push, blank, nimg, int(steps / 2))
+    yield from _rotate(270, push, oimg, blank, steps)
+    yield from _rotate(90, push, blank, nimg, steps)
 
 
 def zoomOutIn(oimg, nimg, steps):
@@ -618,86 +619,163 @@ class TransitionTypes(StrEnum):
         return member
 
     Instant = auto(), "Instant Transition", instant
-    PushLeft = auto(), "Push the old image out to the left", partial(push, rotation=0)
-    PushRight = auto(),"Push the old image out to the right", partial(push, rotation=180)
-    PushUp = auto(), "Push the old image up from the bottom", partial(push, rotation=90)
-    PushDown = auto(),"Push the old image down from the top", partial(push, rotation=270)
-    OverUp = auto(),"Pull the new image up from the bottom", partial(over, rotation=270)
-    OverDown = auto(), "Pull the new image down from the top", partial(over, rotation=90)
-    OverLeft = auto(), "Pull the new image in from the right", partial(over, rotation=180)
-    OverRight = auto(), "Pull the new image in from the left", partial(over, rotation=0)
-    UncoverLeft = auto(), "Pull the old image away to the left", partial(unCover, rotation=0)
-    UncoverRight = auto(), "Pull the old image away to the right", partial(unCover, rotation=180)
-    UncoverUp = auto(), "Pull the old image away to the top", partial(unCover, rotation=90)
-    UncoverDown = auto(), "Pull the old image away to the bottom", partial(unCover, rotation=270)
-    WipeLeft = auto(), "Wipe left from the right side", partial(wipe, rotation=180)
-    WipeRight = auto(), "Wipe right from the left side", partial(wipe, rotation=0)
-    WipeUp = auto(), "Wipe up from the bottom", partial(wipe, rotation=270)
-    WipeDown = auto(), "Wipe down from the top", partial(wipe, rotation=90)
+    Push_Left = auto(), "Push the old image out to the left", partial(push, rotation=0)
+    Push_Right = auto(),"Push the old image out to the right", partial(push, rotation=180)
+    Push_Up = auto(), "Push the old image up from the bottom", partial(push, rotation=90)
+    Push_Down = auto(),"Push the old image down from the top", partial(push, rotation=270)
+    Over_Up = auto(),"Pull the new image up from the bottom", partial(over, rotation=270)
+    Over_Down = auto(), "Pull the new image down from the top", partial(over, rotation=90)
+    Over_Left = auto(), "Pull the new image in from the right", partial(over, rotation=180)
+    Over_Right = auto(), "Pull the new image in from the left", partial(over, rotation=0)
+    Uncover_Left = auto(), "Pull the old image away to the left", partial(unCover, rotation=0)
+    Uncover_Right = auto(), "Pull the old image away to the right", partial(unCover, rotation=180)
+    Uncover_Up = auto(), "Pull the old image away to the top", partial(unCover, rotation=90)
+    Uncover_Down = auto(), "Pull the old image away to the bottom", partial(unCover, rotation=270)
+    Wipe_Left = auto(), "Wipe left from the right side", partial(wipe, rotation=180)
+    Wipe_Right = auto(), "Wipe right from the left side", partial(wipe, rotation=0)
+    Wipe_Up = auto(), "Wipe up from the bottom", partial(wipe, rotation=270)
+    Wipe_Down = auto(), "Wipe down from the top", partial(wipe, rotation=90)
     DownUp = auto(), "Push the old image down, and the new image up", downUp
-    SlideRightDown = auto(), "Slide the new image down from the top left corner", partial(slide, rotation=0)
-    SlideRightUp = auto(), "Slide the new image up from the bottom left corner", partial(slide, rotation=270)
-    SlideLeftDown = auto(), "Slide the new image down from the top right corner", partial(slide, rotation=90)
-    SlideLeftUp = auto(), "Slide the new image up from the bottom right corner", partial(slide, rotation=180)
-    ExpandRightDown = auto(), "Expand the image down from the top left corner", partial(expand, rotation=0)
-    ExpandRightUp = auto(), "Expand the image up from the bottom left corner", partial(expand, rotation=270)
-    ExpandLeftDown = auto(), "Expand the image down from the top right corner", partial(expand, rotation=90)
-    ExpandLeftUp = auto(), "Expand the image up from the bottom right corner", partial(expand, rotation=180)
-    ShrinkRightDown = auto(), "Shrink the image down from the top left corner", partial(shrink, rotation=180)
-    ShrinkRightUp = auto(), "Shrink the image up from the bottom left corner", partial(shrink, rotation=90)
-    ShrinkLeftDown = auto(), "Shrink the image down from the top right corner", partial(shrink, rotation=270)
-    ShrinkLeftUp = auto(), "Shrink the image up from the bottom right corner", partial(shrink, rotation=0)
-    CurtainHoriz = auto(), "Pull the new image in from the left and right", partial(curtain, rotation=0)
-    CurtainVert = auto(), "Pull the new image in from the op and bottom", partial(curtain, rotation=90)
-    CurtainOutHoriz = auto(), "Push the old image out to both sides", partial(curtainOut, rotation=0)
-    CurtainOutVert = auto(), "Push the old image out to the top and bottom", partial(curtainOut, rotation=90)
-    ZoomIn = auto(), "Expand the new in from the center", zoomIn
-    ZoomOut = auto(), "Shrink the old image out to the center.", zoomOut
-    ZoomOutIn = auto(), "Zoom the old image out, then the new image in", zoomOutIn
+    Slide_RightDown = auto(), "Slide the new image down from the top left corner", partial(slide, rotation=0)
+    Slide_RightUp = auto(), "Slide the new image up from the bottom left corner", partial(slide, rotation=270)
+    Slide_LeftDown = auto(), "Slide the new image down from the top right corner", partial(slide, rotation=90)
+    Slide_LeftUp = auto(), "Slide the new image up from the bottom right corner", partial(slide, rotation=180)
+    Expand_RightDown = auto(), "Expand the image down from the top left corner", partial(expand, rotation=0)
+    Expand_RightUp = auto(), "Expand the image up from the bottom left corner", partial(expand, rotation=270)
+    Expand_LeftDown = auto(), "Expand the image down from the top right corner", partial(expand, rotation=90)
+    Expand_LeftUp = auto(), "Expand the image up from the bottom right corner", partial(expand, rotation=180)
+    Shrink_RightDown = auto(), "Shrink the image down from the top left corner", partial(shrink, rotation=180)
+    Shrink_RightUp = auto(), "Shrink the image up from the bottom left corner", partial(shrink, rotation=90)
+    Shrink_LeftDown = auto(), "Shrink the image down from the top right corner", partial(shrink, rotation=270)
+    Shrink_LeftUp = auto(), "Shrink the image up from the bottom right corner", partial(shrink, rotation=0)
+    CurtainIn_Horiz = auto(), "Pull the new image in from the left and right", partial(curtainIn, rotation=0)
+    CurtainIn_Vert = auto(), "Pull the new image in from the op and bottom", partial(curtainIn, rotation=90)
+    CurtainOut_Horiz = auto(), "Push the old image out to both sides", partial(curtainOut, rotation=0)
+    CurtainOut_Vert = auto(), "Push the old image out to the top and bottom", partial(curtainOut, rotation=90)
+    Zoom_In = auto(), "Expand the new in from the center", zoomIn
+    Zoom_Out = auto(), "Shrink the old image out to the center.", zoomOut
+    Zoom_OutIn = auto(), "Zoom the old image out, then the new image in", zoomOutIn
     Fade = auto(), "Fade from the old image to the new", fade
-    FadeOutIn = auto(), "Fade the old image out, then the new one in", fadeOutIn
-    SpinOut = auto(), "Spin and expand the new image in to the center", spinOut
-    SpinIn = auto(), "Spin and shrink the old image out from the center", spinIn
-    SpinInOut = auto(), "Spin and shrink the old image to the center, then spin and expand the new image in", spinInOut
+    Fade_OutIn = auto(), "Fade the old image out, then the new one in", fadeOutIn
+    Spin_Out = auto(), "Spin and expand the new image in to the center", spinOut
+    Spin_In = auto(), "Spin and shrink the old image out from the center", spinIn
+    Spin_InOut = auto(), "Spin and shrink the old image to the center, then spin and expand the new image in", spinInOut
     Transporter = auto(), "Replace the old image pixel by pixel, randomly", partial(shimmer, keep=True)
     Shimmer = auto(), "Replace pixels randomly, switching between old and new until the new image is complete", partial(shimmer, keep=False)
-    LeanOut = auto(), "Lean the image out to the back", leanOut
-    LeanIn = auto(),"Raise the image in from the back", leanIn
-    LeanOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", leanOutIn
-    FlipOut = auto(), "Lean the image out to the back", flipOut
-    FlipIn = auto(),"Raise the image in from the back", flipIn
+    Lean_Out = auto(), "Lean the image out to the back", leanOut
+    Lean_In = auto(),"Raise the image in from the back", leanIn
+    Lean_OutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", leanOutIn
+    Flip_Out = auto(), "Lean the image out to the back", flipOut
+    Flip_In = auto(),"Raise the image in from the back", flipIn
     # FlipOutIn = auto(), "Lower the image out to the back, then raise the new image in from the back", flipOutIn
-    LeanFlip = auto(), "Lean the old image out at the bottom, and flip the new one in from the top", leanflip
-    LeanFlipHoriz = auto(), "Lean the old image out to the left, and flip the new one in from the right", leanfliphoriz
+    Lean_Flip = auto(), "Lean the old image out at the bottom, and flip the new one in from the top", leanflip
+    Lean_FlipHoriz = auto(), "Lean the old image out to the left, and flip the new one in from the right", leanfliphoriz
     #LowerFlip = auto(), "Complicated", lowerflip
     #PageTurn = auto(), "Page Turn", pageturn
     Boxes = auto(), "Replace boxes one at a time, top to bottom", boxes
-    BoxesUp = auto(), "Replace boxes one at a time, bottom to top", partial(boxes, rotation=180)
-    BoxesRandom = auto(), "Replace boxes one at a time, randomly", boxesrandom
-    BoxesSnake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
-    BarsHoriz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
-    BarsVertical = auto(), "Move bars of the image vertically", partial(bars, rotation=90)
-    StreakDown = auto(), "Streak columns from the top to bottom", partial(streak, rotation=270)
-    StreakUp = auto(), "Streak columns from the top to bottom", partial(streak, rotation=90)
-    StreakLeft = auto(), "Streak columns from the top to bottom", partial(streak, rotation=0)
-    StreakRight = auto(), "Streak columns from the top to bottom", partial(streak, rotation=180)
-    DripDown = auto(), "Drip columns from the top to bottom", partial(drip, rotation=90)
-    DripUp = auto(), "Drip columns from the top to bottom", partial(drip, rotation=270)
-    DripLeft = auto(), "Drip columns from the top to bottom", partial(drip, rotation=180)
-    DripRight = auto(), "Drip columns from the top to bottom", partial(drip, rotation=0)
-    DiagonalUp = auto(), "Diagonal", partial(diagonal, rotation=90)
-    DiagonalDown = auto(), "Diagonal", partial(diagonal, rotation=270)
-    DiagonalLeft = auto(), "Diagonal", partial(diagonal, rotation=0)
-    DiagonalRight = auto(), "Diagonal", partial(diagonal, rotation=180)
-    RipHoriz = auto(), "Rip apart horizontally", partial(rip, rotation=0)
-    RipVert = auto(), "Rip apart horizontally", partial(rip, rotation=90)
+    Boxes_Up = auto(), "Replace boxes one at a time, bottom to top", partial(boxes, rotation=180)
+    Boxes_Random = auto(), "Replace boxes one at a time, randomly", boxesrandom
+    Boxes_Snake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
+    Bars_Horiz = auto(), "Move bars of the image sideways", partial(bars, rotation=0)
+    Bars_Vert = auto(), "Move bars of the image vertically", partial(bars, rotation=90)
+    Streak_Down = auto(), "Streak columns from the top to bottom", partial(streak, rotation=270)
+    Streak_Up = auto(), "Streak columns from the top to bottom", partial(streak, rotation=90)
+    Streak_Left = auto(), "Streak columns from the top to bottom", partial(streak, rotation=0)
+    Streak_Right = auto(), "Streak columns from the top to bottom", partial(streak, rotation=180)
+    Drip_Left = auto(), "Drip columns from the top to bottom", partial(drip, rotation=180)
+    Drip_Right = auto(), "Drip columns from the top to bottom", partial(drip, rotation=0)
+    Drip_Down = auto(), "Drip columns from the top to bottom", partial(drip, rotation=90)
+    Drip_Up = auto(), "Drip columns from the top to bottom", partial(drip, rotation=270)
+    Diagonal_Left = auto(), "Diagonal", partial(diagonal, rotation=0)
+    Diagonal_Right = auto(), "Diagonal", partial(diagonal, rotation=180)
+    Diagonal_Up = auto(), "Diagonal", partial(diagonal, rotation=90)
+    Diagonal_Down = auto(), "Diagonal", partial(diagonal, rotation=270)
+    Rip_Horiz = auto(), "Rip apart horizontally", partial(rip, rotation=0)
+    Rip_Vert = auto(), "Rip apart vertically", partial(rip, rotation=90)
 
-choices = list(TransitionTypes)[:-1]
+class Directions(StrEnum):
+    Up = auto()
+    Down = auto()
+    Left = auto()
+    Right = auto()
+    LeftDown = auto()
+    RightDown = auto()
+    LeftUp = auto()
+    RightUp = auto()
+    Horiz = auto()
+    Vert = auto()
+    In = auto()
+    Out = auto()
+    InOut = auto()
+    OutIn = auto()
+
+Cardinal = [Directions.Left, Directions.Right, Directions.Up, Directions.Down]
+Diagonal = [Directions.LeftUp, Directions.RightUp, Directions.LeftDown, Directions.RightDown]
+UpDown   = [Directions.Horiz, Directions.Vert]
+InOut    = [Directions.In, Directions.Out, Directions.InOut]
+InOrOut  = [Directions.In, Directions.Out]
+OutIn    = [Directions.In, Directions.Out, Directions.OutIn]
+
+class TransitionGroups(StrEnum):
+    def __new__(cls, value, description, variants):
+        member = str.__new__(cls, value)
+        member._value_ = value
+        member.description = description
+        member.variants = variants
+        return member
+
+    Push = auto(), "Push the old image out with the new image", Cardinal
+    Over = auto(), "Slide the new image over the old", Cardinal
+    Uncover = auto(), "Uncover the new image by sliding the old", Cardinal
+    Wipe = auto(), "Wipe the new image to the old", Cardinal
+    DownUp = auto(), "Lower the old image, and raise a new one", None
+    Slide = auto(), "Slide the new image in diagonally", Diagonal
+    Expand = auto(), "Expand the new image in diagonally", Diagonal
+    Shrink = auto(), "Shrink the old image out diagonally, uncovering the new", Diagonal
+    CurtainIn = auto(), "Close a curtain with the new image", UpDown
+    CurtainOut = auto(), "Open a curtain exposing the new image", UpDown
+    Fade = auto(), "Fade from one image to the other", [None, Directions.OutIn]
+    Transporter = auto(), "Replace the old image pixel by pixel, randomly", None
+    Shimmer = auto(), "Replace pixels randomly, switching between old and new until the new image is complete", None
+    Zoom = auto(), "Zoom an image in or out", OutIn
+    Spin = auto(), "Spin an image in or out", InOrOut
+    Lean = auto(), "Lean image in or out", OutIn
+    Flip = auto(), "Flip image in or out", InOrOut
+    Boxes = auto(), "Replace the image box by box", [None, "Up", "Random", "Snake"]
+    Bars = auto(), "Slide alternating bars in or out", UpDown
+    Streak = auto(), "Replace the image by Streak", Cardinal
+    Drip = auto(), "Drip the new image in over the old", Cardinal
+    Diagonal = auto(), "Biagonal", Cardinal
+    Rip = auto(), "Rip the image apart", UpDown
+
+
+def make_transitions(group):
+    variants = group.variants
+    if not variants:
+        return [TransitionTypes(str(group))]
+    output = []
+    for v in variants:
+        if v:
+            output.append(TransitionTypes(str(group) + "_" + str(v)))
+        else:
+            output.append(TransitionTypes(str(group)))
+    return output
 
 def getTransition(name: str):
     val = TransitionTypes(name)
 
     return val.function
+
+def expandGroups(transitions):
+    for i in transitions:
+        if i in TransitionTypes:
+            yield TransitionTypes(i)
+        elif i in TransitionGroups:
+            grp = TransitionGroups(i)
+            yield from make_transitions(grp)
+        else:
+            print(f"No group or transitions named {i}")
+
 
 def test():
     import sys
@@ -738,11 +816,14 @@ def test():
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
-    transitions = [TransitionTypes(x) for x in sys.argv] if len(sys.argv) > 0 else TransitionTypes
+    transitions = sys.argv if len(sys.argv) > 0 else TransitionTypes
+    print(transitions)
 
     cur = next(images)
     nxt = next(images)
-    for i in transitions:
+    print(list(expandGroups(transitions)))
+
+    for i in expandGroups(transitions):
         print(f"{i:20}  - {i.description}")
         print(f"\t=> {nxt[1]}")
         sendArt(f, cur[0])
