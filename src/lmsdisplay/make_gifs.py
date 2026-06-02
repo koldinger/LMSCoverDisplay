@@ -35,6 +35,8 @@ from pathlib import Path
 import transitions
 import util
 
+from icecream import ic
+
 def makeGif(outputdir: Path, images, transition):
     print(f"Processing transition: {transition}")
 
@@ -47,7 +49,8 @@ def makeGif(outputdir: Path, images, transition):
         # Have to do this because some transitions return the same object each time, which screws up
         # the gif builder.
         results.extend([i.copy() for i in transition.function(f, s, 16)])
-        results.extend([s, s, s, s, s, s])   # add a couple extra copies, for a brief pause
+        # add extra copies to pause
+        results.extend([s] * 5)
 
     outname = outputdir.joinpath(str(transition)).with_suffix(".gif")
 
@@ -66,10 +69,10 @@ def makeGifs(output: Path, images, trans=None):
             print(f"{i} Failed: {e}")
 
 def doTheGifThing():
-    output = Path("samples")
+    output = Path("static/transitions")
     size = 256
 
-    trans = sys.argv
+    trans = sys.argv.copy()
     trans.pop(0)
     trans = [transitions.TransitionTypes(i) for i in trans]
 
@@ -82,7 +85,68 @@ def doTheGifThing():
 
     makeGifs(output, images, trans)
 
+def makeGrpGif(outputdir: Path, images, grp):
+    print(f"Procressing group {grp}")
+    trans = transitions.make_transitions(grp)
+    # Make sure there's more than one transsition
+    if len(trans) == 1:
+        trans = trans * 2
+
+    images = images[:len(trans)]
+
+    results = []
+
+    for i in range(len(images)):
+        f = images[i % len(images)]
+        s = images[(i + 1) % len(images)]
+        transition = trans[i % len(trans)]
+
+        # Do the transition, and then make a copy of all images.
+        # Have to do this because some transitions return the same object each time, which screws up
+        # the gif builder.
+        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        # add extra copies to extend
+        results.extend([s] * 5)
+
+    outname = outputdir.joinpath(str(grp)).with_suffix(".gif")
+
+    print(f"Transition: {grp} {outname} {len(results)}")
+
+    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, loop=0, duration=1*len(results))
+
+
+def makeGrpGifs(output, images, grps):
+    if not grps:
+        grps = list(transitions.TransitionGroups)
+
+    for i in grps:
+        try:
+            makeGrpGif(output, images, i)
+        except Exception as e:
+            print(f"{i} Failed: {e}")
+
+
+def doTheGroupThing():
+    output = Path("static/groups")
+    size = 256
+
+    grps = sys.argv.copy()
+    grps.pop(0)
+    grps = [transitions.TransitionGroups(i) for i in grps]
+
+    util.makedir(output)
+
+    names = ["test1.png", "test2.png", "test3.png", "test4.png", "test5.png"]
+    names = [Path("art", x) for x in names]
+
+    images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
+
+    makeGrpGifs(output, images, grps)
+
+def main():
+    doTheGifThing()
+    doTheGroupThing()
 
 if __name__ == "__main__":
-    doTheGifThing()
+    main()
 
