@@ -1,0 +1,764 @@
+{#
+  LMS Cover Art Display Configuration — Jinja2 Template
+  -------------------------------------------------------
+  Expected template variables:
+    players     : dict  { server_name: [{"id": str, "label": str}, ...] }  each key becomes an <optgroup>
+    transitions : list of dicts  [{ "id": "fade", "label": "Fade", "subs": [{ "id": "fade_slow", "label": "Fade Slow" }, ...] }, ...]
+    presets     : dict of saved values {
+                    "player"                    : str   (player id)
+                    "transitions"               : list  [sub_id, ...]  (flat list of selected sub ids)
+                    "color_saturation"          : float (0–2,    default 1.0)
+                    "contrast_enhancement"      : float (0–2,    default 1.0)
+                    "transition_frames"         : int   (1–64,   default 20)
+                    "frame_delay"               : float (0–2,    default 0.15)
+                    "pause_delay"               : int   (0–300s, default 0)
+                    "show_volume_bar"           : bool  (default false)
+                    "dim_at_night"              : bool  (default false)
+                    "dim_start_time"            : str   "HH:MM"  (default "22:00")
+                    "dim_end_time"              : str   "HH:MM"  (default "07:00")
+                    "dimmed_brightness"         : float (0.0–1.0, default 0.2)
+                    "hostname"                  : str   (default "")
+                    "display_host"              : str   (default "localhost")
+                    "display_port"              : int   (1–65535, default 1337)
+                    "orientation"               : int   (0, 90, 180, or 270, default 0)
+                  }
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMS Cover Art Display Configuration</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f5f4;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #6b6b6b;
+    --color-text-tertiary: #9ca3af;
+    --color-text-info: #185fa5;
+    --color-text-success: #3b6d11;
+    --color-border-tertiary: rgba(0,0,0,0.15);
+    --color-border-secondary: rgba(0,0,0,0.3);
+    --color-border-primary: rgba(0,0,0,0.4);
+    --color-border-info: #185fa5;
+    --color-background-info: #e6f1fb;
+    --color-background-success: #eaf3de;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f9f9f8;
+    padding: 2rem;
+    color: var(--color-text-primary);
+  }
+
+  .page { max-width: 600px; }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+    margin-bottom: 8px;
+  }
+
+  .divider { height: 0.5px; background: var(--color-border-tertiary); margin: 1.5rem 0; }
+  .section-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 8px; }
+
+  .select-wrap { position: relative; display: flex; align-items: center; }
+  .select-wrap i.icon-left { position: absolute; left: 12px; font-size: 16px; color: var(--color-text-secondary); pointer-events: none; }
+  select {
+    width: 100%; padding: 9px 36px 9px 36px; font-size: 14px;
+    color: var(--color-text-primary); background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md);
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+  }
+  select:hover { border-color: var(--color-border-primary); }
+  select:focus { outline: none; box-shadow: 0 0 0 3px var(--color-background-info); border-color: var(--color-border-info); }
+  .chevron-wrap { position: absolute; right: 10px; pointer-events: none; color: var(--color-text-secondary); font-size: 16px; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .toolbar-label { font-size: 13px; color: var(--color-text-secondary); }
+  .list-section-label { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+  .btn-group { display: flex; gap: 6px; }
+  .btn-group button {
+    font-size: 13px; padding: 5px 14px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary);
+    color: var(--color-text-primary); cursor: pointer; transition: background 0.15s, transform 0.1s;
+  }
+  .btn-group button:hover { background: var(--color-background-secondary); }
+  .btn-group button:active { transform: scale(0.97); }
+
+  .list { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+  .item { border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .item:last-child { border-bottom: none; }
+  .item-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    cursor: pointer; user-select: none; background: var(--color-background-primary); transition: background 0.15s;
+  }
+  .item-header:hover { background: var(--color-background-secondary); }
+  .item-header input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-text-info); flex-shrink: 0; }
+  .item-label { font-size: 15px; font-weight: 500; color: var(--color-text-primary); flex: 1; }
+  .toggle-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+    color: var(--color-text-secondary); display: flex; align-items: center; transition: transform 0.2s, background 0.15s;
+  }
+  .toggle-btn:hover { background: var(--color-background-secondary); }
+  .toggle-btn.open { transform: rotate(180deg); }
+  .sub-list {
+    background: var(--color-background-secondary); border-top: 0.5px solid var(--color-border-tertiary);
+    overflow: hidden; max-height: 0; transition: max-height 0.25s ease;
+  }
+  .sub-list.open { max-height: 400px; }
+  .sub-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 40px;
+    border-bottom: 0.5px solid var(--color-border-tertiary); cursor: pointer; transition: background 0.15s;
+  }
+  .sub-item:last-child { border-bottom: none; }
+  .sub-item:hover { background: var(--color-background-primary); }
+  .sub-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--color-text-info); flex-shrink: 0; }
+  .sub-label { font-size: 14px; color: var(--color-text-primary); }
+  .badge { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--color-background-info); color: var(--color-text-info); font-weight: 500; }
+  .badge.none { background: var(--color-background-secondary); color: var(--color-text-tertiary); }
+  .badge.all  { background: var(--color-background-success);   color: var(--color-text-success); }
+  .count-bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+    background: var(--color-background-secondary); font-size: 13px; color: var(--color-text-secondary);
+    border-top: 0.5px solid var(--color-border-tertiary);
+  }
+  .count-num { font-weight: 500; color: var(--color-text-primary); }
+
+  .slider-block { margin-bottom: 1.25rem; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-val { font-size: 14px; font-weight: 500; color: var(--color-text-primary); min-width: 36px; text-align: right; }
+  .range-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; padding: 0 1px; }
+
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .check-row:last-of-type { border-bottom: none; }
+  .check-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-text-info); flex-shrink: 0; }
+  .check-row label { font-size: 14px; color: var(--color-text-primary); cursor: pointer; user-select: none; flex: 1; }
+
+  .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  input[type=time] {
+    width: 100%; padding: 8px 12px; font-size: 14px; color: var(--color-text-primary);
+    background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+  }
+  input[type=time]:hover { border-color: var(--color-border-primary); }
+  input[type=time]:focus { outline: none; box-shadow: 0 0 0 3px var(--color-background-info); }
+  .time-section { opacity: 0.4; pointer-events: none; transition: opacity 0.2s; }
+  .time-section.enabled { opacity: 1; pointer-events: all; }
+
+  .field-block { margin-bottom: 1.25rem; }
+  .field-block:last-child { margin-bottom: 0; }
+  .field-input {
+    width: 100%; padding: 8px 12px; font-size: 14px; color: var(--color-text-primary);
+    background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md); transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field-input:hover { border-color: var(--color-border-primary); }
+  .field-input:focus { outline: none; box-shadow: 0 0 0 3px var(--color-background-info); border-color: var(--color-border-info); }
+  .field-input.invalid { border-color: #c0392b; box-shadow: 0 0 0 3px rgba(192,57,43,0.12); }
+  .field-hint { font-size: 11px; margin-top: 5px; color: var(--color-text-tertiary); min-height: 16px; transition: color 0.15s; }
+  .field-hint.error { color: #c0392b; }
+
+  .advanced-toggle-row { display: flex; align-items: center; }
+  .btn-advanced {
+    font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary);
+    color: var(--color-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 7px;
+    width: 100%; justify-content: center; transition: background 0.15s, color 0.15s, transform 0.1s;
+  }
+  .btn-advanced:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+  .btn-advanced:active { transform: scale(0.98); }
+  .btn-advanced i.arrow { transition: transform 0.25s; }
+  .btn-advanced.open i.arrow { transform: rotate(180deg); }
+  .advanced-section { overflow: hidden; max-height: 0; transition: max-height 0.35s ease, opacity 0.3s ease; opacity: 0; }
+  .advanced-section.open { max-height: 600px; opacity: 1; }
+  .advanced-inner { padding-top: 1.5rem; }
+  .advanced-heading { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
+
+  .save-row { display: flex; justify-content: space-between; margin-top: 1.5rem; gap: 10px; align-items: center; }
+  .save-status { font-size: 13px; color: var(--color-text-secondary); opacity: 0; transition: opacity 0.3s; }
+  .save-status.visible { opacity: 1; }
+  .save-status.success { color: var(--color-text-success); }
+  .save-status.error   { color: #c0392b; }
+  .btn-save {
+    font-size: 14px; padding: 8px 22px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary);
+    color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-save:hover { background: var(--color-background-secondary); }
+  .btn-save:active { transform: scale(0.97); }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-reset {
+    font-size: 14px; padding: 8px 22px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary);
+    color: #c0392b; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-reset:hover { background: #fdf0ee; }
+  .btn-reset:active { transform: scale(0.97); }
+  .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #gif-tooltip {
+    position: fixed; display: none; z-index: 9999; pointer-events: none;
+    border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary); box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    overflow: hidden; max-width: 200px;
+  }
+  #gif-tooltip img { display: block; max-width: 200px; max-height: 200px; }
+</style>
+</head>
+<body>
+
+<div id="gif-tooltip"><img id="gif-tooltip-img" src="" alt=""></div>
+
+<div class="page">
+  <p class="eyebrow">Configuration</p>
+  <h1 style="font-size:22px;font-weight:500;line-height:1.3;margin-bottom:0">Welcome to the LMS Cover Art Display Configuration</h1>
+
+  <div class="divider"></div>
+
+  {# ── Player select ─────────────────────────────────────────────────────── #}
+  <div class="section-label">Select player</div>
+  <div class="select-wrap">
+    <i class="ti ti-device-audio icon-left" aria-hidden="true"></i>
+    <select id="player-select">
+      <option value="" disabled {% if not presets.player %}selected{% endif %}>Choose a player…</option>
+      {% for server_name, server_players in players.items() %}
+      <optgroup label="{{ server_name }}">
+        {% for player in server_players %}
+        <option value="{{ player.id }}"{% if presets.player == player.id %} selected{% endif %}>{{ player.label }}</option>
+        {% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+    <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
+  </div>
+
+  <div class="divider"></div>
+
+  {# ── Transitions list ──────────────────────────────────────────────────── #}
+  <div class="toolbar">
+    <span class="list-section-label">Select transitions</span>
+    <div class="btn-group">
+      <button id="btn-all">Select all</button>
+      <button id="btn-none">Deselect all</button>
+    </div>
+  </div>
+  <div style="margin-bottom:10px"><span class="toolbar-label" id="toolbar-count"></span></div>
+  <div class="list" id="list"></div>
+
+  <div class="divider"></div>
+
+  {# ── Sliders ───────────────────────────────────────────────────────────── #}
+  <div class="slider-block">
+    <div class="section-label">Color saturation</div>
+    <div class="slider-row">
+      <input type="range" id="saturation" min="0" max="2" step="0.1" value="{{ presets.color_saturation | default(1.0) }}">
+      <span class="slider-val" id="saturation-val">{{ presets.color_saturation | default(1.0) }}</span>
+    </div>
+    <div class="range-ends"><span>0</span><span>2</span></div>
+  </div>
+
+  <div class="slider-block">
+    <div class="section-label">Contrast enhancement</div>
+    <div class="slider-row">
+      <input type="range" id="contrast" min="0" max="2" step="0.1" value="{{ presets.contrast_enhancement | default(1.0) }}">
+      <span class="slider-val" id="contrast-val">{{ presets.contrast_enhancement | default(1.0) }}</span>
+    </div>
+    <div class="range-ends"><span>0</span><span>2</span></div>
+  </div>
+
+  <div class="slider-block">
+    <div class="section-label">Frames in transitions</div>
+    <div class="slider-row">
+      <input type="range" id="transition_frames" min="1" max="64" step="1" value="{{ presets.transition_frames | default(20) }}">
+      <span class="slider-val" id="transition_frames-val">{{ presets.transition_frames | default(20) }}</span>
+    </div>
+    <div class="range-ends"><span>1</span><span>64</span></div>
+  </div>
+
+  <div class="slider-block">
+    <div class="section-label">Frame delay in transitions</div>
+    <div class="slider-row">
+      <input type="range" id="frame_delay" min="0" max="2" step="0.05" value="{{ presets.frame_delay | default(0.15) }}">
+      <span class="slider-val" id="frame_delay-val">{{ presets.frame_delay | default(0.15) }}</span>
+    </div>
+    <div class="range-ends"><span>0</span><span>2</span></div>
+  </div>
+
+  <div class="slider-block">
+    <div class="section-label">Pause delay</div>
+    <div class="slider-row">
+      <input type="range" id="pausedelay" min="0" max="300" step="1" value="{{ presets.pause_delay | default(0) }}">
+      <span class="slider-val" id="pausedelay-val">{{ presets.pause_delay | default(0) }}s</span>
+    </div>
+    <div class="range-ends"><span>0s</span><span>300s</span></div>
+  </div>
+
+  <div class="divider"></div>
+
+  {# ── Checkboxes ────────────────────────────────────────────────────────── #}
+  <div class="check-row">
+    <input type="checkbox" id="volume"{% if presets.show_volume_bar %} checked{% endif %}>
+    <label for="volume">Show volume bar</label>
+  </div>
+  <div class="check-row">
+    <input type="checkbox" id="dim"{% if presets.dim_at_night %} checked{% endif %}>
+    <label for="dim">Dim at night</label>
+  </div>
+
+  <div class="divider"></div>
+
+  {# ── Dim times ─────────────────────────────────────────────────────────── #}
+  <div class="time-section{% if presets.dim_at_night %} enabled{% endif %}" id="time-section">
+    <div class="time-grid">
+      <div>
+        <div class="section-label">Start time</div>
+        <input type="time" id="start-time" value="{{ presets.dim_start_time | default('22:00') }}">
+      </div>
+      <div>
+        <div class="section-label">End time</div>
+        <input type="time" id="end-time" value="{{ presets.dim_end_time | default('07:00') }}">
+      </div>
+    </div>
+    <div class="slider-block" style="margin-top:1.25rem;margin-bottom:0">
+      <div class="section-label">Dimmed brightness</div>
+      <div class="slider-row">
+        <input type="range" id="dimmed-brightness" min="0" max="1" step="0.01" value="{{ presets.dimmed_brightness | default(0.2) }}">
+        <span class="slider-val" id="dimmed-brightness-val">{{ ((presets.dimmed_brightness | default(0.2)) * 100) | int }}%</span>
+      </div>
+      <div class="range-ends"><span>0%</span><span>100%</span></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  {# ── Advanced options ──────────────────────────────────────────────────── #}
+  <div class="advanced-toggle-row">
+    <button class="btn-advanced" id="btn-advanced">
+      <i class="ti ti-settings" aria-hidden="true"></i>
+      <span id="btn-advanced-label">Show advanced options</span>
+      <i class="ti ti-chevron-down arrow" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div class="advanced-section" id="advanced-section">
+    <div class="advanced-inner">
+      <div class="advanced-heading">
+        <i class="ti ti-adjustments-horizontal" aria-hidden="true"></i>
+        Advanced options
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Hostname</div>
+        <input class="field-input" type="text" id="hostname" maxlength="63"
+               placeholder="(optional)" value="{{ presets.hostname | default('') }}">
+        <div class="field-hint" id="hostname-hint">Optional. Up to 63 alphanumeric characters, periods, and hyphens.</div>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Display host</div>
+        <input class="field-input" type="text" id="display-host" maxlength="63"
+               value="{{ presets.display_host | default('localhost') }}">
+        <div class="field-hint" id="display-host-hint">Up to 63 alphanumeric characters and periods. Cannot be blank.</div>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Display port</div>
+        <input class="field-input" type="number" id="display-port" min="1" max="65535" step="1"
+               value="{{ presets.display_port | default(1337) }}">
+        <div class="field-hint" id="display-port-hint">A number between 1 and 65535.</div>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Orientation</div>
+        <div class="select-wrap">
+          <i class="ti ti-rotate-clockwise icon-left" aria-hidden="true"></i>
+          <select class="field-input" id="orientation" style="padding-left:36px">
+            {% for deg in [0, 90, 180, 270] %}
+            <option value="{{ deg }}"{% if (presets.orientation | default(0)) == deg %} selected{% endif %}>{{ deg }}°</option>
+            {% endfor %}
+          </select>
+          <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="save-row">
+    <button class="btn-save" id="btn-save">
+      <i class="ti ti-device-floppy" aria-hidden="true"></i> Save configuration
+    </button>
+    <span class="save-status" id="save-status"></span>
+    <button class="btn-reset" id="btn-reset">
+      <i class="ti ti-refresh" aria-hidden="true"></i> Reset configuration
+    </button>
+  </div>
+</div>
+
+<script>
+{# ── Transitions data injected from server ─────────────────────────────── #}
+const data = [
+  {% for group in transitions %}
+  {
+    id:    {{ group.id | tojson }},
+    label: {{ group.label | tojson }},
+    subs: [
+      {% for sub in group.subs %}
+      { id: {{ sub.id | tojson }}, label: {{ sub.label | tojson }} }{% if not loop.last %},{% endif %}
+
+      {% endfor %}
+    ]
+  }{% if not loop.last %},{% endif %}
+
+  {% endfor %}
+];
+
+{# ── Preset transition selections injected from server ────────────────── #}
+const presetTransitions = {{ presets.transitions | default([]) | tojson }};
+
+const state = {};
+data.forEach(g => {
+  state[g.id] = { open: false, subs: {} };
+  g.subs.forEach(s => {
+    // Mark checked if this sub appears in the preset for this group
+    state[g.id].subs[s.id] = presetTransitions.includes(s.id);
+  });
+});
+
+function countSelected() {
+  let n = 0;
+  data.forEach(g => g.subs.forEach(s => { if (state[g.id].subs[s.id]) n++; }));
+  return n;
+}
+function totalSubs() { return data.reduce((a, g) => a + g.subs.length, 0); }
+function badgeClass(g) {
+  const vals = Object.values(state[g.id].subs);
+  const c = vals.filter(Boolean).length;
+  if (c === 0) return 'none';
+  if (c === vals.length) return 'all';
+  return '';
+}
+function badgeText(g) {
+  const vals = Object.values(state[g.id].subs);
+  const c = vals.filter(Boolean).length;
+  if (c === 0) return 'none';
+  if (c === vals.length) return 'all';
+  return c + '/' + vals.length;
+}
+function setAll(checked) {
+  data.forEach(g => Object.keys(state[g.id].subs).forEach(k => state[g.id].subs[k] = checked));
+  render();
+}
+
+document.getElementById('dim').addEventListener('change', function () {
+  document.getElementById('time-section').classList.toggle('enabled', this.checked);
+});
+
+const btnAdvanced = document.getElementById('btn-advanced');
+const advSection  = document.getElementById('advanced-section');
+const btnLabel    = document.getElementById('btn-advanced-label');
+btnAdvanced.addEventListener('click', () => {
+  const open = advSection.classList.toggle('open');
+  btnAdvanced.classList.toggle('open', open);
+  btnLabel.textContent = open ? 'Hide advanced options' : 'Show advanced options';
+});
+
+// Validation
+const ALNUM_PERIOD     = /^[a-zA-Z0-9.-]*$/;
+const ALNUM_PERIOD_REQ = /^[a-zA-Z0-9.]+$/;
+
+function setFieldState(inputEl, hintEl, valid, errorMsg, defaultMsg) {
+  if (valid) {
+    inputEl.classList.remove('invalid');
+    hintEl.classList.remove('error');
+    hintEl.textContent = defaultMsg;
+  } else {
+    inputEl.classList.add('invalid');
+    hintEl.classList.add('error');
+    hintEl.textContent = errorMsg;
+  }
+}
+
+const hostnameEl   = document.getElementById('hostname');
+const hostnameHint = document.getElementById('hostname-hint');
+hostnameEl.addEventListener('input', () => {
+  if (!ALNUM_PERIOD.test(hostnameEl.value)) hostnameEl.value = hostnameEl.value.replace(/[^a-zA-Z0-9.-]/g, '');
+  const valid = hostnameEl.value === '' || (ALNUM_PERIOD.test(hostnameEl.value) && hostnameEl.value.length <= 63);
+  setFieldState(hostnameEl, hostnameHint, valid,
+    'Only letters, numbers, periods, and hyphens allowed (max 63 characters).',
+    'Optional. Up to 63 alphanumeric characters, periods, and hyphens.');
+});
+
+const displayHostEl   = document.getElementById('display-host');
+const displayHostHint = document.getElementById('display-host-hint');
+displayHostEl.addEventListener('input', () => {
+  const cleaned = displayHostEl.value.replace(/[^a-zA-Z0-9.]/g, '');
+  if (cleaned !== displayHostEl.value) displayHostEl.value = cleaned;
+  const valid = ALNUM_PERIOD_REQ.test(cleaned) && cleaned.length <= 63;
+  setFieldState(displayHostEl, displayHostHint, valid,
+    cleaned === '' ? 'Cannot be blank.' : 'Only letters, numbers, and periods allowed (max 63 characters).',
+    'Up to 63 alphanumeric characters and periods. Cannot be blank.');
+});
+displayHostEl.addEventListener('blur', () => {
+  if (displayHostEl.value === '') {
+    displayHostEl.value = 'localhost';
+    setFieldState(displayHostEl, displayHostHint, true, '', 'Up to 63 alphanumeric characters and periods. Cannot be blank.');
+  }
+});
+
+const displayPortEl   = document.getElementById('display-port');
+const displayPortHint = document.getElementById('display-port-hint');
+displayPortEl.addEventListener('input', () => {
+  displayPortEl.value = displayPortEl.value.replace(/[^0-9]/g, '');
+  const v = parseInt(displayPortEl.value, 10);
+  const valid = !isNaN(v) && v >= 1 && v <= 65535;
+  setFieldState(displayPortEl, displayPortHint, valid,
+    isNaN(v) || displayPortEl.value === '' ? 'Port is required.' : 'Must be between 1 and 65535.',
+    'A number between 1 and 65535.');
+});
+displayPortEl.addEventListener('blur', () => {
+  const v = parseInt(displayPortEl.value, 10);
+  if (isNaN(v) || v < 1) displayPortEl.value = 1;
+  else if (v > 65535) displayPortEl.value = 65535;
+  setFieldState(displayPortEl, displayPortHint, true, '', 'A number between 1 and 65535.');
+});
+
+function collectFormData() {
+  const transitions = [];
+  data.forEach(g => {
+    g.subs.forEach(s => { if (state[g.id].subs[s.id]) transitions.push(s.id); });
+  });
+  const dimChecked = document.getElementById('dim').checked;
+  return {
+    player:                      document.getElementById('player-select').value,
+    transitions,
+    color_saturation:            parseFloat(document.getElementById('saturation').value),
+    contrast_enhancement:        parseFloat(document.getElementById('contrast').value),
+    transition_frames:           parseInt(document.getElementById('transition_frames').value, 10),
+    frame_delay:                 parseFloat(document.getElementById('frame_delay').value),
+    pause_delay:                 parseInt(document.getElementById('pausedelay').value, 10),
+    show_volume_bar:             document.getElementById('volume').checked,
+    dim_at_night:                dimChecked,
+    dim_start_time:              dimChecked ? document.getElementById('start-time').value : null,
+    dim_end_time:                dimChecked ? document.getElementById('end-time').value   : null,
+    dimmed_brightness:           parseFloat(document.getElementById('dimmed-brightness').value),
+    hostname:                    document.getElementById('hostname').value || null,
+    display_host:                document.getElementById('display-host').value,
+    display_port:                parseInt(document.getElementById('display-port').value, 10),
+    orientation:                 parseInt(document.getElementById('orientation').value, 10),
+  };
+}
+
+function isFormValid() {
+  const port = parseInt(displayPortEl.value, 10);
+  if (displayHostEl.classList.contains('invalid') || displayHostEl.value === '') return false;
+  if (hostnameEl.classList.contains('invalid')) return false;
+  if (isNaN(port) || port < 1 || port > 65535) return false;
+  return true;
+}
+
+let statusTimer = null;
+document.getElementById('btn-save').addEventListener('click', async () => {
+  if (!isFormValid()) {
+    showStatus('Please fix validation errors before saving.', 'error');
+    if (!advSection.classList.contains('open')) {
+      advSection.classList.add('open');
+      btnAdvanced.classList.add('open');
+      btnLabel.textContent = 'Hide advanced options';
+    }
+    return;
+  }
+  const payload = collectFormData();
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  try {
+    const response = await fetch('save_config', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    if (response.ok) {
+      showStatus('Configuration saved.', 'success');
+    } else {
+      showStatus('Server error: ' + response.status, 'error');
+    }
+  } catch (err) {
+    console.log('POST payload:', JSON.stringify(payload, null, 2));
+    showStatus('No server found. Payload logged to console.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', async () => {
+  if (!confirm('Reset configuration to defaults? This cannot be undone.')) return;
+  const btn = document.getElementById('btn-reset');
+  btn.disabled = true;
+  try {
+    const response = await fetch('/reset_config', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      showStatus('Configuration reset. Reloading…', 'success');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      showStatus('Server error: ' + response.status, 'error');
+    }
+  } catch (err) {
+    showStatus('No server found.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function showStatus(msg, type) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.className = 'save-status visible ' + type;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { el.className = 'save-status'; }, 4000);
+}
+
+// GIF tooltip
+const tooltip    = document.getElementById('gif-tooltip');
+const tooltipImg = document.getElementById('gif-tooltip-img');
+let hoverTimer = null, currentMouseX = 0, currentMouseY = 0;
+
+function toFilename(label, dir) {
+  return '/' + dir + '/' + label.replace(/[^a-zA-Z0-9_]+/g, '-').replace(/^-|-$/g, '') + '.gif';
+}
+function showTooltip(label, x, y, dir) {
+  tooltipImg.src = toFilename(label, dir);
+  tooltip.style.display = 'block';
+  positionTooltip(x, y);
+}
+function positionTooltip(x, y) {
+  const pad = 12, tw = tooltip.offsetWidth || 200, th = tooltip.offsetHeight || 200;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let left = x + pad, top = y + pad;
+  if (left + tw > vw - pad) left = x - tw - pad;
+  if (top  + th > vh - pad) top  = y - th - pad;
+  tooltip.style.left = left + 'px';
+  tooltip.style.top  = top  + 'px';
+}
+function hideTooltip() {
+  clearTimeout(hoverTimer);
+  tooltip.style.display = 'none';
+  tooltipImg.src = '';
+}
+function attachTooltip(el, label, dir) {
+  el.addEventListener('mouseenter', e => {
+    currentMouseX = e.clientX; currentMouseY = e.clientY;
+    hoverTimer = setTimeout(() => showTooltip(label, currentMouseX, currentMouseY, dir), 1000);
+  });
+  el.addEventListener('mousemove', e => {
+    currentMouseX = e.clientX; currentMouseY = e.clientY;
+    if (tooltip.style.display === 'block') positionTooltip(currentMouseX, currentMouseY);
+  });
+  el.addEventListener('mouseleave', () => hideTooltip());
+}
+
+function render() {
+  const n = countSelected(), t = totalSubs();
+  document.getElementById('toolbar-count').textContent = n + ' of ' + t + ' selected';
+
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  data.forEach(g => {
+    const s = state[g.id];
+    const allChecked = Object.values(s.subs).every(Boolean);
+    const anyChecked = Object.values(s.subs).some(Boolean);
+
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <div class="item-header">
+        <input type="checkbox" id="cb-${g.id}" ${allChecked ? 'checked' : ''}>
+        <label class="item-label" for="cb-${g.id}">${g.label}</label>
+        <span class="badge ${badgeClass(g)}">${badgeText(g)}</span>
+        <button class="toggle-btn ${s.open ? 'open' : ''}" aria-label="expand" data-group="${g.id}">
+          <i class="ti ti-chevron-down" style="font-size:16px" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="sub-list ${s.open ? 'open' : ''}">
+        ${g.subs.map(sub => `
+          <div class="sub-item">
+            <input type="checkbox" id="cb-${sub.id}" ${s.subs[sub.id] ? 'checked' : ''} data-group="${g.id}" data-sub="${sub.id}">
+            <label class="sub-label" for="cb-${sub.id}">${sub.label}</label>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    const parentCb = div.querySelector('#cb-' + g.id);
+    if (anyChecked && !allChecked) parentCb.indeterminate = true;
+    parentCb.addEventListener('change', e => {
+      Object.keys(s.subs).forEach(k => s.subs[k] = e.target.checked); render();
+    });
+    div.querySelector('.toggle-btn').addEventListener('click', e => {
+      e.stopPropagation(); s.open = !s.open; render();
+    });
+    div.querySelector('.item-header').addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT' || e.target.closest('.toggle-btn')) return;
+      s.open = !s.open; render();
+    });
+    attachTooltip(div.querySelector('.item-label'), g.label, 'static/groups');
+    div.querySelectorAll('[data-sub]').forEach(cb => {
+      const subLabel = cb.nextElementSibling;
+      const subObj   = g.subs.find(s => s.id === cb.dataset.sub);
+      if (subLabel && subObj) attachTooltip(subLabel, subObj.label, 'static/transitions');
+      cb.addEventListener('change', e => {
+        s.subs[e.target.dataset.sub] = e.target.checked; render();
+      });
+    });
+    list.appendChild(div);
+  });
+
+  const bar = document.createElement('div');
+  bar.className = 'count-bar';
+  bar.innerHTML = `<i class="ti ti-check" style="font-size:15px" aria-hidden="true"></i><span><span class="count-num">${n}</span> of <span class="count-num">${t}</span> items selected</span>`;
+  list.appendChild(bar);
+}
+
+// Dimmed brightness slider — stored as 0–1, displayed as 0–100%
+const dimBrightEl  = document.getElementById('dimmed-brightness');
+const dimBrightVal = document.getElementById('dimmed-brightness-val');
+dimBrightEl.addEventListener('input', () => {
+  dimBrightVal.textContent = Math.round(parseFloat(dimBrightEl.value) * 100) + '%';
+});
+
+document.getElementById('btn-all').addEventListener('click',  () => setAll(true));
+document.getElementById('btn-none').addEventListener('click', () => setAll(false));
+
+[
+  ['saturation',       v => parseFloat(v).toFixed(1)],
+  ['contrast',         v => parseFloat(v).toFixed(1)],
+  ['transition_frames', v => parseInt(v)],
+  ['frame_delay',       v => parseFloat(v).toFixed(2)],
+  ['pausedelay',       v => parseInt(v) + 's'],
+].forEach(([id, fmt]) => {
+  const el  = document.getElementById(id);
+  const out = document.getElementById(id + '-val');
+  el.addEventListener('input', () => out.textContent = fmt(el.value));
+});
+
+render();
+</script>
+
+</body>
+</html>
