@@ -29,45 +29,57 @@
 
 import os
 import signal
+import socket
+import subprocess
 from pathlib import Path
 
 import configargparse
 import rich.traceback
 from flask import Flask, render_template, request
-from rich import print
-from pid import PidFile
-
 from LMSTools import server
+from pid import PidFile
+from rich import print
+
 from . import discovery, transitions
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
 
 args: configargparse.Namespace
-servers = discovery.discover_lms()
 rich.traceback.install()
 
 app = Flask(__name__, static_url_path="/static")
-
-servers = []
-players = {}
+#app.jinja_env.add_extension("jinja2.ext.debug")
 
 
 # Collect all the servers and players
-def getServersAndPlayers():
-    global servers, players
-    l_servers = discovery.discover_lms()
-    l_players = {}
-    for s in l_servers:
+def getPlayers():
+    out = {}
+    servers = discovery.discover_lms()
+    for s in servers:
         ss = server.LMSServer(s["host"], s["port"])
-        l_players[ss.host] = sorted(ss.get_players(), key=lambda x:x.name)
-    players = l_players
-    servers = l_servers
+        s_players = [{"id": p.ref, "label": p.name } for p in sorted(ss.get_players(), key=lambda x:x.name)]
+        out[ss.host] = s_players
+    return out
+
+def makeTransitions():
+    out = []
+    for grp in transitions.TransitionGroups:
+        t = {"id": str(grp), "label": str(grp), "subs": []}
+        for sub in transitions.make_transitions(grp):
+            s = {
+                "id": str(sub),
+                "label": str(sub).replace("_", " "),
+            }
+            t["subs"].append(s)
+        out.append(t)
+
+    return out
 
 @app.route("/", methods=["GET"])
 def index():
     #print("Index - GET")
-    getServersAndPlayers()
+    players = getPlayers()
 
     presets = {}
     errmsg = ""
@@ -79,6 +91,8 @@ def index():
             errmsg = f"{args.displayconfig} does not exist"
             print(errmsg)
 
+    print(presets)
+
     dimtimes = presets.get("dimtimes", ["0.00", "0.00"])
     presets["dimstart"] = dimtimes[0] if len(dimtimes) > 0 else "0:00"
     presets["dimend"] = dimtimes[1] if len(dimtimes) > 1 else "0:00"
@@ -87,41 +101,70 @@ def index():
     presets["lmsport_http"] = ports[0]
     presets["lmsport_telnet"] = ports[1]
 
-    print("Servers: ", servers)
-    print("Players: ", players)
+    #print("Servers: ", servers)
+    #print("Players: ", players)
 
-    return render_template("index.html", presets=presets, players=players, servers=servers, transitions=transitions.TransitionTypes)
+    trans = makeTransitions()
+    print("Presets:    ", presets)
+    #print("Players:    ", players)
+    #print("Transitions:",  trans)
 
-@app.route("/", methods=["POST"])
-def indexPost():
+    return render_template("lms_cover_art_config.html", presets=presets, players=players, transitions=trans)
+
+@app.route("/save_config", methods=["POST"])
+def save_config():
     #print("Index - POST")
 
-    print(request.form)
+    print(request.json)
 
-    trans = [t for t in request.form.getlist("transitions") if t]
+    output = request.json
 
-    output = dict(request.form.items())
-    presets = dict(request.form.items())        # Copy to use again
 
-    output["transitions"] = trans
-    output["dimtimes"] = [output.pop("dimstart", "0:10"), output.pop("dimend", "0:01")]
-    output["lmsports"] = [output.pop("lmsport_http", 9000), output.pop("lmsport_telnet", 9090)]
-
-    if "volume" not in output:
-        output["volume"] = "0"
-
-    #print(output)
+    # Remove values we don't save.
+    hostname = output.pop("hostname")
+    if hostname and hostname != socket.gethostname():
+        print(f"Setting hostname to {hostname}, was {socket.gethostname()}")
+        command = ["hostnamectl", "set-hostname", hostname]
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        print(result)
 
     if args.displayconfig:
+        print(f"Saving configuration:{ args.displayconfig}")
         with open(args.displayconfig, "w") as f:
             f.write(configargparse.DefaultConfigFileParser().serialize(output))
 
-    signal_proc(args.disppid)
-    signal_proc(args.remotepid)
+    for i in args.pidfiles:
+        signal_proc(i)
 
-    presets["transitions"] = trans
+    #return render_template("lms_config.html", presets=presets, players=players, transitions=transitions.TransitionTypes)
+    trans = makeTransitions()
+    return "Saved"
 
-    return render_template("index.html", presets=presets, players=players, servers=servers, transitions=transitions.TransitionTypes)
+@app.route("/reset_config", methods=["POST"])
+def reset_config():
+    print(f"Resetting configuration: {args.displayconfig}")
+    defaults = {
+        "player": "",
+        "transitions": [],
+        "color_saturation": 1.6,
+        "contrast_enhancement": 1.6,
+        "frames_in_transitions": 39,
+        "frame_delay_in_transitions": 1.35,
+        "show_volume_bar": True,
+        "dim_at_night": True,
+        "dim_start_time": "22:00",
+        "dim_end_time": "07:00",
+        "dimmed_brightness": 0.41,
+        "display_host": "localhost",
+        "display_port": 1337,
+        "orientation": 0,
+    }
+
+    if args.displayconfig:
+        with open(args.displayconfig, "w") as f:
+            f.write(configargparse.DefaultConfigFileParser().serialize(defaults))
+
+    return "Reset"
 
 def signal_proc(pidfile):
     if pidfile:
@@ -136,8 +179,7 @@ def signal_proc(pidfile):
 
 def processCommandLine():
     parser = configargparse.ArgumentParser("LMS Display Configuration Web Interface")
-    parser.add_argument("--disppid",    type=Path,         help="Signal the display process to reread configurations")
-    parser.add_argument("--remotepid",  type=Path,         help="Signal the remote process to reread configurations")
+    parser.add_argument("--pidfiles",    default=[], nargs='?', type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
 
     return parser.parse_args()
@@ -146,6 +188,10 @@ def main():
     global args
     with PidFile("lmsconfig"):
         args = processCommandLine()
+
+        if args.displayconfig:
+            if not args.displayconfig.exists():
+                reset_config()
         app.run(host="0.0.0.0")
 
 if __name__ == "__main__":
