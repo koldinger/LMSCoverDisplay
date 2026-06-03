@@ -135,8 +135,8 @@ def initI2C():
     mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
 
     # Only initiasize the pins we use, namely A0-A4
-    for pin in range(0, 5):
-        pin = mcp.get_pin(pin)
+    for p in range(0, 5):
+        pin = mcp.get_pin(p)
 
         pin.direction = Direction.INPUT
         pin.pull = Pull.UP
@@ -207,18 +207,16 @@ def pollButtons():
                 event_q.put(KeyEvents(pin._pin))
         time.sleep(0.05)
 
-reload = False
-
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
-    global args, reload
+    global args
     ic()
     args = process_cmdline()
     event_q.put(KeyEvents.RELOAD_CONFIG)
     # clear the cache on getArt so we get changes to images immediately
 
 
-def getPlayer(servers, name) -> player.LMSPlayer:
+def getPlayer(servers, name) -> player.LMSPlayer | None:
     ic()
     for srv in servers:
         s = server.LMSServer(srv["host"], int(srv["port"]))
@@ -232,7 +230,7 @@ def getPlayer(servers, name) -> player.LMSPlayer:
 
 
 def main():
-    global args, __version__
+    global args
     print(f"Running.   Version: {__version__}")
     args = process_cmdline()
     console = Console()
@@ -258,13 +256,13 @@ def main():
                 plr = getPlayer(servers, args.player)
                 ic(plr)
 
-                while not reload:
+                while True:
                     event = event_q.get()
                     ic(event)
 
                     match event:
                         case KeyEvents.SKIP_FORWARD:
-                            plr.__next__()
+                            plr.next()
                         case KeyEvents.SKIP_BACK:
                             if plr.time_elapsed > RESET_PERIOD:
                                 plr.seek_to(0)
@@ -276,7 +274,8 @@ def main():
                             plr.volume_up()
                         case KeyEvents.VOL_DOWN:
                             plr.volume_down()
-
+                        case KeyEvents.RELOAD_CONFIG:
+                            break
             except Exception as e:
                 console.print_exception()
                 time.sleep(backoff)
