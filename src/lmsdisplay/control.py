@@ -86,25 +86,13 @@ def index():
     if args.displayconfig:
         try:
             with open(args.displayconfig) as conf:
-                presets = configargparse.DefaultConfigFileParser().parse(conf)
+                presets = configargparse.YAMLConfigFileParser().parse(conf)
         except FileNotFoundError:
             errmsg = f"{args.displayconfig} does not exist"
             print(errmsg)
 
-    print(presets)
-
-    dimtimes = presets.get("dimtimes", ["0.00", "0.00"])
-    presets["dimstart"] = dimtimes[0] if len(dimtimes) > 0 else "0:00"
-    presets["dimend"] = dimtimes[1] if len(dimtimes) > 1 else "0:00"
-
-    ports = presets.get("lmsports", [9000, 9090])
-    presets["lmsport_http"] = ports[0]
-    presets["lmsport_telnet"] = ports[1]
-
-    #print("Servers: ", servers)
-    #print("Players: ", players)
-
     trans = makeTransitions()
+
     print("Presets:    ", presets)
     #print("Players:    ", players)
     #print("Transitions:",  trans)
@@ -136,8 +124,6 @@ def save_config():
     for i in args.pidfiles:
         signal_proc(i)
 
-    #return render_template("lms_config.html", presets=presets, players=players, transitions=transitions.TransitionTypes)
-    trans = makeTransitions()
     return "Saved"
 
 @app.route("/reset_config", methods=["POST"])
@@ -161,8 +147,11 @@ def reset_config():
     }
 
     if args.displayconfig:
-        with open(args.displayconfig, "w") as f:
-            f.write(configargparse.DefaultConfigFileParser().serialize(defaults))
+        try:
+            with open(args.displayconfig, "w") as f:
+                f.write(configargparse.DefaultConfigFileParser().serialize(defaults))
+        except Exception as e:
+            return str(e), 500
 
     return "Reset"
 
@@ -179,7 +168,7 @@ def signal_proc(pidfile):
 
 def processCommandLine():
     parser = configargparse.ArgumentParser("LMS Display Configuration Web Interface")
-    parser.add_argument("--pidfiles",    default=[], nargs='?', type=Path,         help="Signal the display process to reread configurations")
+    parser.add_argument("--pidfiles",    default=[], nargs='*', type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
 
     return parser.parse_args()
@@ -188,10 +177,11 @@ def main():
     global args
     with PidFile("lmsconfig"):
         args = processCommandLine()
+        ic(args)
 
-        if args.displayconfig:
-            if not args.displayconfig.exists():
-                reset_config()
+        # Generate a config file if it doesn't exist already
+        if args.displayconfig and not args.displayconfig.exists():
+            reset_config()
         app.run(host="0.0.0.0")
 
 if __name__ == "__main__":
