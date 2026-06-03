@@ -86,7 +86,7 @@ def index():
     if args.displayconfig:
         try:
             with open(args.displayconfig) as conf:
-                presets = configargparse.YAMLConfigFileParser().parse(conf)
+                presets = configargparse.ConfigFileParser().parse(conf)
         except FileNotFoundError:
             errmsg = f"{args.displayconfig} does not exist"
             print(errmsg)
