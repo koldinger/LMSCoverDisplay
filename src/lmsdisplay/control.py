@@ -174,7 +174,7 @@ def main():
 
         # Generate a config file if it doesn't exist already
         if args.displayconfig and not args.displayconfig.exists():
-            write_config(args.displayconfig, defaults)
+            write_config(args.displayconfig, defaults.defaults)
 
         app.run(host="0.0.0.0")
 
