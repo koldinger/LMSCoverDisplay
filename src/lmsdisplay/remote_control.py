@@ -37,6 +37,7 @@ from enum import Enum
 from pathlib import Path
 from queue import Queue
 import contextlib
+from types import SimpleNamespace
 
 from digitalio import Direction, Pull
 from pid import PidFile
