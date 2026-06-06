@@ -31,6 +31,11 @@ import datetime
 
 from contextlib import suppress
 from pathlib import Path
+from rich import print
+
+from types import SimpleNamespace
+
+import toml
 
 def parsetime(timestr):
     """ Parse a time string, with different possible formats. """
@@ -44,7 +49,6 @@ def parsetime(timestr):
         return datetime.datetime.strptime(timestr, "%I%p").time()
     return datetime.time(0, 0)
 
-
 def betweentimes(now, start, end):
     """ Determine if now is between start and end on a 24 hour clock. """
     if not (start and end):
@@ -53,12 +57,15 @@ def betweentimes(now, start, end):
         return start <= now <= end
     return now <= end or now >= start
 
-
 def makedir(name: Path):
     if not name.exists():
         name.mkdir()
     elif not name.is_dir():
         raise NotADirectoryError
+
+def loadtoml(file, defaults):
+    values = defaults | toml.load(file)
+    return SimpleNamespace(**values)
 
 if __name__ == "__main__":
     for i in ["11pm", "23", "11:30pm", "11:30", "23:30", "24:30", "13pm"]:

@@ -33,24 +33,27 @@ import socket
 import subprocess
 from pathlib import Path
 
-import configargparse
+import argparse
 import rich.traceback
 from flask import Flask, render_template, request
 from LMSTools import server
 from pid import PidFile
 from rich import print
+import toml
 
-from . import discovery, transitions
+from . import discovery, transitions, defaults
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
 
-args: configargparse.Namespace
+args: argparse.Namespace
 rich.traceback.install()
 
 app = Flask(__name__, static_url_path="/static")
 #app.jinja_env.add_extension("jinja2.ext.debug")
 
+# TODO @kolding: Fix this
+__version__ = "0.1.0"
 
 # Collect all the servers and players
 def getPlayers():
@@ -85,8 +88,7 @@ def index():
     errmsg = ""
     if args.displayconfig:
         try:
-            with open(args.displayconfig) as conf:
-                presets = configargparse.ConfigFileParser().parse(conf)
+            presets = toml.load(args.displayconfig)
         except FileNotFoundError:
             errmsg = f"{args.displayconfig} does not exist"
             print(errmsg)
@@ -99,27 +101,27 @@ def index():
 
     return render_template("lms_cover_art_config.html", presets=presets, players=players, transitions=trans)
 
+
 @app.route("/save_config", methods=["POST"])
 def save_config():
     #print("Index - POST")
 
     print(request.json)
 
-    output = request.json
-
-
+    config = request.json
     # Remove values we don't save.
-    hostname = output.pop("hostname")
+
+    hostname = config.pop("hostname")
     if hostname and hostname != socket.gethostname():
         print(f"Setting hostname to {hostname}, was {socket.gethostname()}")
         command = ["hostnamectl", "set-hostname", hostname]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         print(result)
 
-    if args.displayconfig:
-        print(f"Saving configuration:{ args.displayconfig}")
-        with open(args.displayconfig, "w") as f:
-            f.write(configargparse.DefaultConfigFileParser().serialize(output))
+    try:
+        write_config(args.displayconfig, config)
+    except Exception as e:
+        return str(e), 500
 
     for i in args.pidfiles:
         signal_proc(i)
@@ -129,29 +131,11 @@ def save_config():
 @app.route("/reset_config", methods=["POST"])
 def reset_config():
     print(f"Resetting configuration: {args.displayconfig}")
-    defaults = {
-        "player": "",
-        "transitions": [],
-        "color_saturation": 1.6,
-        "contrast_enhancement": 1.6,
-        "frames_in_transitions": 39,
-        "frame_delay_in_transitions": 1.35,
-        "show_volume_bar": True,
-        "dim_at_night": True,
-        "dim_start_time": "22:00",
-        "dim_end_time": "07:00",
-        "dimmed_brightness": 0.41,
-        "display_host": "localhost",
-        "display_port": 1337,
-        "orientation": 0,
-    }
 
-    if args.displayconfig:
-        try:
-            with open(args.displayconfig, "w") as f:
-                f.write(configargparse.DefaultConfigFileParser().serialize(defaults))
-        except Exception as e:
-            return str(e), 500
+    try:
+        write_config(args.displayconfig, defaults.defaults)
+    except Exception as e:
+        return str(e), 500
 
     return "Reset"
 
@@ -166,22 +150,32 @@ def signal_proc(pidfile):
         except Exception as e:
             print("Unable to send HUP signal: ", str(e))
 
+def write_config(filename, config):
+    if filename:
+        print(f"Saving configuration: { filename }")
+        with filename.open("w") as f:
+            toml.dump(config, f)
+
 def processCommandLine():
-    parser = configargparse.ArgumentParser("LMS Display Configuration Web Interface")
-    parser.add_argument("--pidfiles",    default=[], nargs='*', type=Path,         help="Signal the display process to reread configurations")
+    parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
+    parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
+    parser.add_argument("--version", action="version", version =__version__)
 
     return parser.parse_args()
 
 def main():
     global args
-    with PidFile("lmsconfig"):
-        args = processCommandLine()
-        ic(args)
+    args = processCommandLine()
+    ic(args)
+
+    with PidFile("lmsconfig") as p:
+        ic(p)
 
         # Generate a config file if it doesn't exist already
         if args.displayconfig and not args.displayconfig.exists():
-            reset_config()
+            write_config(args.displayconfig, defaults)
+
         app.run(host="0.0.0.0")
 
 if __name__ == "__main__":

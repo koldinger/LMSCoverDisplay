@@ -1,0 +1,17 @@
+defaults = {
+    "player": "",
+    "transitions": [],
+    "color_saturation": 1.6,
+    "contrast_enhancement": 1.6,
+    "frames_in_transitions": 39,
+    "frame_delay_in_transitions": 1.35,
+    "show_volume_bar": True,
+    "dim_at_night": True,
+    "dim_start_time": "22:00",
+    "dim_end_time": "07:00",
+    "dimmed_brightness": 0.41,
+    "display_host": "localhost",
+    "display_port": 1337,
+    "orientation": 0,
+    "image_size": 64,
+}

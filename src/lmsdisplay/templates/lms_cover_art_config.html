@@ -21,6 +21,7 @@
                     "display_host"              : str   (default "localhost")
                     "display_port"              : int   (1–65535, default 1337)
                     "orientation"               : int   (0, 90, 180, or 270, default 0)
+                    "image_size"                : int   (positive integer, default 64)
                   }
 #}
 <!DOCTYPE html>
@@ -394,6 +395,13 @@
           <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
         </div>
       </div>
+
+      <div class="field-block">
+        <div class="section-label">Image size</div>
+        <input class="field-input" type="number" id="image-size" min="1" step="1"
+               value="{{ presets.image_size | default(64) }}">
+        <div class="field-hint" id="image-size-hint">A positive integer.</div>
+      </div>
     </div>
   </div>
 
@@ -559,14 +567,33 @@ function collectFormData() {
     display_host:                document.getElementById('display-host').value,
     display_port:                parseInt(document.getElementById('display-port').value, 10),
     orientation:                 parseInt(document.getElementById('orientation').value, 10),
+    image_size:                  parseInt(document.getElementById('image-size').value, 10),
   };
 }
+
+const imageSizeEl   = document.getElementById('image-size');
+const imageSizeHint = document.getElementById('image-size-hint');
+imageSizeEl.addEventListener('input', () => {
+  imageSizeEl.value = imageSizeEl.value.replace(/[^0-9]/g, '');
+  const v = parseInt(imageSizeEl.value, 10);
+  const valid = !isNaN(v) && v >= 1;
+  setFieldState(imageSizeEl, imageSizeHint, valid,
+    isNaN(v) || imageSizeEl.value === '' ? 'Image size is required.' : 'Must be a positive integer.',
+    'A positive integer.');
+});
+imageSizeEl.addEventListener('blur', () => {
+  const v = parseInt(imageSizeEl.value, 10);
+  if (isNaN(v) || v < 1) imageSizeEl.value = 64;
+  setFieldState(imageSizeEl, imageSizeHint, true, '', 'A positive integer.');
+});
 
 function isFormValid() {
   const port = parseInt(displayPortEl.value, 10);
   if (displayHostEl.classList.contains('invalid') || displayHostEl.value === '') return false;
   if (hostnameEl.classList.contains('invalid')) return false;
   if (isNaN(port) || port < 1 || port > 65535) return false;
+  const imgSize = parseInt(imageSizeEl.value, 10);
+  if (isNaN(imgSize) || imgSize < 1) return false;
   return true;
 }
 

@@ -29,7 +29,6 @@
 
 import argparse
 import contextlib
-import datetime as dt
 import functools
 import importlib.metadata
 import importlib.resources
@@ -45,7 +44,6 @@ from queue import Queue
 
 from LMSTools import server
 
-import configargparse
 import requests
 from pid import PidFile
 from PIL import Image, ImageEnhance
@@ -55,6 +53,7 @@ from rich.console import Console
 from . import transitions, util, volume
 from . import flaschen
 from . import lms_monitor, discovery
+from . import defaults
 
 #rich.traceback.install()
 args: argparse.Namespace
@@ -94,10 +93,10 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     return color
 
 def handleEvents(display, playerID, trans, baseUrl):
-    lastimg = Image.new("RGB", (args.imagesize))
+    lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
-    blank = Image.new("RGB", tuple(args.imagesize), color=(0, 0, 0))
+    blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
     #lyrionlogo = getInternalArt("logo.png")
     lyrionlogo = blank
 
@@ -129,7 +128,7 @@ def handleEvents(display, playerID, trans, baseUrl):
                     trackid = None
                     art = getCurrentArt(playerID, baseUrl)
 
-                if args.show_volume_bar:
+                if config.show_volume_bar:
                     vol = int(event.volume)
 
                     # If the volume has changed,
@@ -149,9 +148,9 @@ def handleEvents(display, playerID, trans, baseUrl):
                     # If we just switched to pause timing, record the time we paused (roughly)
                     pausestart = datetime.now()
                 playing = False
-                pause_img = blank if args.pauselogo else lyrionlogo
+                pause_img = blank #if config.pauselogo else lyrionlogo
 
-                if (datetime.now() - pausestart).seconds >= args.pause_delay:
+                if (datetime.now() - pausestart).seconds >= config.pause_delay:
                     # If we're past the pausedelay, switch to the pause display
                     if lastimg != blank:
                         sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
@@ -167,8 +166,8 @@ def handleEvents(display, playerID, trans, baseUrl):
 
 def dimImage(image):
     """ Dim an image. """
-    if args.dim_at_night:
-        image = ImageEnhance.Brightness(image).enhance(args.dimmed_brightness)
+    if config.dim_at_night:
+        image = ImageEnhance.Brightness(image).enhance(config.dimmed_brightness)
     return image
 
 def sendArt(f, art, overlay=None):
@@ -183,11 +182,11 @@ def sendArt(f, art, overlay=None):
         art = art.copy()
         art.paste(overlay, (0, 0), overlay)
 
-    if args.dim_at_night is not None and util.betweentimes(datetime.now().time(), args.dim_start_time, args.dim_end_time):
+    if config.dim_at_night and util.betweentimes(datetime.now().time(), util.parsetime(config.dim_start_time), util.parsetime(config.dim_end_time)):
         art = dimImage(art)
 
-    if args.orientation:
-        art = art.rotate(args.orientation)
+    if config.orientation:
+        art = art.rotate(config.orientation)
 
     px = art.load()
     for x in range(art.width):
@@ -197,16 +196,16 @@ def sendArt(f, art, overlay=None):
     f.send()
 
 def sendTransition(f, art, lastimg, transition):
-    for i in transition(lastimg, art, args.transition_frames):
+    for i in transition(lastimg, art, config.transition_frames):
         sendArt(f, i)
-        time.sleep(args.frame_delay)
+        time.sleep(config.frame_delay)
 
 def enhanceImage(img: Image.Image) -> Image.Image:
     """ Pump up the contrast and color if requested. """
-    if args.contrast_enhancement != 1.0:
-        img = ImageEnhance.Contrast(img).enhance(args.contrast_enhancement)
-    if args.color_saturation != 1.0:
-        img = ImageEnhance.Color(img).enhance(args.color_saturation)
+    if config.contrast_enhancement != 1.0:
+        img = ImageEnhance.Contrast(img).enhance(config.contrast_enhancement)
+    if config.color_saturation != 1.0:
+        img = ImageEnhance.Color(img).enhance(config.color_saturation)
     return img
 
 def getCurrentArt(playerID, baseUrl):
@@ -219,7 +218,7 @@ def getCurrentArt(playerID, baseUrl):
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
         img = Image.open(BytesIO(resp.content))
-        rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
+        rimg = img.resize((config.image_size, config.image_size), Resampling.BILINEAR)
         rimg = enhanceImage(rimg)
     else:
         rimg = getInternalArt("questionmark.jpg")
@@ -236,7 +235,7 @@ def getArt(trackID: str, baseUrl):
     resp = requests.get(url, timeout=(5, 10))
     if resp.status_code == requests.codes["ok"]:
         img = Image.open(BytesIO(resp.content))
-        rimg = img.resize(tuple(args.imagesize), Resampling.BILINEAR)
+        rimg = img.resize((config.image_size, config.image_size), Resampling.BILINEAR)
         rimg = enhanceImage(rimg)
     else:
         rimg = getInternalArt("questionmark.jpg")
@@ -249,62 +248,21 @@ def getArt(trackID: str, baseUrl):
 def getInternalArt(name: str) -> Image.Image:
     """ Retrieve artwork from the internal resource files. """
     fname = importlib.resources.files().joinpath("art", name).read_bytes()
-    return Image.open(fname).convert("RGB").resize(tuple(args.imagesize))
+    return Image.open(fname).convert("RGB").resize((config.image_size, config.image_size))
 
 def process_cmdline():
-    epilog = "Avaliable transitions:\n\n" + ", ".join(transitions.TransitionTypes)
-    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server",
-                                           epilog=epilog)
+    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
                                            # formatter_class=argparse.RawTextHelpFormatter)
-
-    midnight = dt.time(0, 0)
-
     parser.suggest_on_error = True
 
-    parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
-
-    # TODO: Remove the required on this later, so we can find any player that's playing.
-    parser.add_argument("--player", "-p", default=None, help="Player to monitor")
-
-    parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
-    parser.add_argument( "--password", type=str, default=None, help="Password")
-
-    parser.add_argument( "--orientation", "-o", default=0, type=int, choices=[0, 90, 180, 270], help="Orientation of the display, in degrees")
-
-    parser.add_argument("--transitions", "-t", nargs="*", metavar = "transition",
-                        default=[], choices=transitions.TransitionTypes,
-                        help = "A list of transitions to chose from")
-    parser.add_argument("--imagesize", "-i", default=[64, 64], type=int, nargs=2, help="Dimension of the display")
-
-    parser.add_argument("--dim_at_night", dest="dim_at_night", action=argparse.BooleanOptionalAction, default=False, help="Dim the screen to this amount")
-    parser.add_argument("--dimmed_brightness", dest="dimmed_brightness", type=float, default=1.0, help="Dim the screen to this amount")
-    parser.add_argument("--dim_start_time", dest="dim_start_time", type=util.parsetime, default=midnight, metavar="Time", help="Start dimming at this time")
-    parser.add_argument("--dim_end_time", dest="dim_end_time", type=util.parsetime, default=midnight, metavar="Time", help="End dimming at this time")
-
-    parser.add_argument("--contrast_enhancement", "-c", dest="contrast_enhancement", default=5.0, type=float, help="Enhance contrast to this value.  Def: 1.0 (change nothing)")
-    parser.add_argument("--color_saturation", "-C", dest="color_saturation", default=1.0, type=float, help="Enhance color to this value.  Def: 1.0 (change nothing)")
-
-    parser.add_argument("--frame_delay", type=float, default=0.15, help="Delay between frames during transitions")
-    parser.add_argument("--transition_frames", type=int, default=10, help="Number of interim images in the transitions")
-
-    parser.add_argument("--show_volume_bar", action="store_true", default=False, help="Display the volume bar when volume changes")
-
-    parser.add_argument("--pause_delay", "-P", type=int, default=0, help="Time to pause (in seconds) before switchiing to pause display")
-    parser.add_argument("--pauselogo", action="store_true", default=False, help="Show Lyrion logo when paused")
-
-    parser.add_argument( "--display_host", "-d", dest="display_host", default="localhost", type=str, help="Display host")
-    parser.add_argument( "--display_port", "-D", dest="display_port", default=1337, type=int, help="Display port")
-
-
-
-    # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
-
+    parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")
     parser.add_argument("--version", action="version", version=__version__)
 
     args = parser.parse_args()
-    ic(args)
 
-    return args
+    conf = util.loadtoml(args.config, defaults.defaults)
+
+    return args, conf
 
 
 class ReloadEvent:
@@ -312,9 +270,8 @@ class ReloadEvent:
 
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
-    global args
-    ic()
-    args = process_cmdline()
+    global args, config
+    args, config = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     getArt.cache_clear()
     event_q.put(ReloadEvent())
@@ -327,17 +284,17 @@ def getPlayer(servers, name):
             for plr in players:
                 if name in (plr.ref ,plr.name):
                     return plr
-    return None
+    raise PlayerNotFoundError(name)
 
 
 def main():
-    global args, __version__
+    global args, config
     print(f"Running.   Version: {__version__}")
-    args = process_cmdline()
+    args, config = process_cmdline()
     console = Console()
 
-    #piddir = args.pidfile.parent
-    #pidfile = args.pidfile.name
+    #piddir = config.pidfile.parent
+    #pidfile = config.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
@@ -348,22 +305,19 @@ def main():
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
                 ic(servers)
-                plr = getPlayer(servers, args.player)
-                ic(plr)
+                plr = getPlayer(servers, config.player)
                 print(f"Monitoring: {plr}")
-                if not (plr):
-                    raise PlayerNotFoundError(args.player)
 
                 base_url = f"http://{plr.server.host}:{plr.server.port}"
 
-                disp = flaschen.Flaschen(args.display_host, args.display_port, args.imagesize[0], args.imagesize[1])
+                disp = flaschen.Flaschen(config.display_host, config.display_port, config.image_size, config.image_size)
 
-                mon = lms_monitor.PlayerMonitor(plr.ref, plr.server.host, event_q, args.login, args.password)
+                mon = lms_monitor.PlayerMonitor(plr.ref, plr.server.host, event_q)
                 mon.start()
 
                 backoff = 1
 
-                handleEvents(disp, args.player, args.transitions, base_url)
+                handleEvents(disp, config.player, config.transitions, base_url)
                 mon.close()
             except Exception:
                 console.print_exception()

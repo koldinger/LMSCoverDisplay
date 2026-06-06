@@ -28,17 +28,16 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import datetime as dt
 import importlib.metadata
 import signal
 import threading
 import time
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
 from queue import Queue
+import contextlib
 
-import configargparse
 from digitalio import Direction, Pull
 from pid import PidFile
 from rich.console import Console
@@ -51,10 +50,11 @@ from adafruit_mcp230xx.mcp23017 import MCP23017
 from adafruit_debouncer import Debouncer, Button
 from RPi import GPIO
 
-from . import discovery
+from . import discovery, util, defaults
 
 #rich.traceback.install()
 args: argparse.Namespace
+config: SimpleNamespace
 
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
@@ -69,41 +69,23 @@ __version__ = "Unknown"
 class PlayerNotFoundError(Exception):
     pass
 
-try:
+with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     # Replace 'your-package-name' with the actual distribution name of your package
     __version__ = importlib.metadata.version("lmsdisplay")
-except importlib.metadata.PackageNotFoundError:
-    pass
-    #print("Package not found or not installed.")
 
 def process_cmdline():
-    parser = configargparse.ArgumentParser("Display album art from Lyrion Music Server", ignore_unknown_config_file_keys=True)
-                                          
-                                           # formatter_class=argparse.RawTextHelpFormatter)
-
-    midnight = dt.time(0, 0)
+    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
 
     parser.suggest_on_error = True
 
-    parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", is_config_file=True)
-
-    # TODO: Remove the required on this later, so we can find any player that's playing.
-    parser.add_argument( "--player", "-p", default=None, required=True, help="Player to monitor")
-
-    parser.add_argument( "--login", type=str, default=None, help="Login name.  Leave blank if login not required")
-    parser.add_argument( "--password", type=str, default=None, help="Password")
-
-    parser.add_argument( "--lmsserver", "-l", default=None, type=str, help="Name of the LMS Server")
-    parser.add_argument( "--lmsports", "-L", default=[9000, 9090], type=int, nargs=2,
-                        help="Ports for the LMS Server.   Takes 2 arguments, the Host port and the CLI port")
-
-    # parser.add_argument("--pidfile", type=Path, default=Path(f"/var/run/{Path(sys.argv[0]).name}"), help="File to store PID into. %(default)s")
-
+    parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", required=True)
     parser.add_argument("--version", action="version", version=__version__)
 
     args = parser.parse_args()
 
-    return args
+    config = util.loadtoml(args.config, defaults.defaults)
+
+    return args, config
 
 
 class ReloadEvent:
@@ -209,9 +191,9 @@ def pollButtons():
 
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
-    global args
+    global args, config
     ic()
-    args = process_cmdline()
+    args, config = process_cmdline()
     event_q.put(KeyEvents.RELOAD_CONFIG)
     # clear the cache on getArt so we get changes to images immediately
 
@@ -230,9 +212,9 @@ def getPlayer(servers, name) -> player.LMSPlayer | None:
 
 
 def main():
-    global args
+    global args, config
     print(f"Running.   Version: {__version__}")
-    args = process_cmdline()
+    args, config = process_cmdline()
     console = Console()
 
     initI2C()
@@ -246,14 +228,13 @@ def main():
         polling_thread = threading.Thread(target=pollButtons)
         polling_thread.daemon = True
         polling_thread.start()
-        ic()
 
         backoff = 1
         while True:
             try:
                 servers = discovery.discover_lms()
                 ic(servers)
-                plr = getPlayer(servers, args.player)
+                plr = getPlayer(servers, config.player)
                 ic(plr)
 
                 while True:
