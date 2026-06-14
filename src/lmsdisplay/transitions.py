@@ -140,8 +140,9 @@ def _doCurtainIn(oimg, nimg, steps):
         lc = left.crop((left.width - width, 0, left.width, left.height))
         img.paste(lc, (0, 0))
 
-        rc = right.crop((right.width - width, 0, right.width, right.height))
-        img.paste(rc, (img.width - width, 0))
+        # Don't need to crop the right image.   We can just overflow off the side
+        # rc = right.crop((0, 0, right.width, right.height))
+        img.paste(right, (img.width - width, 0))
 
         yield img
     yield nimg
@@ -160,8 +161,9 @@ def _doCurtainOut(oimg, nimg, steps):
         lc = left.crop((left.width - width, 0, left.width, left.height))
         img.paste(lc, (0, 0))
 
-        rc = right.crop((right.width - width, 0, right.width, right.height))
-        img.paste(rc, (img.width - width, 0))
+        # Don't need to crop the right image.   We can just overflow off the side
+        # rc = right.crop((0, 0, right.width, right.height))
+        img.paste(right, (img.width - width, 0))
 
         yield img
     yield nimg
