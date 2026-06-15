@@ -35,7 +35,7 @@ from pathlib import Path
 
 import argparse
 import rich.traceback
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory
 from LMSTools import server
 from pid import PidFile
 from rich import print
@@ -50,6 +50,7 @@ args: argparse.Namespace
 rich.traceback.install()
 
 app = Flask(__name__, static_url_path="/static")
+
 #app.jinja_env.add_extension("jinja2.ext.debug")
 
 # TODO @kolding: Fix this
@@ -60,7 +61,7 @@ def getPlayers():
     out = {}
     servers = discovery.discover_lms()
     for s in servers:
-        ss = server.LMSServer(s["host"], s["port"])
+        ss = server.LMSServer(s.host, s.port)
         s_players = [{"id": p.ref, "label": p.name } for p in sorted(ss.get_players(), key=lambda x:x.name)]
         out[ss.host] = s_players
     return out
@@ -138,6 +139,11 @@ def reset_config():
         return str(e), 500
 
     return "Reset"
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, "static"),
+                               "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 def signal_proc(pidfile):
     if pidfile:
