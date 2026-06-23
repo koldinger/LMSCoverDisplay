@@ -85,6 +85,11 @@
   .chevron-wrap { position: absolute; right: 10px; pointer-events: none; color: var(--color-text-secondary); font-size: 16px; }
 
   .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .transitions-panel { overflow: hidden; max-height: 0; transition: max-height 0.3s ease, opacity 0.25s ease; opacity: 0; }
+  .transitions-panel.open { max-height: 2000px; opacity: 1; }
+  .list-section-label { font-size: 15px; font-weight: 500; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .list-section-label i.arrow { transition: transform 0.25s; color: var(--color-text-secondary); font-size: 16px; }
+  .list-section-label.open i.arrow { transform: rotate(180deg); }
   .toolbar-label { font-size: 13px; color: var(--color-text-secondary); }
   .list-section-label { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
   .btn-group { display: flex; gap: 6px; }
@@ -211,6 +216,13 @@
   .btn-reset:active { transform: scale(0.97); }
   .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .version-footer {
+    margin-top: 1.5rem;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    text-align: right;
+  }
+
   #gif-tooltip {
     position: fixed; display: none; z-index: 9999; pointer-events: none;
     border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary);
@@ -251,14 +263,21 @@
 
   {# ── Transitions list ──────────────────────────────────────────────────── #}
   <div class="toolbar">
-    <span class="list-section-label">Select transitions</span>
-    <div class="btn-group">
-      <button id="btn-all">Select all</button>
-      <button id="btn-none">Deselect all</button>
+    <span class="list-section-label" id="transitions-toggle">
+      Select transitions
+      <i class="ti ti-chevron-down arrow" aria-hidden="true"></i>
+    </span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="toolbar-label" id="toolbar-count"></span>
+      <div class="btn-group" id="transitions-btn-group" style="display:none">
+        <button id="btn-all">Select all</button>
+        <button id="btn-none">Deselect all</button>
+      </div>
     </div>
   </div>
-  <div style="margin-bottom:10px"><span class="toolbar-label" id="toolbar-count"></span></div>
-  <div class="list" id="list"></div>
+  <div class="transitions-panel" id="transitions-panel">
+    <div class="list" id="list"></div>
+  </div>
 
   <div class="divider"></div>
 
@@ -414,6 +433,7 @@
       <i class="ti ti-refresh" aria-hidden="true"></i> Reset configuration
     </button>
   </div>
+  <div class="version-footer">v{{ version }}</div>
 </div>
 
 <script>
@@ -445,6 +465,15 @@ data.forEach(g => {
     state[g.id].subs[s.id] = presetTransitions.includes(s.id);
   });
 });
+
+let transitionsPanelOpen = false;
+
+function setTransitionsPanelOpen(open) {
+  transitionsPanelOpen = open;
+  document.getElementById("transitions-panel").classList.toggle("open", open);
+  document.getElementById("transitions-toggle").classList.toggle("open", open);
+  document.getElementById("transitions-btn-group").style.display = open ? "flex" : "none";
+}
 
 function countSelected() {
   let n = 0;
@@ -760,6 +789,11 @@ function render() {
   bar.className = 'count-bar';
   bar.innerHTML = `<i class="ti ti-check" style="font-size:15px" aria-hidden="true"></i><span><span class="count-num">${n}</span> of <span class="count-num">${t}</span> items selected</span>`;
   list.appendChild(bar);
+
+  // Auto-collapse when none or all selected and user hasn't manually opened it
+  if ((n === 0 || n === t) && !transitionsPanelOpen) {
+    setTransitionsPanelOpen(false);
+  }
 }
 
 // Dimmed brightness slider — stored as 0–1, displayed as 0–100%
@@ -767,6 +801,10 @@ const dimBrightEl  = document.getElementById('dimmed-brightness');
 const dimBrightVal = document.getElementById('dimmed-brightness-val');
 dimBrightEl.addEventListener('input', () => {
   dimBrightVal.textContent = Math.round(parseFloat(dimBrightEl.value) * 100) + '%';
+});
+
+document.getElementById('transitions-toggle').addEventListener('click', () => {
+  setTransitionsPanelOpen(!transitionsPanelOpen);
 });
 
 document.getElementById('btn-all').addEventListener('click',  () => setAll(true));
@@ -784,6 +822,9 @@ document.getElementById('btn-none').addEventListener('click', () => setAll(false
   el.addEventListener('input', () => out.textContent = fmt(el.value));
 });
 
+// Open panel initially only if there is a partial selection
+const _initN = countSelected(), _initT = totalSubs();
+setTransitionsPanelOpen(_initN > 0 && _initN < _initT);
 render();
 </script>
 
