@@ -695,7 +695,7 @@ const tooltipImg = document.getElementById('gif-tooltip-img');
 let hoverTimer = null, currentMouseX = 0, currentMouseY = 0;
 
 function toFilename(label, dir) {
-  return '/' + dir + '/' + label.replace(/[^a-zA-Z0-9_]+/g, '-').replace(/^-|-$/g, '') + '.gif';
+  return '/' + dir + '/' + label.replace(/[^a-zA-Z0-9_]+/g, '-').replace(/^-|-$/g, '') + '.webp';
 }
 function showTooltip(label, x, y, dir) {
   tooltipImg.src = toFilename(label, dir);
