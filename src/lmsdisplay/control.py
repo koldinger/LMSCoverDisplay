@@ -27,23 +27,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import argparse
+import contextlib
+import importlib
 import os
 import signal
 import socket
 import subprocess
 from pathlib import Path
 
-import argparse
 import rich.traceback
+import toml
 from flask import Flask, render_template, request, send_from_directory
+from icecream import ic
 from LMSTools import server
 from pid import PidFile
 from rich import print
-import toml
 
-from . import discovery, transitions, defaults
+from . import defaults, discovery, transitions
 
-from icecream import ic
 ic.configureOutput(includeContext=True)
 
 args: argparse.Namespace
@@ -54,7 +56,9 @@ app = Flask(__name__, static_url_path="/static")
 #app.jinja_env.add_extension("jinja2.ext.debug")
 
 # TODO @kolding: Fix this
-__version__ = "0.1.0"
+__version__ = "Unknown"
+with contextlib.suppress(importlib.metadata.PackageNotFoundError):
+    __version__ = importlib.metadata.version("lmsdisplay")
 
 # Collect all the servers and players
 def getPlayers():
@@ -100,7 +104,7 @@ def index():
     #print("Players:    ", players)
     #print("Transitions:",  trans)
 
-    return render_template("lms_cover_art_config.html", presets=presets, players=players, transitions=trans)
+    return render_template("lms_cover_art_config.html", presets=presets, players=players, transitions=trans, version=__version__)
 
 
 @app.route("/save_config", methods=["POST"])
