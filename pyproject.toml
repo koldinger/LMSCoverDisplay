@@ -1,11 +1,12 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools >= 80.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
+dynamic = ["version"]
 name = "lmsdisplay"
-version = "0.1.0"
 description = "Display cover art from Lyrion Music Server to an RGB Matrix display"
+license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -40,6 +41,12 @@ packages = [ "lmsdisplay" ]
 
 [tool.setuptools.package-data]
 lmsdisplay = ["static/*", "static/transitions/*", "static/groups/*", "templates/*", "art/*", "data/*"]
+
+# [tool.setuptools.dynamic]
+# dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools_scm]
+version_file = "src/MusicUtils/_version.py"
 
 [tool.uv.sources]
 lmstools = { git = "https://github.com/koldinger/LMSTools.git" }
