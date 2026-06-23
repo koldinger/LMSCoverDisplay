@@ -158,7 +158,7 @@ if __name__ == "__main__":
     mon = PlayerMonitor("d8:3a:dd:55:b2:c9", "localhost", q)
     mon.start()
 
-    for i in range(5):
+    for _ in range(5):
         thing = q.get()
         print(thing)
 
