@@ -48,7 +48,7 @@ from LMSTools import player, server
 import board
 import busio
 from adafruit_mcp230xx.mcp23017 import MCP23017
-from adafruit_debouncer import Debouncer, Button
+from adafruit_debouncer import Button
 from RPi import GPIO
 
 from . import discovery, util, defaults
@@ -62,8 +62,8 @@ def unix_timestamp():
 
 from icecream import ic
 
-#ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-#ic.disable()
+ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+ic.disable()
 
 __version__ = "Unknown"
 
