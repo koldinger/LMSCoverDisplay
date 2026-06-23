@@ -1,23 +1,27 @@
 import socket
 
+from collections import namedtuple
+
+
 DISCOVERY_PORT = 3483
-DEFAULT_DISCOVERY_TIMEOUT = 3
+DEFAULT_DISCOVERY_TIMEOUT = 1
 
 ATTR_HOST = "host"
 ATTR_PORT = "port"
 
-def discover_lms():
-    """Scan network for Logitech Media Servers."""
+LmsInstance = namedtuple("LmsInstance", [ATTR_HOST, ATTR_PORT])
+
+def discover_lms(timeout=DEFAULT_DISCOVERY_TIMEOUT):
+    """ Scan network for Logitech Media Servers. """
     lms_ip = "<broadcast>"
     lms_port = DISCOVERY_PORT
     lms_msg = b"eJSON\0"
-    lms_timeout = DEFAULT_DISCOVERY_TIMEOUT
 
-    entries = []
+    entries = set()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.settimeout(lms_timeout)
+    sock.settimeout(timeout)
     sock.bind(("", 0))
 
     try:
@@ -34,10 +38,7 @@ def discover_lms():
                     if data.startswith(b"JSON", 1):
                         length = data[5:6][0]
                         port = int(data[0-length:])
-                    entries.append({
-                        ATTR_HOST: server[0],
-                        ATTR_PORT: port,
-                    })
+                    entries.add(LmsInstance(server[0], port))
             except TimeoutError:
                 break
     finally:
@@ -45,5 +46,5 @@ def discover_lms():
     return entries
 
 if __name__ == "__main__":
-    servers = discover_lms()
+    servers = discover_lms(timeout=0.5)
     print(servers)

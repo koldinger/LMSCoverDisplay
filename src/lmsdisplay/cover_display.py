@@ -70,14 +70,14 @@ playpat = re.compile(r" mode:\s*(\w+)")
 volpat = re.compile(r" volume:\s*(\d+)")
 
 __version__ = "Unknown"
+with contextlib.suppress(importlib.metadata.PackageNotFoundError):
+    __version__ = importlib.metadata.version("lmsdisplay")
+
 
 class PlayerNotFoundError(Exception):
     pass
 
 event_q = Queue()
-
-with contextlib.suppress(importlib.metadata.PackageNotFoundError):
-    __version__ = importlib.metadata.version("lmsdisplay")
 
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
@@ -195,9 +195,9 @@ def sendArt(f, art, overlay=None):
             f.set(x, y, pixel)
     f.send()
 
-def sendTransition(f, art, lastimg, transition):
+def sendTransition(f, art, lastimg, transition, overlay=None):
     for i in transition(lastimg, art, config.transition_frames):
-        sendArt(f, i)
+        sendArt(f, i, overlay)
         time.sleep(config.frame_delay)
 
 def enhanceImage(img: Image.Image) -> Image.Image:
@@ -278,7 +278,7 @@ def reloadConfig(_signum, _frame):
 
 def getPlayer(servers, name):
     for srv in servers:
-        s = server.LMSServer(srv["host"], int(srv["port"]))
+        s = server.LMSServer(srv.host, int(srv.port))
         if s:
             players = s.get_players()
             for plr in players:

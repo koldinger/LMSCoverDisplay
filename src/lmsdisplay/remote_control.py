@@ -202,7 +202,7 @@ def reloadConfig(_signum, _frame):
 def getPlayer(servers, name) -> player.LMSPlayer | None:
     ic()
     for srv in servers:
-        s = server.LMSServer(srv["host"], int(srv["port"]))
+        s = server.LMSServer(srv.host, int(srv.port))
         if s:
             players = s.get_players()
             for plr in players:
