@@ -108,7 +108,11 @@ def makeGrpGif(outputdir: Path, images, grp):
         # add extra copies to extend
         results.extend([s] * 5)
 
-    outname = outputdir.joinpath(str(grp)).with_suffix(".gif")
+    # Generate a name for the file.
+    # Due to a bug in the web page, we need to replace the _ (underscores) with
+    # - (dash).   Not sure why, AI generated JavaScript is beyond me.
+    #
+    outname = outputdir.joinpath(str(grp).replace("_", "-")).with_suffix(".gif")
 
     print(f"Transition: {grp} {outname} {len(results)}")
 
