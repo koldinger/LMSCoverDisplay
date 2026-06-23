@@ -37,7 +37,7 @@ import util
 
 from icecream import ic
 
-def makeGif(outputdir: Path, images, transition):
+def makeImage(outputdir: Path, images, transition):
     print(f"Processing transition: {transition}")
 
     results = []
@@ -47,7 +47,7 @@ def makeGif(outputdir: Path, images, transition):
         s = images[(i + 1) % len(images)]
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
-        # the gif builder.
+        # the image builder.
         results.extend([i.copy() for i in transition.function(f, s, 16)])
         # add extra copies to pause
         results.extend([s] * 5)
@@ -58,17 +58,17 @@ def makeGif(outputdir: Path, images, transition):
 
     results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, lossless=False, loop=0, duration=1*len(results))
 
-def makeGifs(output: Path, images, trans=None):
+def makeImages(output: Path, images, trans=None):
     if not trans:
         trans = list(transitions.TransitionTypes)
 
     for i in trans:
         try:
-            makeGif(output, images, i)
+            makeImage(output, images, i)
         except Exception as e:
             print(f"{i} Failed: {e}")
 
-def doTheGifThing():
+def doTheTransitionThing():
     output = Path("static/transitions")
     size = 256
 
@@ -83,9 +83,9 @@ def doTheGifThing():
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
 
-    makeGifs(output, images, trans)
+    makeImages(output, images, trans)
 
-def makeGrpGif(outputdir: Path, images, grp):
+def makeGrpImage(outputdir: Path, images, grp):
     print(f"Procressing group {grp}")
     trans = transitions.make_transitions(grp)
     # Make sure there's more than one transsition
@@ -103,7 +103,7 @@ def makeGrpGif(outputdir: Path, images, grp):
 
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
-        # the gif builder.
+        # the image builder.
         results.extend([i.copy() for i in transition.function(f, s, 16)])
         # add extra copies to extend
         results.extend([s] * 5)
@@ -119,13 +119,13 @@ def makeGrpGif(outputdir: Path, images, grp):
     results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, lossless=False, loop=0, duration=1*len(results))
 
 
-def makeGrpGifs(output, images, grps):
+def makeGrpImages(output, images, grps):
     if not grps:
         grps = list(transitions.TransitionGroups)
 
     for i in grps:
         try:
-            makeGrpGif(output, images, i)
+            makeGrpImage(output, images, i)
         except Exception as e:
             print(f"{i} Failed: {e}")
 
@@ -145,10 +145,10 @@ def doTheGroupThing():
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
 
-    makeGrpGifs(output, images, grps)
+    makeGrpImages(output, images, grps)
 
 def main():
-    doTheGifThing()
+    doTheTransitionThing()
     doTheGroupThing()
 
 if __name__ == "__main__":
