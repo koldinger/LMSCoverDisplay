@@ -33,6 +33,8 @@ from contextlib import suppress
 from pathlib import Path
 from rich import print
 
+from PIL import Image, ImageEnhance
+
 from types import SimpleNamespace
 
 import toml
@@ -66,6 +68,26 @@ def makedir(name: Path):
 def loadtoml(file, defaults):
     values = defaults | toml.load(file)
     return SimpleNamespace(**values)
+
+class ImageAdjuster:
+    def __init__(self, contrast, color, size):
+        self.contrast = contrast
+        self.color = color
+        self.size = (size, size)
+
+
+    def adjustImage(self, img: Image.Image) -> Image.Image:
+        """ Pump up the contrast and color if requested. """
+        if self.contrast != 1.0:
+            img = ImageEnhance.Contrast(img).enhance(self.contrast)
+        if self.color != 1.0:
+            img = ImageEnhance.Color(img).enhance(self.color)
+        rimg = img.resize(self.size, Image.Resampling.BILINEAR)
+
+        if rimg.mode not in ["RGB", "RGBA"]:
+            rimg = rimg.convert("RGB")
+
+        return rimg
 
 if __name__ == "__main__":
     for i in ["11pm", "23", "11:30pm", "11:30", "23:30", "24:30", "13pm"]:

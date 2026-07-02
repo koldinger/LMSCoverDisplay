@@ -31,8 +31,17 @@ import queue
 import re
 import threading
 import time
-from collections import namedtuple
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
+import functools
+import requests
+from io import BytesIO
+from PIL import Image
+
+from . import events, util
+
+import traceback
+
+import LMSTools
 
 from telnetlib3 import telnetlib
 
@@ -41,8 +50,8 @@ from telnetlib3 import telnetlib
 #     now = datetime.now()
 #     return f'{now.strftime("%H:%M:%S")} --> '
 
-#from icecream import ic
-#$ic.configureOutput(includeContext=True)
+from icecream import ic
+ic.configureOutput(includeContext=True)
 
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
@@ -50,28 +59,28 @@ volpat = re.compile(r" volume:\s*(\d+)")
 
 MAX_BACKOFF = 120
 
-LMS_TELNET_PORT = 9090
-
 def command_string(string, query=False):
     if query:
         string = string + " ?"
     return string + "\r\n"
 
-PlayEvent = namedtuple("PlayEvent", ["mode", "song", "volume"])
 
 class PlayerMonitor(threading.Thread):
-    def __init__(self, player_id: str, server: str, queue: queue.Queue, login=None, password=None):
+    def __init__(self, player: LMSTools.LMSPlayer, queue: queue.Queue, adjuster: util.ImageAdjuster, login=None, password=None):
         super().__init__()
         # ic(player_id, server, login, password)
-        self.player_id = player_id
-        self.server = server
+        self.player = player
+        self.player_id = player.ref
+        self.server = player.server
         self.queue = queue
         self.login = login
         self.password = password
         self.tn: telnetlib.Telnet
         self.backoff = 1
         self.closed = False
+        self.adjuster = adjuster
 
+        self.base_url = f"http://{player.server.host}:{player.server.port}"
         self.daemon = True
 
     def getLine(self):
@@ -91,12 +100,66 @@ class PlayerMonitor(threading.Thread):
     def sendLine(self, line):
         self.tn.write(bytes(line, "ascii"))
 
+
+    @functools.lru_cache(maxsize=128)
+    def getArt(self, trackID: str):
+        """ Get the art for a track ID. """
+        url = urljoin(self.base_url, f"music/{trackID}/cover.jpg")
+        resp = requests.get(url, timeout=(5, 10))
+        if resp.status_code == requests.codes["ok"]:
+            img = Image.open(BytesIO(resp.content))
+            rimg = self.adjuster.adjustImage(img)
+        else:
+            rimg = getInternalArt("questionmark.jpg")
+
+        return rimg
+
+    def getCurrentArt(self):
+        """
+        Get the art for the currently playing track.
+
+        Useful for when you're receiving from a streaming service.
+        """
+        url = urljoin(self.base_url, f"music/current/cover.jpg?player={self.player_id}")
+        resp = requests.get(url, timeout=(5, 10))
+        if resp.status_code == requests.codes["ok"]:
+            img = Image.open(BytesIO(resp.content))
+            rimg = self.adjuster.adjustImage(img)
+        else:
+            rimg = getInternalArt("questionmark.jpg")
+
+        return rimg
+
+    def getCliPort(self):
+        """ Retrieve the CLI port number from the server.   Use the jsonrpc web interface. """
+        ic()
+        params = { "id": 1,
+                   "method": "slim.request",
+                   "params": ["-", ["pref", "plugin.cli:cliport", "?"]],
+                  }
+        ic(params)
+        headers = { "Content-Type": "application/json" }
+        ic(headers)
+        url = urljoin(self.base_url, "jsonrpc.js")
+        ic(url)
+        res = requests.post(url, json=params, headers=headers)
+        res.raise_for_status()
+        ic(res)
+        ic(res.text)
+        return int(res.json()["result"]["_p2"])
+
     def run(self):
+        ic()
         while True:
+            ic()
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
-                self.tn = telnetlib.Telnet(self.server, LMS_TELNET_PORT)
+                # Get the CLI port, and the 
+                cli_port = self.getCliPort()
+                ic(self.server.host, cli_port)
+
+                self.tn = telnetlib.Telnet(self.server.host, cli_port)
                 if self.login:
                     self.sendLine(command_string(f"login {self.login} {self.password}"))
                 self.backoff = 1            # Reset the backoff time
@@ -127,6 +190,9 @@ class PlayerMonitor(threading.Thread):
                 while True:
                     line = self.getLine()
                     # TODO: Check if we're the status command.
+                    #if not line.startswith(subscribe_cmd):
+                        #print(f"Unexpected line: {line}")
+                        #continue
 
                     playmatch = playpat.search(line)
                     idmatch = idpat.search(line)
@@ -136,7 +202,16 @@ class PlayerMonitor(threading.Thread):
                     song_id = idmatch.group(1) if idmatch else None
                     volume = volmatch.group(1) if volmatch else None
 
-                    p = PlayEvent(play, song_id, volume)
+                    playtype = events.EventType(play.lower())
+
+                    if song_id:
+                        trackid = song_id
+                        art = self.getArt(int(trackid))
+                    else:
+                        trackid = None
+                        art = self.getCurrentArt()
+
+                    p = events.PlayEvent(playtype, trackid, volume, art)
                     self.queue.put(p)
 
             except (EOFError, ConnectionResetError) as e:

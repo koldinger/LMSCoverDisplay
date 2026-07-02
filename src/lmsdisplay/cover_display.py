@@ -29,55 +29,45 @@
 
 import argparse
 import contextlib
-import functools
 import importlib.metadata
-import importlib.resources
 import random
-import re
 import signal
+from threading import TIMEOUT_MAX
 import time
-from datetime import datetime
-from io import BytesIO
+from datetime import datetime, timedelta
+from queue import Queue, Empty
 from pathlib import Path
-from urllib.parse import urljoin
-from queue import Queue
+
+import rich.traceback
+from pid import PidFile
+from PIL import Image, ImageEnhance
+from rich.console import Console
 
 from LMSTools import server
 
-import requests
-from pid import PidFile
-from PIL import Image, ImageEnhance
-from PIL.Image import Resampling
-from rich.console import Console
+from . import discovery, flaschen, lms_monitor, transitions, util, volume, defaults, events
 
-from . import transitions, util, volume
-from . import flaschen
-from . import lms_monitor, discovery
-from . import defaults
-
-#rich.traceback.install()
+rich.traceback.install()
 args: argparse.Namespace
 
 def unix_timestamp():
     return f"{datetime.now().strftime("%H:%M")} |> "
 
 from icecream import ic
-ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-ic.disable()
 
-idpat = re.compile(r" id:\s*(\d+)")
-playpat = re.compile(r" mode:\s*(\w+)")
-volpat = re.compile(r" volume:\s*(\d+)")
+ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+#ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     __version__ = importlib.metadata.version("lmsdisplay")
 
-
 class PlayerNotFoundError(Exception):
     pass
 
 event_q = Queue()
+
+TIMEOUT_DEF = 20                # 20 second timeout.   Screen should flush at 30
 
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
@@ -92,24 +82,39 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
         color = (255, 255, 255, 200)
     return color
 
-def handleEvents(display, playerID, trans, baseUrl):
+def handleEvents(display, trans):
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
     blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
     #lyrionlogo = getInternalArt("logo.png")
-    lyrionlogo = blank
 
     if not trans:
         trans = list(transitions.TransitionTypes)
 
     # Setup as if we're paused at the start.
     playing = False
-    pausestart = datetime.now()
+    pause_delta = timedelta(seconds=config.pause_delay)
+    cleartime = None
+
+    timeout = TIMEOUT_DEF
 
     while True:
-        event = event_q.get()
-        ic(event)
+        try:
+            event = event_q.get(timeout = timeout)
+            ic(event)
+        except Empty:
+            ic("Timeout", playing)
+            if playing:
+                sendArt(lastimg, display)
+            else:
+                ic(cleartime, datetime.now())
+                if cleartime and datetime.now() >= cleartime:
+                    ic("Pause clear 1")
+                    sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
+                    timeout = TIMEOUT_DEF
+            continue
+
 
         # Grab the current playing status from the stream
         overlay = None
@@ -119,14 +124,9 @@ def handleEvents(display, playerID, trans, baseUrl):
             break
 
         match event.mode:
-            case "play":
+            case events.EventType.PLAY:
                 playing = True
-                if event.song:
-                    trackid = event.song
-                    art = getArt(int(trackid), baseUrl)
-                else:
-                    trackid = None
-                    art = getCurrentArt(playerID, baseUrl)
+                art = event.artwork
 
                 if config.show_volume_bar:
                     vol = int(event.volume)
@@ -143,20 +143,28 @@ def handleEvents(display, playerID, trans, baseUrl):
                     sendArt(display, art, overlay=overlay)
                 lastimg = art
 
-            case "pause" | "stop":
+            case events.EventType.PAUSE | events.EventType.STOP:
                 if playing:
                     # If we just switched to pause timing, record the time we paused (roughly)
-                    pausestart = datetime.now()
+                    if config.pause_delay:
+                        pausestart = datetime.now()
+                        cleartime = pausestart + pause_delta
+                        timeout = min(config.pause_delay, TIMEOUT_DEF)
+
                 playing = False
                 pause_img = blank #if config.pauselogo else lyrionlogo
 
-                if (datetime.now() - pausestart).seconds >= config.pause_delay:
-                    # If we're past the pausedelay, switch to the pause display
+                ic(cleartime, datetime.now())
+                if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
+                    # If we're past the pause_delay, switch to the pause display
+                    ic("Pause clear 2")
                     if lastimg != blank:
                         sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                     #else:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
+                    cleartime = None
+                    timeout = TIMEOUT_DEF
                 else:
                     # Else, still in the pause delay, just blast the last image
                     sendArt(display, lastimg)
@@ -200,71 +208,6 @@ def sendTransition(f, art, lastimg, transition, overlay=None):
         sendArt(f, i, overlay)
         time.sleep(config.frame_delay)
 
-def enhanceImage(img: Image.Image) -> Image.Image:
-    """ Pump up the contrast and color if requested. """
-    if config.contrast_enhancement != 1.0:
-        img = ImageEnhance.Contrast(img).enhance(config.contrast_enhancement)
-    if config.color_saturation != 1.0:
-        img = ImageEnhance.Color(img).enhance(config.color_saturation)
-    return img
-
-def getCurrentArt(playerID, baseUrl):
-    """
-    Get the art for the currently playing track.
-
-    Useful for when you're receiving from a streaming service.
-    """
-    url = urljoin(baseUrl, f"music/current/cover.jpg?player={playerID}")
-    resp = requests.get(url, timeout=(5, 10))
-    if resp.status_code == requests.codes["ok"]:
-        img = Image.open(BytesIO(resp.content))
-        rimg = img.resize((config.image_size, config.image_size), Resampling.BILINEAR)
-        rimg = enhanceImage(rimg)
-    else:
-        rimg = getInternalArt("questionmark.jpg")
-
-    if rimg.mode not in ["RGB", "RGBA"]:
-        rimg = rimg.convert("RGB")
-    return rimg
-
-
-@functools.lru_cache(maxsize=128)
-def getArt(trackID: str, baseUrl):
-    """ Get the art for a track ID. """
-    url = urljoin(baseUrl, f"music/{trackID}/cover.jpg")
-    resp = requests.get(url, timeout=(5, 10))
-    if resp.status_code == requests.codes["ok"]:
-        img = Image.open(BytesIO(resp.content))
-        rimg = img.resize((config.image_size, config.image_size), Resampling.BILINEAR)
-        rimg = enhanceImage(rimg)
-    else:
-        rimg = getInternalArt("questionmark.jpg")
-
-    if rimg.mode not in ["RGB", "RGBA"]:
-        rimg = rimg.convert("RGB")
-    return rimg
-
-@functools.cache
-def getInternalArt(name: str) -> Image.Image:
-    """ Retrieve artwork from the internal resource files. """
-    fname = importlib.resources.files().joinpath("art", name).read_bytes()
-    return Image.open(fname).convert("RGB").resize((config.image_size, config.image_size))
-
-def process_cmdline():
-    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
-                                           # formatter_class=argparse.RawTextHelpFormatter)
-    parser.suggest_on_error = True
-
-    parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")
-    parser.add_argument("--version", action="version", version=__version__)
-
-    args = parser.parse_args()
-
-    conf = util.loadtoml(args.config, defaults.defaults)
-
-    return args, conf
-
-
 class ReloadEvent:
     pass
 
@@ -287,6 +230,20 @@ def getPlayer(servers, name):
     raise PlayerNotFoundError(name)
 
 
+def process_cmdline():                                                                     
+    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")         
+                                           # formatter_class=argparse.RawTextHelpFormatter)
+    parser.suggest_on_error = True                                                         
+
+    parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
+    parser.add_argument("--version", action="version", version=__version__)
+
+    args = parser.parse_args()
+
+    conf = util.loadtoml(args.config, defaults.defaults)                                   
+
+    return args, conf                                                                      
+
 def main():
     global args, config
     print(f"Running.   Version: {__version__}")
@@ -301,6 +258,7 @@ def main():
     with PidFile("lmsdisplay"):
         backoff = 1
         while True:
+            adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
             try:
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
@@ -308,16 +266,14 @@ def main():
                 plr = getPlayer(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                base_url = f"http://{plr.server.host}:{plr.server.port}"
-
                 disp = flaschen.Flaschen(config.display_host, config.display_port, config.image_size, config.image_size)
 
-                mon = lms_monitor.PlayerMonitor(plr.ref, plr.server.host, event_q)
+                mon = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
                 mon.start()
 
                 backoff = 1
 
-                handleEvents(disp, config.player, config.transitions, base_url)
+                handleEvents(disp, config.transitions)
                 mon.close()
             except Exception:
                 console.print_exception()
