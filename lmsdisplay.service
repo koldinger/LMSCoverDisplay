@@ -1,6 +1,9 @@
 [Unit]
 Description=LMS Cover Art Display server
 After=ft-server.service
+After=wifiselect.service
+Requires=ft-server.service
+Wants=wifiselect.service
 
 [Service]
 ExecStart=/usr/local/bin/lmsdisplay --config /etc/lmsdisplay.conf
