@@ -56,7 +56,7 @@ def unix_timestamp():
 from icecream import ic
 
 ic.configureOutput(includeContext=True, prefix=unix_timestamp)
-#ic.disable()
+ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
