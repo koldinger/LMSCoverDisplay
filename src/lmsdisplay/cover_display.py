@@ -236,7 +236,7 @@ def process_cmdline():
     parser.suggest_on_error = True                                                         
 
     parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--version", "-v", action="version", version=__version__)
 
     args = parser.parse_args()
 
