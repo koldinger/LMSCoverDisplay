@@ -1,6 +1,37 @@
+# vim: set et sw=4 sts=4 fileencoding=utf-8:
+#
+# Copyright 2025-2026, Eric Koldinger, All Rights Reserved.
+# kolding@washington.edu
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the copyright holder nor the
+#       names of its contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 import qrcode
 import psutil
 import socket
+
+from PIL import Image
 
 CONFIG_PORT=5000
 
@@ -13,18 +44,18 @@ def get_ip_address(ifname):
     return None
 
 
-def generate_config_qrcode(ifname):
+def generate_config_qrcode(ifname:str) -> Image.Image:
     qr = qrcode.QRCode(version=2, box_size=2, border=3)
     hostaddr = get_ip_address(ifname)
     #hostaddr = socket.gethostname()
-    url = f"http:{hostaddr}:{CONFIG_PORT}"
+    url = f"http://{hostaddr}:{CONFIG_PORT}"
     print(url)
     qr.add_data(url)
     q = qr.make_image(fill_color="black", back_color="cyan")
 
     return q.get_image()
 
-def generate_wifi_qrcode(ssid):
+def generate_wifi_qrcode(ssid:str) -> Image.Image:
     qr = qrcode.QRCode(version=2, box_size=2, border=1)
     data = f"WIFI:T:nopass;P:S:{ssid};;"
     print(data, len(data))
@@ -36,6 +67,7 @@ def generate_wifi_qrcode(ssid):
 
 if __name__ == "__main__":
     import flaschen
+    import time
     def sendArt(f, i):
         px = i.load()
         for x in range(i.width):
@@ -45,10 +77,16 @@ if __name__ == "__main__":
 
     import imgcat
     #q = generate_config_qrcode("enp7s0")
-    q = generate_wifi_qrcode("cover-connect123")
+    q = generate_wifi_qrcode("SetupPortal")
     imgcat.imgcat(q)
 
-    display = "coverpi2.local"
+    display = "coverpi.local"
     f = flaschen.Flaschen(display, 1337, 64, 64)
+    sendArt(f, q)
+
+    time.sleep(5)
+
+    q = generate_config_qrcode("enp7s0")
+    imgcat.imgcat(q)
     sendArt(f, q)
 
