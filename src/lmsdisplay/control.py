@@ -36,15 +36,17 @@ import socket
 import subprocess
 from pathlib import Path
 
+import nmcli
 import rich.traceback
 import toml
 from flask import Flask, render_template, request, send_from_directory
 from icecream import ic
-from LMSTools import server
 from pid import PidFile
 from rich import print
 
-from . import defaults, discovery, transitions
+from LMSTools import server
+
+from . import defaults, discovery, transitions, util
 
 ic.configureOutput(includeContext=True)
 
@@ -65,9 +67,15 @@ def getPlayers():
     out = {}
     servers = discovery.discover_lms()
     for s in servers:
+        try:
+            name = socket.getnameinfo((s.host, s.port), socket.NI_NAMEREQD)[0]
+        except socket.gaierror:
+            name = None
+        host_label = f"{s.host} - {name}" if name else s.host
         ss = server.LMSServer(s.host, s.port)
         s_players = [{"id": p.ref, "label": p.name } for p in sorted(ss.get_players(), key=lambda x:x.name)]
-        out[ss.host] = s_players
+
+        out[host_label] = s_players
     return out
 
 def makeTransitions():
@@ -144,10 +152,52 @@ def reset_config():
 
     return "Reset"
 
+@app.route("/reset-networking", methods=["POST"])
+def reset_networking():
+    print(f"Resetting network configuration")
+
+    try:
+        delete_config = request.json.get("delete_config", False)
+        try:
+            wifi_conn = get_wifi_connection()
+            print(delete_config, wifi_conn)
+            if delete_config and wifi_conn:
+                print(f"Deleting connection {wifi_conn.name}")
+                nmcli.connection.delete(wifi_conn.name)
+            else:
+                nmcli.connection.down(wifi_conn.name)
+        except ValueError as e:
+            # We're pretty swrewed up if we got here.   Wifi must have dropped between when the user hit the
+            # button and now.
+            print(str(e))
+
+
+        # Signal the processes to reload.   This should send the display process back to it's debloy netorking screen
+        for i in args.pidfiles:
+            signal_proc(i)
+
+        command = ["systemctl", "start", "wifiselect"]
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        print(result)
+
+    except Exception as e:
+        return str(e), 500
+
+    # This is sort of unnecessary, as the client is probably connected to new network, and this has failed.
+    return "Reset"
+
+
 @app.route("/favicon.ico")
 def favicon():
     return send_from_directory(os.path.join(app.root_path, "static"),
                                "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
+def get_wifi_connection():
+    connections = nmcli.connection.show_all(active=True)
+    for c in connections:
+        if c.device == "wlan0":
+            return c
+    raise ValueError(f"No current wifi connection")
 
 def signal_proc(pidfile):
     if pidfile:
@@ -168,6 +218,7 @@ def write_config(filename, config):
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
+    parser.add_argument("--port", default=80, type=util.port_number, help="Listen on this port.")
     parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
     parser.add_argument("--version", action="version", version =__version__)
@@ -186,7 +237,7 @@ def main():
         if args.displayconfig and not args.displayconfig.exists():
             write_config(args.displayconfig, defaults.defaults)
 
-        app.run(host="0.0.0.0")
+        app.run(host="0.0.0.0", port=args.port)
 
 if __name__ == "__main__":
     main()
