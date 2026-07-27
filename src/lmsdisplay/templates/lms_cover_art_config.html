@@ -216,6 +216,35 @@
   .btn-reset:active { transform: scale(0.97); }
   .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--color-background-primary); border-radius: var(--border-radius-lg);
+    border: 0.5px solid var(--color-border-secondary); box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    padding: 1.5rem; max-width: 420px; width: 90%; transform: translateY(8px); transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-title { font-size: 16px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .modal-title i { color: #c0392b; }
+  .modal-body { font-size: 14px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 1.25rem; }
+  .modal-check-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 1.25rem; background: var(--color-background-secondary); border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); }
+  .modal-check-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: #c0392b; flex-shrink: 0; }
+  .modal-check-row label { font-size: 13px; color: var(--color-text-primary); cursor: pointer; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-btn-cancel { font-size: 13px; padding: 7px 18px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; transition: background 0.15s; }
+  .modal-btn-cancel:hover { background: var(--color-background-secondary); }
+  .modal-btn-confirm { font-size: 13px; padding: 7px 18px; border-radius: var(--border-radius-md); border: none; background: #c0392b; color: #fff; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 6px; }
+  .modal-btn-confirm:hover { background: #a93226; }
+  .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .net-reset-row { display: flex; justify-content: flex-end; margin-top: 0.75rem; }
+  .btn-net-reset { font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md); border: 0.5px solid rgba(192,57,43,0.4); background: var(--color-background-primary); color: #c0392b; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
+  .btn-net-reset:hover { background: #fdf0ee; }
+  .btn-net-reset:active { transform: scale(0.97); }
+
   .version-footer {
     margin-top: 1.5rem;
     font-size: 11px;
@@ -433,7 +462,35 @@
       <i class="ti ti-refresh" aria-hidden="true"></i> Reset configuration
     </button>
   </div>
+  <div class="net-reset-row">
+    <button class="btn-net-reset" id="btn-net-reset">
+      <i class="ti ti-wifi-off" aria-hidden="true"></i> Reset networking
+    </button>
+  </div>
   <div class="version-footer">v{{ version }}</div>
+</div>
+
+{# ── Reset networking confirmation modal ──────────────────────────────────── #}
+<div class="modal-overlay" id="net-reset-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <div class="modal-title">
+      <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+      Reset networking?
+    </div>
+    <div class="modal-body">
+      This will restart the networking service. The device may become temporarily unreachable. This cannot be undone.
+    </div>
+    <div class="modal-check-row">
+      <input type="checkbox" id="modal-delete-config">
+      <label for="modal-delete-config">Also delete the current network configuration</label>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="modal-btn-confirm" id="modal-confirm">
+        <i class="ti ti-wifi-off" aria-hidden="true"></i> Reset networking
+      </button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -678,6 +735,46 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
     showStatus('No server found.', 'error');
   } finally {
     btn.disabled = false;
+  }
+});
+
+// ── Reset networking modal ──────────────────────────────────────────────────
+const netResetModal = document.getElementById('net-reset-modal');
+
+function openNetResetModal() {
+  document.getElementById('modal-delete-config').checked = false;
+  netResetModal.classList.add('open');
+}
+function closeNetResetModal() {
+  netResetModal.classList.remove('open');
+}
+
+document.getElementById('btn-net-reset').addEventListener('click', () => openNetResetModal());
+document.getElementById('modal-cancel').addEventListener('click', () => closeNetResetModal());
+netResetModal.addEventListener('click', e => { if (e.target === netResetModal) closeNetResetModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNetResetModal(); });
+
+document.getElementById('modal-confirm').addEventListener('click', async () => {
+  const deleteConfig = document.getElementById('modal-delete-config').checked;
+  const confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.disabled = true;
+  try {
+    const response = await fetch('/reset-networking', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ delete_config: deleteConfig }),
+    });
+    closeNetResetModal();
+    if (response.ok) {
+      showStatus('Networking reset successfully.', 'success');
+    } else {
+      showStatus('Server error: ' + response.status, 'error');
+    }
+  } catch (err) {
+    closeNetResetModal();
+    showStatus('No server found.', 'error');
+  } finally {
+    confirmBtn.disabled = false;
   }
 });
 
