@@ -100,24 +100,24 @@ def handleEvents(display, trans):
     timeout = TIMEOUT_DEF
 
     while True:
+        event = None            # Clear the previous event
         try:
             event = event_q.get(timeout = timeout)
-            ic(event)
         except Empty:
-            ic("Timeout", playing)
             if playing:
                 sendArt(lastimg, display)
-            else:
-                ic(cleartime, datetime.now())
-                if cleartime and datetime.now() >= cleartime:
-                    ic("Pause clear 1")
-                    sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
-                    timeout = TIMEOUT_DEF
+            elif cleartime and datetime.now() >= cleartime:
+                sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
+                timeout = TIMEOUT_DEF
             continue
 
 
         # Grab the current playing status from the stream
         overlay = None
+
+        # Continue on if no event was discovered
+        if not event:
+            continue
 
         # Handle a reload event and break out of the loop
         if type(event) is ReloadEvent:
@@ -229,20 +229,25 @@ def getPlayer(servers, name):
                     return plr
     raise PlayerNotFoundError(name)
 
+def check_connection():
+    return True
 
-def process_cmdline():                                                                     
-    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")         
+def check_player():
+    return True
+
+def process_cmdline():
+    parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
                                            # formatter_class=argparse.RawTextHelpFormatter)
-    parser.suggest_on_error = True                                                         
+    parser.suggest_on_error = True
 
     parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
     parser.add_argument("--version", "-v", action="version", version=__version__)
 
     args = parser.parse_args()
 
-    conf = util.loadtoml(args.config, defaults.defaults)                                   
+    conf = util.loadtoml(args.config, defaults.defaults)
 
-    return args, conf                                                                      
+    return args, conf
 
 def main():
     global args, config
@@ -259,6 +264,8 @@ def main():
         backoff = 1
         while True:
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
+            check_connection()
+
             try:
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
