@@ -29,6 +29,7 @@
 
 import datetime
 
+from argparse import ArgumentTypeError
 from contextlib import suppress
 from pathlib import Path
 from rich import print
@@ -68,6 +69,17 @@ def makedir(name: Path):
 def loadtoml(file, defaults):
     values = defaults | toml.load(file)
     return SimpleNamespace(**values)
+
+def port_number(value):
+    try:
+        ivalue = int(value)
+    except ValueError:
+        raise ArgumentTypeError(f"'{value}' is not a valid integer") from None
+
+    if ivalue not in range(0, 65535):
+        raise ArgumentTypeError(f"'{value}' is not a valid port number (0-65535)")
+
+    return ivalue
 
 class ImageAdjuster:
     def __init__(self, contrast, color, size):
