@@ -34,7 +34,7 @@ from contextlib import suppress
 from pathlib import Path
 from rich import print
 
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 
 from types import SimpleNamespace
 
@@ -94,12 +94,16 @@ class ImageAdjuster:
             img = ImageEnhance.Contrast(img).enhance(self.contrast)
         if self.color != 1.0:
             img = ImageEnhance.Color(img).enhance(self.color)
-        rimg = img.resize(self.size, Image.Resampling.BILINEAR)
+        # Resize the image.   If it's not the same size we expect, pad it out.
+        # Keeps the aspect ratio, but centered with black bounds.
+        img.thumbnail(self.size, Image.Resampling.BILINEAR)
+        if img.size != self.size:
+            img = ImageOps.pad(img, self.size, color="black")
 
-        if rimg.mode not in ["RGB", "RGBA"]:
-            rimg = rimg.convert("RGB")
+        if img.mode not in ["RGB", "RGBA"]:
+            img = img.convert("RGB")
 
-        return rimg
+        return img
 
 if __name__ == "__main__":
     for i in ["11pm", "23", "11:30pm", "11:30", "23:30", "24:30", "13pm"]:
