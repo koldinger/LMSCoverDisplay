@@ -19,9 +19,9 @@ i2c_dev
 EOF
 
 # Import important packages
-apt-get update
-apt-get upgrade
-apt install -y git i2c-tools python3-pip python3-setuptools procs btop fd-find bat
+apt update -y
+apt upgrade -y
+apt install -git i2c-tools python3-pip python3-setuptools procs btop fd-find bat -y
 
 # Disable Externally Managed Python sntuff
 rm /usr/lib/python3*/EXTERNALLY-MANAGED
