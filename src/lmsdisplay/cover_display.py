@@ -32,7 +32,6 @@ import contextlib
 import importlib.metadata
 import random
 import signal
-from threading import TIMEOUT_MAX
 import time
 from datetime import datetime, timedelta
 from queue import Queue, Empty
@@ -45,52 +44,50 @@ from rich.console import Console
 
 from LMSTools import server
 
-from . import discovery, flaschen, lms_monitor, transitions, util, volume, defaults, events
+from . import discovery, lms_monitor, transitions, util, volume, defaults, events, display
 
 rich.traceback.install()
 args: argparse.Namespace
 
-def unix_timestamp():
-    return f"{datetime.now().strftime("%H:%M")} |> "
 
 from icecream import ic
-
-ic.configureOutput(includeContext=True, prefix=unix_timestamp)
+ic.configureOutput(includeContext=True)
 ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     __version__ = importlib.metadata.version("lmsdisplay")
 
+
 class PlayerNotFoundError(Exception):
     pass
 
+
 event_q = Queue()
 
-TIMEOUT_DEF = 20                # 20 second timeout.   Screen should flush at 30
+TIMEOUT_DEF = 20    # 20 second timeout.   Screen should flush at 30
 
 def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     try:
         # Get the averoge color of the current screen.
         # Do this by resizing the picture to 1 pixel, and grabbing the color
         small = art.resize((1, 1), resample=Image.Resampling.LANCZOS).convert("RGB")
-        R, G, B = small.getpixel((0, 0))
+        r, g, b = small.getpixel((0, 0))
         # Compute the contrasting color, based on the luma
-        luma = 0.299*R + 0.587*G + 0.114*B
+        luma = 0.299*r + 0.587*g + 0.114*b
         color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
     except:
         color = (255, 255, 255, 200)
     return color
 
-def handleEvents(display, trans):
+
+def handleEvents(display, trans: list[transitions.TransitionTypes]) -> None:
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
     blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
-    #lyrionlogo = getInternalArt("logo.png")
 
-    if not trans:
-        trans = list(transitions.TransitionTypes)
+    trans = trans or list(transitions.TransitionTypes)
 
     # Setup as if we're paused at the start.
     playing = False
@@ -105,12 +102,11 @@ def handleEvents(display, trans):
             event = event_q.get(timeout = timeout)
         except Empty:
             if playing:
-                sendArt(lastimg, display)
+                sendArt(display, lastimg)
             elif cleartime and datetime.now() >= cleartime:
                 sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
                 timeout = TIMEOUT_DEF
             continue
-
 
         # Grab the current playing status from the stream
         overlay = None
@@ -121,6 +117,7 @@ def handleEvents(display, trans):
 
         # Handle a reload event and break out of the loop
         if type(event) is ReloadEvent:
+            event = None
             break
 
         match event.mode:
@@ -144,15 +141,13 @@ def handleEvents(display, trans):
                 lastimg = art
 
             case events.EventType.PAUSE | events.EventType.STOP:
-                if playing:
-                    # If we just switched to pause timing, record the time we paused (roughly)
-                    if config.pause_delay:
-                        pausestart = datetime.now()
-                        cleartime = pausestart + pause_delta
-                        timeout = min(config.pause_delay, TIMEOUT_DEF)
+                if playing and config.pause_delay:
+                    pausestart = datetime.now()
+                    cleartime = pausestart + pause_delta
+                    timeout = min(config.pause_delay, TIMEOUT_DEF)
 
                 playing = False
-                pause_img = blank #if config.pauselogo else lyrionlogo
+                pause_img = blank
 
                 ic(cleartime, datetime.now())
                 if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
@@ -160,7 +155,7 @@ def handleEvents(display, trans):
                     ic("Pause clear 2")
                     if lastimg != blank:
                         sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
-                    #else:
+                    # else:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
                     cleartime = None
@@ -178,12 +173,13 @@ def dimImage(image):
         image = ImageEnhance.Brightness(image).enhance(config.dimmed_brightness)
     return image
 
-def sendArt(f, art, overlay=None):
+
+def sendArt(display, art, overlay=None):
     """
     Send art to the display, dimming it if necessary.
 
-    If an overlay image is presented, it will be overlaid over the artwork before sending.
-    Sent via the flaschen-taschen library, but sent to via UDP to port 1337 (usually).
+    If an overlay image is presented, it will be overlaid over the artwork
+    before sending.
     """
     if overlay:
         overlay = overlay.resize(art.size)
@@ -196,20 +192,18 @@ def sendArt(f, art, overlay=None):
     if config.orientation:
         art = art.rotate(config.orientation)
 
-    px = art.load()
-    for x in range(art.width):
-        for y in range(art.height):
-            pixel = tuple(px[x, y])
-            f.set(x, y, pixel)
-    f.send()
+    display.send_image(art)
+
 
 def sendTransition(f, art, lastimg, transition, overlay=None):
     for i in transition(lastimg, art, config.transition_frames):
         sendArt(f, i, overlay)
         time.sleep(config.frame_delay)
 
+
 class ReloadEvent:
     pass
+
 
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
@@ -218,6 +212,7 @@ def reloadConfig(_signum, _frame):
     # clear the cache on getArt so we get changes to images immediately
     getArt.cache_clear()
     event_q.put(ReloadEvent())
+
 
 def getPlayer(servers, name):
     for srv in servers:
@@ -229,11 +224,14 @@ def getPlayer(servers, name):
                     return plr
     raise PlayerNotFoundError(name)
 
+
 def check_connection():
     return True
 
+
 def check_player():
     return True
+
 
 def process_cmdline():
     parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
@@ -249,14 +247,25 @@ def process_cmdline():
 
     return args, conf
 
+
+def init_display():
+    x = config.image_size
+    y = config.image_size
+    match config.driver:
+        case "flashen_taschen":
+            disp = display.FlashenDisplay(config.display_host, config.display_port, x, y)
+        case "internal":
+            disp = display.InternalDisplay(x, y, config.gpio_slowdown, config.max_refresh_rate)
+        case _:
+            raise ValueError(config.driver)
+    return disp
+
+
 def main():
     global args, config
     print(f"Running.   Version: {__version__}")
     args, config = process_cmdline()
     console = Console()
-
-    #piddir = config.pidfile.parent
-    #pidfile = config.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
 
@@ -273,7 +282,7 @@ def main():
                 plr = getPlayer(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                disp = flaschen.Flaschen(config.display_host, config.display_port, config.image_size, config.image_size)
+                disp = init_display()
 
                 mon = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
                 mon.start()
@@ -287,6 +296,7 @@ def main():
                 print(f"Backing off for {backoff}")
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 120)
+
 
 if __name__ == "__main__":
     main()

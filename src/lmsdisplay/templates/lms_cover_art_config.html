@@ -18,7 +18,10 @@
                     "dim_end_time"              : str   "HH:MM"  (default "07:00")
                     "dimmed_brightness"         : float (0.0–1.0, default 0.2)
                     "hostname"                  : str   (default "")
-                    "display_host"              : str   (default "localhost")
+                    "driver"                    : str   ("internal" or "flaschen_taschen", default "internal")
+                    "gpio_slowdown"             : int   (0–5, default 2, only used when driver is internal)
+                    "max_refresh_rate"          : int   (1–200, default 120, only used when driver is internal)
+                    "display_host"              : str   (default "localhost", only used when driver is flaschen_taschen)
                     "display_port"              : int   (1–65535, default 1337)
                     "orientation"               : int   (0, 90, 180, or 270, default 0)
                     "image_size"                : int   (positive integer, default 64)
@@ -240,6 +243,10 @@
   .modal-btn-confirm { font-size: 13px; padding: 7px 18px; border-radius: var(--border-radius-md); border: none; background: #c0392b; color: #fff; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 6px; }
   .modal-btn-confirm:hover { background: #a93226; }
   .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .driver-fields { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.25s ease, opacity 0.2s ease; }
+  .driver-fields.visible { max-height: 200px; opacity: 1; }
+  .internal-fields { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.25s ease, opacity 0.2s ease; }
+  .internal-fields.visible { max-height: 200px; opacity: 1; }
   .net-reset-row { display: flex; justify-content: flex-end; margin-top: 0.75rem; }
   .btn-net-reset { font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md); border: 0.5px solid rgba(192,57,43,0.4); background: var(--color-background-primary); color: #c0392b; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
   .btn-net-reset:hover { background: #fdf0ee; }
@@ -368,8 +375,6 @@
     <label for="dim">Dim at night</label>
   </div>
 
-  <div class="divider"></div>
-
   {# ── Dim times ─────────────────────────────────────────────────────────── #}
   <div class="time-section{% if presets.dim_at_night %} enabled{% endif %}" id="time-section">
     <div class="time-grid">
@@ -418,6 +423,25 @@
       </div>
 
       <div class="field-block">
+        <div class="section-label">Display driver</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--color-text-primary)">
+            <input type="radio" name="driver" id="driver-internal" value="internal"
+                   {% if presets.driver | default("internal") == "internal" %}checked{% endif %}
+                   style="width:15px;height:15px;cursor:pointer;accent-color:var(--color-text-info)">
+            Use internal driver
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--color-text-primary)">
+            <input type="radio" name="driver" id="driver-ft" value="flaschen_taschen"
+                   {% if presets.driver | default("internal") == "flaschen_taschen" %}checked{% endif %}
+                   style="width:15px;height:15px;cursor:pointer;accent-color:var(--color-text-info)">
+            Use Flaschen-Taschen server
+          </label>
+        </div>
+      </div>
+
+      <div class="driver-fields" id="driver-fields">
+      <div class="field-block">
         <div class="section-label">Display host</div>
         <input class="field-input" type="text" id="display-host" maxlength="63"
                value="{{ presets.display_host | default('localhost') }}">
@@ -430,6 +454,23 @@
                value="{{ presets.display_port | default(1337) }}">
         <div class="field-hint" id="display-port-hint">A number between 1 and 65535.</div>
       </div>
+      </div> {# end driver-fields #}
+
+      <div class="internal-fields" id="internal-fields">
+      <div class="field-block">
+        <div class="section-label">GPIO slowdown</div>
+        <input class="field-input" type="number" id="gpio-slowdown" min="0" max="5" step="1"
+               value="{{ presets.gpio_slowdown | default(2) }}">
+        <div class="field-hint" id="gpio-slowdown-hint">Integer between 0 and 5.</div>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Max refresh rate</div>
+        <input class="field-input" type="number" id="max-refresh-rate" min="1" max="200" step="1"
+               value="{{ presets.max_refresh_rate | default(120) }}">
+        <div class="field-hint" id="max-refresh-rate-hint">Integer between 1 and 200.</div>
+      </div>
+      </div> {# end internal-fields #}
 
       <div class="field-block">
         <div class="section-label">Orientation</div>
@@ -630,6 +671,51 @@ displayPortEl.addEventListener('blur', () => {
   setFieldState(displayPortEl, displayPortHint, true, '', 'A number between 1 and 65535.');
 });
 
+// ── Driver radio toggle ───────────────────────────────────────────────────
+function updateDriverFields() {
+  const useFT = document.getElementById("driver-ft").checked;
+  document.getElementById("driver-fields").classList.toggle("visible", useFT);
+  document.getElementById("internal-fields").classList.toggle("visible", !useFT);
+}
+document.querySelectorAll("input[name=driver]").forEach(r =>
+  r.addEventListener("change", updateDriverFields)
+);
+updateDriverFields(); // set initial state
+
+const gpioSlowdownEl   = document.getElementById("gpio-slowdown");
+const gpioSlowdownHint = document.getElementById("gpio-slowdown-hint");
+gpioSlowdownEl.addEventListener("input", () => {
+  gpioSlowdownEl.value = gpioSlowdownEl.value.replace(/[^0-9]/g, "");
+  const v = parseInt(gpioSlowdownEl.value, 10);
+  const valid = !isNaN(v) && v >= 0 && v <= 5;
+  setFieldState(gpioSlowdownEl, gpioSlowdownHint, valid,
+    "Must be between 0 and 5.",
+    "Integer between 0 and 5.");
+});
+gpioSlowdownEl.addEventListener("blur", () => {
+  const v = parseInt(gpioSlowdownEl.value, 10);
+  if (isNaN(v) || v < 0) gpioSlowdownEl.value = 0;
+  else if (v > 5) gpioSlowdownEl.value = 5;
+  setFieldState(gpioSlowdownEl, gpioSlowdownHint, true, "", "Integer between 0 and 5.");
+});
+
+const maxRefreshEl   = document.getElementById("max-refresh-rate");
+const maxRefreshHint = document.getElementById("max-refresh-rate-hint");
+maxRefreshEl.addEventListener("input", () => {
+  maxRefreshEl.value = maxRefreshEl.value.replace(/[^0-9]/g, "");
+  const v = parseInt(maxRefreshEl.value, 10);
+  const valid = !isNaN(v) && v >= 1 && v <= 200;
+  setFieldState(maxRefreshEl, maxRefreshHint, valid,
+    "Must be between 1 and 200.",
+    "Integer between 1 and 200.");
+});
+maxRefreshEl.addEventListener("blur", () => {
+  const v = parseInt(maxRefreshEl.value, 10);
+  if (isNaN(v) || v < 1) maxRefreshEl.value = 1;
+  else if (v > 200) maxRefreshEl.value = 200;
+  setFieldState(maxRefreshEl, maxRefreshHint, true, "", "Integer between 1 and 200.");
+});
+
 function collectFormData() {
   const transitions = [];
   data.forEach(g => {
@@ -649,6 +735,9 @@ function collectFormData() {
     dim_start_time:              dimChecked ? document.getElementById('start-time').value : null,
     dim_end_time:                dimChecked ? document.getElementById('end-time').value   : null,
     dimmed_brightness:           parseFloat(document.getElementById('dimmed-brightness').value),
+    driver:                      document.querySelector('input[name=driver]:checked').value,
+    gpio_slowdown:               parseInt(document.getElementById('gpio-slowdown').value, 10),
+    max_refresh_rate:            parseInt(document.getElementById('max-refresh-rate').value, 10),
     hostname:                    document.getElementById('hostname').value || null,
     display_host:                document.getElementById('display-host').value,
     display_port:                parseInt(document.getElementById('display-port').value, 10),

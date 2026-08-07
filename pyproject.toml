@@ -24,11 +24,10 @@ dependencies = [
     "qrcode>=8.2",
     "requests>=2.32.3",
     "rich>=13.9.4",
-    "rpi-gpio>=0.7.1",
-    "sdbus-networkmanager>=2.0.0",
     "strenum>=0.4.15",
     "telnetlib3>=2.0.8",
     "toml>=0.10.2",
+    "waitress>=3.0.2",
 ]
 
 [project.scripts]

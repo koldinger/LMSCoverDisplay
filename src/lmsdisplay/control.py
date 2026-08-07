@@ -43,6 +43,7 @@ from flask import Flask, render_template, request, send_from_directory
 from icecream import ic
 from pid import PidFile
 from rich import print
+import waitress
 
 from LMSTools import server
 
@@ -237,7 +238,7 @@ def main():
         if args.displayconfig and not args.displayconfig.exists():
             write_config(args.displayconfig, defaults.defaults)
 
-        app.run(host="0.0.0.0", port=args.port)
+        waitress.serve(app, host="0.0.0.0", port=args.port)
 
 if __name__ == "__main__":
     main()
