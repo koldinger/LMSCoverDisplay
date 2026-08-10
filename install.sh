@@ -29,6 +29,8 @@ rm /usr/lib/python3*/EXTERNALLY-MANAGED
 # Install uv
 pip install uv 
 
+uv pip install --system git+https://github.com/hzeller/rpi-rgb-led-matrix.git
+
 # Start installing files
 cp ft-server /usr/local/bin
 
@@ -36,6 +38,7 @@ cp ft-server /usr/local/bin
 #uv pip install --system .
 
 # Install service files
-SERVICES=("ft-server.service" "lmsconfig.service" "lmsdisplay.service" "lmsremote.service")
+#SERVICES=("ft-server.service" "lmsconfig.service" "lmsdisplay.service" "lmsremote.service")
+SERVICES=("lmsconfig.service" "lmsdisplay.service" "lmsremote.service")
 cp "${SERVICES[@]}" /usr/lib/systemd/system
 systemctl enable "${SERVICES[@]}"
