@@ -30,6 +30,7 @@
 import argparse
 import contextlib
 import importlib.metadata
+import itertools
 import random
 import signal
 import time
@@ -38,17 +39,17 @@ from queue import Queue, Empty
 from pathlib import Path
 
 import rich.traceback
+import nmcli
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
 
 from LMSTools import server
 
-from . import discovery, lms_monitor, transitions, util, volume, defaults, events, display
+from . import discovery, lms_monitor, transitions, util, volume, defaults, events, display, qrcodes
 
 rich.traceback.install()
 args: argparse.Namespace
-
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
@@ -225,13 +226,53 @@ def getPlayer(servers, name):
     raise PlayerNotFoundError(name)
 
 
-def check_connection():
-    return True
+WIFISELECT_CONN = "wifiselect-hotspot"
+WIFI_INTERFACE = "wlan0"
+SETUP_SSID = "LMSCoverSetup"
+
+class RotatingDisplay:
+    def __init__(self, display, images):
+        self.images = itertools.cycle(images)
+        self.next = datetime.now()
+        self.last_image = None
+        self.display = display
+
+    def update(self):
+        now = datetime.now()
+        if now > self.next:
+            ni = next(self.images)
+            if self.last_image:
+                sendTransition(self.display, ni, self.last_image, transitions.TransitionTypes.Fade)
+            else:
+                sendArt(self.display, ni)
+                self.last_image = ni
+        else:
+            sendArt(self.display, self.last_image)
+
+def check_connection(display):
+    qr = qrcodes.generate_wifi_qrcode(SETUP_SSID)
+
+    rd = RotatingDisplay(display, [(qr, 10)])
+    while True:
+        conns = nmcli.connection.show_all(active=True)
+        # Find the active wifi connection
+        for c in conns:
+            if c.conn_type == "wifi":
+                if c.name != WIFISELECT_CONN:
+                    ic(c.name, c.conn_type)
+                    return
+
+        time.sleep(1)
+        rd.update()
 
 
-def check_player():
-    return True
+def check_player(display, eventq):
+    qr = qrcodes.generate_config_qrcode(WIFI_INTERFACE)
 
+    rd = RotatingDisplay(display, [(qr, 10)])
+    while not config.player:
+        time.sleep(1)
+        rd.update()
 
 def process_cmdline():
     parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
@@ -249,8 +290,8 @@ def process_cmdline():
 
 
 def init_display():
-    x = config.image_size
-    y = config.image_size
+    x = y = config.image_size
+
     match config.driver:
         case "flashen_taschen":
             disp = display.FlashenDisplay(config.display_host, config.display_port, x, y)
@@ -272,8 +313,11 @@ def main():
     with PidFile("lmsdisplay"):
         backoff = 1
         while True:
+            disp = init_display()
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
-            check_connection()
+
+            check_connection(display)
+            check_player(display)
 
             try:
                 ic("Looking for servers")
@@ -281,8 +325,6 @@ def main():
                 ic(servers)
                 plr = getPlayer(servers, config.player)
                 print(f"Monitoring: {plr}")
-
-                disp = init_display()
 
                 mon = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
                 mon.start()
