@@ -40,7 +40,7 @@ package-dir = {"" = "src"}
 packages = [ "lmsdisplay" ]
 
 [tool.setuptools.package-data]
-lmsdisplay = ["static/*", "static/transitions/*", "static/groups/*", "templates/*", "art/*", "data/*"]
+lmsdisplay = ["static/*", "templates/*", "art/*", "data/*"]
 
 # [tool.setuptools.dynamic]
 # dependencies = {file = ["requirements.txt"]}
