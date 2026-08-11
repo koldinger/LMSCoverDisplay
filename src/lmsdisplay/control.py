@@ -120,7 +120,7 @@ def index():
 def save_config():
     #print("Index - POST")
 
-    print(request.json)
+    print("New Config:", request.json)
 
     config = request.json
     # Remove values we don't save.
