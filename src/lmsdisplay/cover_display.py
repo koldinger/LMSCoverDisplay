@@ -43,7 +43,6 @@ import nmcli
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
-
 from LMSTools import server
 
 from . import discovery, lms_monitor, transitions, util, volume, defaults, events, display, qrcodes
@@ -53,7 +52,7 @@ args: argparse.Namespace
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
-ic.disable()
+# ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
@@ -82,7 +81,7 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     return color
 
 
-def handleEvents(display, trans: list[transitions.TransitionTypes]) -> None:
+def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
@@ -103,7 +102,7 @@ def handleEvents(display, trans: list[transitions.TransitionTypes]) -> None:
             event = event_q.get(timeout = timeout)
         except Empty:
             if playing:
-                sendArt(display, lastimg)
+                sendArt(disp, lastimg)
             elif cleartime and datetime.now() >= cleartime:
                 sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
                 timeout = TIMEOUT_DEF
@@ -136,9 +135,9 @@ def handleEvents(display, trans: list[transitions.TransitionTypes]) -> None:
                         overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    sendTransition(display, art, lastimg, transitions.getTransition(random.choice(trans)))
+                    sendTransition(disp, art, lastimg, transitions.getTransition(random.choice(trans)))
                 else:
-                    sendArt(display, art, overlay=overlay)
+                    sendArt(disp, art, overlay=overlay)
                 lastimg = art
 
             case events.EventType.PAUSE | events.EventType.STOP:
@@ -163,7 +162,7 @@ def handleEvents(display, trans: list[transitions.TransitionTypes]) -> None:
                     timeout = TIMEOUT_DEF
                 else:
                     # Else, still in the pause delay, just blast the last image
-                    sendArt(display, lastimg)
+                    sendArt(disp, lastimg)
             case _:
                 print(event)
 
@@ -175,7 +174,7 @@ def dimImage(image):
     return image
 
 
-def sendArt(display, art, overlay=None):
+def sendArt(disp, art, overlay=None):
     """
     Send art to the display, dimming it if necessary.
 
@@ -193,10 +192,12 @@ def sendArt(display, art, overlay=None):
     if config.orientation:
         art = art.rotate(config.orientation)
 
-    display.send_image(art)
+    ic(disp, art)
+    disp.send_image(art)
 
 
 def sendTransition(f, art, lastimg, transition, overlay=None):
+    ic(art, lastimg)
     for i in transition(lastimg, art, config.transition_frames):
         sendArt(f, i, overlay)
         time.sleep(config.frame_delay)
@@ -232,6 +233,7 @@ SETUP_SSID = "LMSCoverSetup"
 
 class RotatingDisplay:
     def __init__(self, display, images):
+        ic(images, len(images))
         self.images = itertools.cycle(images)
         self.next = datetime.now()
         self.last_image = None
@@ -240,19 +242,26 @@ class RotatingDisplay:
     def update(self):
         now = datetime.now()
         if now > self.next:
-            ni = next(self.images)
-            if self.last_image:
-                sendTransition(self.display, ni, self.last_image, transitions.TransitionTypes.Fade)
+            art, delay = next(self.images)
+
+            if self.last_image and art != self.last_image:
+                sendTransition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
             else:
-                sendArt(self.display, ni)
-                self.last_image = ni
+                sendArt(self.display, art)
+                self.last_image = art
+            self.next = datetime.now() + timedelta(seconds=delay)
         else:
             sendArt(self.display, self.last_image)
 
-def check_connection(display):
-    qr = qrcodes.generate_wifi_qrcode(SETUP_SSID)
+def check_connection(dis):
+    if not args.check_conn:
+        return
 
-    rd = RotatingDisplay(display, [(qr, 10)])
+    qr = qrcodes.generate_wifi_qrcode(SETUP_SSID, config.image_size)
+    logo = util.get_internal_art("wifi.jpg").resize((config.image_size, config.image_size), resample=Image.Resampling.NEAREST)
+    ic(logo)
+
+    rd = RotatingDisplay(dis, [(qr, 10), (logo, 5)])
     while True:
         conns = nmcli.connection.show_all(active=True)
         # Find the active wifi connection
@@ -266,10 +275,15 @@ def check_connection(display):
         rd.update()
 
 
-def check_player(display, eventq):
-    qr = qrcodes.generate_config_qrcode(WIFI_INTERFACE)
+def check_player(display):
+    if not args.check_player:
+        return
 
-    rd = RotatingDisplay(display, [(qr, 10)])
+    qr = qrcodes.generate_config_qrcode(WIFI_INTERFACE, config.image_size)
+    logo =  util.get_internal_art("configure.jpg").resize((config.image_size, config.image_size), resample=Image.Resampling.NEAREST)
+
+    rd = RotatingDisplay(display, [(qr, 10), (logo, 5)])
+    ic(config.player)
     while not config.player:
         time.sleep(1)
         rd.update()
@@ -280,6 +294,8 @@ def process_cmdline():
     parser.suggest_on_error = True
 
     parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
+    parser.add_argument("--check-conn", action=argparse.BooleanOptionalAction, default=True, help="Check the connection")
+    parser.add_argument("--check-player", action=argparse.BooleanOptionalAction, default=True, help="Check the player configuration")
     parser.add_argument("--version", "-v", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -293,7 +309,7 @@ def init_display():
     x = y = config.image_size
 
     match config.driver:
-        case "flashen_taschen":
+        case "flaschen_taschen":
             disp = display.FlashenDisplay(config.display_host, config.display_port, x, y)
         case "internal":
             disp = display.InternalDisplay(x, y, config.gpio_slowdown, config.max_refresh_rate)
@@ -316,8 +332,8 @@ def main():
             disp = init_display()
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
 
-            check_connection(display)
-            check_player(display)
+            check_connection(disp)
+            check_player(disp)
 
             try:
                 ic("Looking for servers")
