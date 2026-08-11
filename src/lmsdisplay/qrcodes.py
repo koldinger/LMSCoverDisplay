@@ -31,7 +31,7 @@ import qrcode
 import psutil
 import socket
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 CONFIG_PORT=80
 
@@ -44,7 +44,7 @@ def get_ip_address(ifname):
     return None
 
 
-def generate_config_qrcode(ifname:str) -> Image.Image:
+def generate_config_qrcode(ifname:str, size) -> Image.Image:
     qr = qrcode.QRCode(version=2, box_size=2, border=3)
     hostaddr = get_ip_address(ifname)
     #hostaddr = socket.gethostname()
@@ -53,17 +53,17 @@ def generate_config_qrcode(ifname:str) -> Image.Image:
     qr.add_data(url)
     q = qr.make_image(fill_color="black", back_color="cyan")
 
-    return q.get_image()
+    return ImageOps.pad(q.get_image(), (size, size), color="cyan")
+    #return q.get_image().resize((size, size))
 
-def generate_wifi_qrcode(ssid:str) -> Image.Image:
+def generate_wifi_qrcode(ssid:str, size:int) -> Image.Image:
     qr = qrcode.QRCode(version=2, box_size=2, border=1)
     data = f"WIFI:T:nopass;P:S:{ssid};;"
     print(data, len(data))
     qr.add_data(data)
     q = qr.make_image(fill_color="black", back_color="green")
 
-    return q.get_image()
-
+    return ImageOps.pad(q.get_image(), (size, size), color="green")
 
 if __name__ == "__main__":
     import flaschen
