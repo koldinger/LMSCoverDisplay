@@ -28,17 +28,16 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import datetime
-
+import importlib.resources
 from argparse import ArgumentTypeError
 from contextlib import suppress
 from pathlib import Path
-from rich import print
-
-from PIL import Image, ImageEnhance, ImageOps
-
 from types import SimpleNamespace
 
 import toml
+from PIL import Image, ImageEnhance, ImageOps
+from rich import print
+
 
 def parsetime(timestr):
     """ Parse a time string, with different possible formats. """
@@ -104,6 +103,13 @@ class ImageAdjuster:
             img = img.convert("RGB")
 
         return img
+
+def get_internal_art(name: str) -> Image.Image:
+    path = importlib.resources.files("lmsdisplay").joinpath("art").joinpath(name)
+    print(path)
+    img = Image.open(str(path))
+
+    return img
 
 if __name__ == "__main__":
     for i in ["11pm", "23", "11:30pm", "11:30", "23:30", "24:30", "13pm"]:
