@@ -27,30 +27,29 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import functools
 import queue
 import re
 import threading
 import time
-from urllib.parse import unquote, urljoin
-import functools
-import requests
-from io import BytesIO
-from PIL import Image
-
-from . import events, util
-
 import traceback
+from io import BytesIO
+from urllib.parse import unquote, urljoin
+
+import requests
+from icecream import ic
+from PIL import Image
+from telnetlib3 import telnetlib
 
 import LMSTools
 
-from telnetlib3 import telnetlib
+from . import events, util
 
 #from datetime import datetime
 # def time_format():
 #     now = datetime.now()
 #     return f'{now.strftime("%H:%M:%S")} --> '
 
-from icecream import ic
 ic.configureOutput(includeContext=True)
 
 idpat = re.compile(r" id:\s*(\d+)")
@@ -110,7 +109,7 @@ class PlayerMonitor(threading.Thread):
             img = Image.open(BytesIO(resp.content))
             rimg = self.adjuster.adjustImage(img)
         else:
-            rimg = getInternalArt("questionmark.jpg")
+            rimg = util.get_internal_art("questionmark.jpg")
 
         return rimg
 
@@ -126,7 +125,7 @@ class PlayerMonitor(threading.Thread):
             img = Image.open(BytesIO(resp.content))
             rimg = self.adjuster.adjustImage(img)
         else:
-            rimg = getInternalArt("questionmark.jpg")
+            rimg = util.get_internal_art("questionmark.jpg")
 
         return rimg
 
