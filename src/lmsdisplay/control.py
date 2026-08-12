@@ -137,10 +137,10 @@ def save_config():
     except Exception as e:
         return str(e), 500
 
-    for i in args.pidfiles:
-        signal_proc(i)
+    signal_procs()
 
     return "Saved"
+
 
 @app.route("/reset_config", methods=["POST"])
 def reset_config():
@@ -150,6 +150,8 @@ def reset_config():
         write_config(args.displayconfig, defaults.defaults)
     except Exception as e:
         return str(e), 500
+
+    signal_procs()
 
     return "Reset"
 
@@ -174,8 +176,7 @@ def reset_networking():
 
 
         # Signal the processes to reload.   This should send the display process back to it's debloy netorking screen
-        for i in args.pidfiles:
-            signal_proc(i)
+        signal_procs()
 
         command = ["systemctl", "start", "wifiselect"]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -210,6 +211,11 @@ def signal_proc(pidfile):
             os.kill(pid, signal.SIGHUP)
         except Exception as e:
             print("Unable to send HUP signal: ", str(e))
+
+
+def signal_procs():
+    for i in args.pidfiles:
+        signal_proc(i)
 
 def write_config(filename, config):
     if filename:
