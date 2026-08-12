@@ -100,6 +100,9 @@ class PlayerMonitor(threading.Thread):
         self.tn.write(bytes(line, "ascii"))
 
 
+    def clear_art_cache(self):
+        self.getArt.cache_clear()
+
     @functools.lru_cache(maxsize=128)
     def getArt(self, trackID: str):
         """ Get the art for a track ID. """
@@ -154,7 +157,7 @@ class PlayerMonitor(threading.Thread):
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
-                # Get the CLI port, and the 
+                # Get the CLI port
                 cli_port = self.getCliPort()
                 ic(self.server.host, cli_port)
 

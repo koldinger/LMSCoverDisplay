@@ -50,6 +50,8 @@ from . import discovery, lms_monitor, transitions, util, volume, defaults, event
 rich.traceback.install()
 args: argparse.Namespace
 
+monitor: lms_monitor.PlayerMonitor
+
 from icecream import ic
 ic.configureOutput(includeContext=True)
 # ic.disable()
@@ -197,7 +199,6 @@ def sendArt(disp, art, overlay=None):
 
 
 def sendTransition(f, art, lastimg, transition, overlay=None):
-    ic(art, lastimg)
     for i in transition(lastimg, art, config.transition_frames):
         sendArt(f, i, overlay)
         time.sleep(config.frame_delay)
@@ -212,7 +213,8 @@ def reloadConfig(_signum, _frame):
     global args, config
     args, config = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
-    getArt.cache_clear()
+    if monitor:
+        monitor.clear_art_cache()
     event_q.put(ReloadEvent())
 
 
@@ -245,6 +247,7 @@ class RotatingDisplay:
             art, delay = next(self.images)
 
             if self.last_image and art != self.last_image:
+                ic()
                 sendTransition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
             else:
                 sendArt(self.display, art)
@@ -319,7 +322,7 @@ def init_display():
 
 
 def main():
-    global args, config
+    global args, config, monitor
     print(f"Running.   Version: {__version__}")
     args, config = process_cmdline()
     console = Console()
@@ -342,13 +345,13 @@ def main():
                 plr = getPlayer(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                mon = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
-                mon.start()
+                monitor = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
+                monitor.start()
 
                 backoff = 1
 
                 handleEvents(disp, config.transitions)
-                mon.close()
+                monitor.close()
             except Exception:
                 console.print_exception()
                 print(f"Backing off for {backoff}")
