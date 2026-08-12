@@ -254,6 +254,7 @@ class RotatingDisplay:
             sendArt(self.display, self.last_image)
 
 def check_connection(dis):
+    nmcli.disable_use_sudo()
     if not args.check_conn:
         return
 
@@ -266,10 +267,9 @@ def check_connection(dis):
         conns = nmcli.connection.show_all(active=True)
         # Find the active wifi connection
         for c in conns:
-            if c.conn_type == "wifi":
-                if c.name != WIFISELECT_CONN:
-                    ic(c.name, c.conn_type)
-                    return
+            if c.conn_type == "wifi" and c.name != WIFISELECT_CONN:
+                ic(c.name, c.conn_type)
+                return
 
         time.sleep(1)
         rd.update()
