@@ -217,10 +217,9 @@ class PlayerMonitor(threading.Thread):
                 print(f"Connection ended, retrying: {e}, {type(e)}")
             except ConnectionError as e:
                 print(f"Other connection error: {e}")
-            finally:
-                if self.closed:
-                    return
 
+            if self.closed:
+                return
 
     def close(self):
         self.closed = True
