@@ -50,7 +50,8 @@ from . import discovery, lms_monitor, transitions, util, volume, defaults, event
 rich.traceback.install()
 args: argparse.Namespace
 
-monitor: lms_monitor.PlayerMonitor
+monitor: lms_monitor.PlayerMonitor | None = None
+reloaded: bool = False
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
@@ -210,11 +211,14 @@ class ReloadEvent:
 
 def reloadConfig(_signum, _frame):
     """ Receive a SIGHUP and reload the configuration file and command line. """
-    global args, config
+    global args, config, reloaded
+    ic()
     args, config = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     if monitor:
         monitor.clear_art_cache()
+
+    reloaded = True
     event_q.put(ReloadEvent())
 
 
@@ -245,14 +249,17 @@ class RotatingDisplay:
         now = datetime.now()
         if now > self.next:
             art, delay = next(self.images)
+            ic(art, delay)
 
             if self.last_image and art != self.last_image:
                 ic()
                 sendTransition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
             else:
                 sendArt(self.display, art)
-                self.last_image = art
+
+            self.last_image = art
             self.next = datetime.now() + timedelta(seconds=delay)
+            ic(self.next)
         else:
             sendArt(self.display, self.last_image)
 
