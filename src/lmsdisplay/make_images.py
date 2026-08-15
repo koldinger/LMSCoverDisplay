@@ -78,7 +78,7 @@ def doTheTransitionThing():
 
     util.makedir(output)
 
-    names = ["test1.png", "test2.png", "test3.png"]
+    names = ["test1.jpg", "test2.jpg", "test3.jpg"]
     names = [Path("art", x) for x in names]
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
@@ -140,7 +140,7 @@ def doTheGroupThing():
 
     util.makedir(output)
 
-    names = ["test1.png", "test2.png", "test3.png", "test4.png", "test5.png"]
+    names = ["test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg"]
     names = [Path("art", x) for x in names]
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
