@@ -321,8 +321,8 @@ def init_display():
     match config.driver:
         case "flaschen_taschen":
             disp = display.FlashenDisplay(config.display_host, config.display_port, x, y)
-        case "internal":
-            disp = display.InternalDisplay(x, y, config.gpio_slowdown, config.max_refresh_rate)
+        # case "internal":
+        #     disp = display.InternalDisplay(x, y, config.gpio_slowdown, config.max_refresh_rate)
         case _:
             raise ValueError(config.driver)
     return disp
