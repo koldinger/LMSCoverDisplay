@@ -596,6 +596,11 @@ def rip(oimg, nimg, steps, rotation=0):
     yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doCurtainOut, True, 8)
     yield nimg
 
+def unrip(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doCurtainIn, True, 8)
+    yield nimg
+
 def diagonal(oimg, nimg, steps, rotation=0):
     yield oimg
     yield from _rotate(rotation, _doDrip, oimg, nimg, steps, _doPush, False, 8)
@@ -694,6 +699,8 @@ class TransitionTypes(StrEnum):
     Diagonal_Down = auto(), "Diagonal", partial(diagonal, rotation=270)
     Rip_Horiz = auto(), "Rip apart horizontally", partial(rip, rotation=0)
     Rip_Vert = auto(), "Rip apart vertically", partial(rip, rotation=90)
+    Unrip_Horiz = auto(), "Rip apart horizontally", partial(unrip, rotation=0)
+    Unrip_Vert = auto(), "Rip apart vertically", partial(unrip, rotation=90)
 
 class Directions(StrEnum):
     Up = auto()
@@ -749,6 +756,7 @@ class TransitionGroups(StrEnum):
     Drip = auto(), "Drip the new image in over the old", Cardinal
     Diagonal = auto(), "Biagonal", Cardinal
     Rip = auto(), "Rip the image apart", UpDown
+    Unrip = auto(), "Rip the image apart", UpDown
 
 
 def make_transitions(group):
