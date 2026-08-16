@@ -959,11 +959,11 @@ function render() {
       if (e.target.tagName === 'INPUT' || e.target.closest('.toggle-btn')) return;
       s.open = !s.open; render();
     });
-    attachTooltip(div.querySelector('.item-label'), g.label, 'static/groups');
+    attachTooltip(div.querySelector('.item-label'), g.label, 'art/groups');
     div.querySelectorAll('[data-sub]').forEach(cb => {
       const subLabel = cb.nextElementSibling;
       const subObj   = g.subs.find(s => s.id === cb.dataset.sub);
-      if (subLabel && subObj) attachTooltip(subLabel, subObj.label, 'static/transitions');
+      if (subLabel && subObj) attachTooltip(subLabel, subObj.label, 'art/transitions');
       cb.addEventListener('change', e => {
         s.subs[e.target.dataset.sub] = e.target.checked; render();
       });

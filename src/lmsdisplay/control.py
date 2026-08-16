@@ -34,14 +34,17 @@ import os
 import signal
 import socket
 import subprocess
+import functools
+from io import BytesIO
 from pathlib import Path
 
 import nmcli
 import rich.traceback
 import toml
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request, send_from_directory, send_file
 from icecream import ic
 from pid import PidFile
+from PIL import Image
 from rich import print
 import waitress
 
@@ -194,6 +197,86 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, "static"),
                                "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
+@app.route("/art/<ttype>/<transition>")
+def art(ttype, transition):
+    imgs = make_art(ttype, transition)
+    if not imgs:
+        return 404, "No such transition"
+
+    out = BytesIO()
+    imgs[0].save(out, format="webp", save_all=True, append_images=imgs[1:], optimize=True, lossless=False, loop=0, duration=1*len(imgs))
+    out.seek(0)
+    return send_file(out, mimetype="image/webp")
+
+@functools.cache
+def proto_images():
+    ic()
+    size = 256
+
+    paths = importlib.resources.files("lmsdisplay").joinpath("art").glob("test*")
+    images = [Image.open(i).resize([size, size]).convert("RGB") for i in paths]
+
+    return images
+
+def make_group(images, grp):
+    ic(grp)
+    trans = transitions.make_transitions(grp)
+    # Make sure there's more than one transsition
+    if len(trans) == 1:
+        trans = trans * 2
+    ic(trans)
+
+    images = images[:len(trans)]
+    ic(images)
+
+    results = []
+
+    for i in range(len(images)):
+        f = images[i % len(images)]
+        s = images[(i + 1) % len(images)]
+        transition = trans[i % len(trans)]
+
+        # Do the transition, and then make a copy of all images.
+        # Have to do this because some transitions return the same object each time, which screws up
+        # the image builder.
+        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        # add extra copies to extend
+        results.extend([s] * 5)
+
+    return results
+
+def make_transition(images, transition):
+    results = []
+
+    for i in range(len(images)):
+        f = images[i % len(images)]
+        s = images[(i + 1) % len(images)]
+        # Do the transition, and then make a copy of all images.
+        # Have to do this because some transitions return the same object each time, which screws up
+        # the image builder.
+        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        # add extra copies to pause
+        results.extend([s] * 5)
+
+    return results
+
+@functools.cache
+def make_art(ttype, transition):
+    t_name = Path(transition).stem.replace("-", "_")
+    match ttype:
+        case "groups":
+            images = proto_images()[:3]
+            out = transitions.TransitionGroups(t_name)
+            ic(out, images)
+            return make_group(images, out)
+        case "transitions":
+            images = proto_images()
+            out = transitions.TransitionTypes(t_name)
+            ic(out, images)
+            return make_transition(images, out)
+    return None
+
+
 def get_wifi_connection():
     connections = nmcli.connection.show_all(active=True)
     for c in connections:
@@ -245,6 +328,7 @@ def main():
             write_config(args.displayconfig, defaults.defaults)
 
         waitress.serve(app, host="0.0.0.0", port=args.port)
+        #app.run(host="0.0.0.0", port=args.port)
 
 if __name__ == "__main__":
     main()
