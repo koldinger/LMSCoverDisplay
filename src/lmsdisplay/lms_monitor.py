@@ -32,7 +32,6 @@ import queue
 import re
 import threading
 import time
-import traceback
 from io import BytesIO
 from urllib.parse import unquote, urljoin
 
@@ -51,6 +50,7 @@ from . import events, util
 #     return f'{now.strftime("%H:%M:%S")} --> '
 
 ic.configureOutput(includeContext=True)
+ic.disable()
 
 idpat = re.compile(r" id:\s*(\d+)")
 playpat = re.compile(r" mode:\s*(\w+)")
@@ -63,6 +63,8 @@ def command_string(string, query=False):
         string = string + " ?"
     return string + "\r\n"
 
+class MonitorEndedEvent:
+    pass
 
 class PlayerMonitor(threading.Thread):
     def __init__(self, player: LMSTools.LMSPlayer, queue: queue.Queue, adjuster: util.ImageAdjuster, login=None, password=None):
@@ -91,10 +93,10 @@ class PlayerMonitor(threading.Thread):
 
             #ic("EOF")
             raise EOFError
-        except AttributeError:
+        except AttributeError as e:
             # This is where we end up when the telnet session has been closed by another
             # thread.   Doesn't quite seem right, but it's what happens.
-            raise ConnectionError("Closed")
+            raise ConnectionError("Closed") from e
 
     def sendLine(self, line):
         self.tn.write(bytes(line, "ascii"))
@@ -110,11 +112,10 @@ class PlayerMonitor(threading.Thread):
         resp = requests.get(url, timeout=(5, 10))
         if resp.status_code == requests.codes["ok"]:
             img = Image.open(BytesIO(resp.content))
-            rimg = self.adjuster.adjustImage(img)
         else:
-            rimg = util.get_internal_art("questionmark.jpg")
+            img = util.get_internal_art("questionmark.jpg")
 
-        return rimg
+        return self.adjuster.adjustImage(img)
 
     def getCurrentArt(self):
         """
@@ -126,11 +127,10 @@ class PlayerMonitor(threading.Thread):
         resp = requests.get(url, timeout=(5, 10))
         if resp.status_code == requests.codes["ok"]:
             img = Image.open(BytesIO(resp.content))
-            rimg = self.adjuster.adjustImage(img)
         else:
-            rimg = util.get_internal_art("questionmark.jpg")
+            img = util.get_internal_art("questionmark.jpg")
 
-        return rimg
+        return self.adjuster.adjustImage(img)
 
     def getCliPort(self):
         """ Retrieve the CLI port number from the server.   Use the jsonrpc web interface. """
@@ -217,8 +217,10 @@ class PlayerMonitor(threading.Thread):
                     self.queue.put(p)
 
             except (EOFError, ConnectionResetError) as e:
+                # self.queue.put(MonitorEndedEvent)
                 print(f"Connection ended, retrying: {e}, {type(e)}")
             except ConnectionError as e:
+                # self.queue.put(MonitorEndedEvent)
                 print(f"Other connection error: {e}")
 
             if self.closed:

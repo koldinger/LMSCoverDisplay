@@ -55,7 +55,7 @@ reloaded: bool = False
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
-# ic.disable()
+ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
@@ -152,12 +152,10 @@ def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
                 playing = False
                 pause_img = blank
 
-                ic(cleartime, datetime.now())
                 if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
                     # If we're past the pause_delay, switch to the pause display
-                    ic("Pause clear 2")
                     if lastimg != blank:
-                        sendTransition(display, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
+                        sendTransition(disp, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                     # else:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
@@ -195,7 +193,6 @@ def sendArt(disp, art, overlay=None):
     if config.orientation:
         art = art.rotate(config.orientation)
 
-    ic(disp, art)
     disp.send_image(art)
 
 
@@ -270,7 +267,6 @@ def check_connection(dis):
 
     qr = qrcodes.generate_wifi_qrcode(SETUP_SSID, config.image_size)
     logo = util.get_internal_art("wifi.jpg").resize((config.image_size, config.image_size), resample=Image.Resampling.NEAREST)
-    ic(logo)
 
     rd = RotatingDisplay(dis, [(qr, 10), (logo, 5)])
     while True:
