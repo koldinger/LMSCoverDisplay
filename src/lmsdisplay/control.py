@@ -35,6 +35,7 @@ import signal
 import socket
 import subprocess
 import functools
+import threading
 from io import BytesIO
 from pathlib import Path
 
@@ -300,17 +301,27 @@ def signal_procs():
     for i in args.pidfiles:
         signal_proc(i)
 
+
 def write_config(filename, config):
     if filename:
         print(f"Saving configuration: { filename }")
         with filename.open("w") as f:
             toml.dump(config, f)
 
+
+class Prerenderer(threading.Thread):
+    def run(self):
+        for g in transitions.TransitionGroups:
+            make_art("groups", str(g) + ".webp")
+        for t in transitions.TransitionTypes:
+            make_art("types", str(t) + ".webp")
+
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
     parser.add_argument("--port", default=80, type=util.port_number, help="Listen on this port.")
     parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
+    parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
     parser.add_argument("--version", action="version", version =__version__)
 
     return parser.parse_args()
@@ -322,6 +333,9 @@ def main():
 
     with PidFile("lmsconfig") as p:
         ic(p)
+
+        if args.prerender:
+            Prerenderer().start()
 
         # Generate a config file if it doesn't exist already
         if args.displayconfig and not args.displayconfig.exists():
