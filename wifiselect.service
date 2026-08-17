@@ -1,0 +1,33 @@
+[Unit]
+Description=WiFi Select — captive portal with hotspot + dnsmasq
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+# ── Customise these flags ────────────────────────────────────────────────────
+# --hotspot-ssid       SSID clients will see
+# --hotspot-password   WPA2 passphrase (remove line for open network)
+# --hotspot-subnet     Gateway IP / CIDR for the AP  (host address = portal URL)
+# --force-hotspot      Always take over, even if currently connected to WiFi
+# --no-dnsmasq         Disable dnsmasq (use NM built-in DHCP, no captive DNS)
+# ────────────────────────────────────────────────────────────────────────────
+ExecStart=/usr/bin/python3 /opt/wifiselect/app.py \
+    --hotspot-ssid SetupPortal \
+    --hotspot-subnet 10.42.0.1/24 \
+    --port 80 \
+    --force-hotspot
+#   --hotspot-password s3cret
+#   --no-dnsmasq
+
+WorkingDirectory=/opt/wifiselect
+Restart=on-failure
+RestartSec=5
+User=root
+Group=root
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
