@@ -58,7 +58,7 @@ def generate_config_qrcode(ifname:str, size) -> Image.Image:
 
 def generate_wifi_qrcode(ssid:str, size:int) -> Image.Image:
     qr = qrcode.QRCode(version=2, box_size=2, border=1)
-    data = f"WIFI:T:nopass;P:S:{ssid};;"
+    data = f"WIFI:S:{ssid};T:nopass;P:;;"
     print(data, len(data))
     qr.add_data(data)
     q = qr.make_image(fill_color="black", back_color="green")
