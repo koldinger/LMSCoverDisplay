@@ -37,6 +37,10 @@ import util
 
 from icecream import ic
 
+def save_images(outname: Path, images):
+    images[0].save(outname, save_all=True, append_images=images[1:], optimize=True, lossless=False, loop=0, duration=1*len(images))
+
+
 def makeImage(outputdir: Path, images, transition):
     print(f"Processing transition: {transition}")
 
@@ -56,7 +60,7 @@ def makeImage(outputdir: Path, images, transition):
 
     print(f"Transition: {transition} {outname} {len(results)}")
 
-    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, lossless=False, loop=0, duration=1*len(results))
+    save_images(outname, results)
 
 def makeImages(output: Path, images, trans=None):
     if not trans:
@@ -78,7 +82,7 @@ def doTheTransitionThing():
 
     util.makedir(output)
 
-    names = ["test1.jpg", "test2.jpg", "test3.jpg"]
+    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg"]
     names = [Path("art", x) for x in names]
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
@@ -116,7 +120,7 @@ def makeGrpImage(outputdir: Path, images, grp):
 
     print(f"Transition: {grp} {outname} {len(results)}")
 
-    results[0].save(outname, save_all=True, append_images=results[1:], optimize=True, lossless=False, loop=0, duration=1*len(results))
+    save_images(outname, results)
 
 
 def makeGrpImages(output, images, grps):
@@ -140,7 +144,7 @@ def doTheGroupThing():
 
     util.makedir(output)
 
-    names = ["test1.jpg", "test2.jpg", "test3.jpg", "test4.jpg", "test5.jpg"]
+    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg", "cover4.jpg", "cover5.jpg", "cover6.jpg"]
     names = [Path("art", x) for x in names]
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]

@@ -54,6 +54,7 @@ from LMSTools import server
 from . import defaults, discovery, transitions, util
 
 ic.configureOutput(includeContext=True)
+ic.disable()
 
 args: argparse.Namespace
 rich.traceback.install()
@@ -200,21 +201,15 @@ def favicon():
 
 @app.route("/art/<ttype>/<transition>")
 def art(ttype, transition):
-    imgs = make_art(ttype, transition)
-    if not imgs:
-        return 404, "No such transition"
-
-    out = BytesIO()
-    imgs[0].save(out, format="webp", save_all=True, append_images=imgs[1:], optimize=True, lossless=False, loop=0, duration=1*len(imgs))
-    out.seek(0)
-    return send_file(out, mimetype="image/webp")
+    f = get_art_path(ttype, transition)
+    return send_file(f, mimetype="image/webp")
 
 @functools.cache
 def proto_images():
     ic()
     size = 256
 
-    paths = importlib.resources.files("lmsdisplay").joinpath("art").glob("test*")
+    paths = importlib.resources.files("lmsdisplay").joinpath("art").glob("cover*")
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in paths]
 
     return images
@@ -222,20 +217,20 @@ def proto_images():
 def make_group(images, grp):
     ic(grp)
     trans = transitions.make_transitions(grp)
+    ic(trans)
     # Make sure there's more than one transsition
     if len(trans) == 1:
         trans = trans * 2
-    ic(trans)
 
     images = images[:len(trans)]
-    ic(images)
 
     results = []
 
-    for i in range(len(images)):
+    for i in range(len(trans)):
         f = images[i % len(images)]
         s = images[(i + 1) % len(images)]
         transition = trans[i % len(trans)]
+        ic(i, transition)
 
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
@@ -247,6 +242,7 @@ def make_group(images, grp):
     return results
 
 def make_transition(images, transition):
+    ic(transition)
     results = []
 
     for i in range(len(images)):
@@ -261,21 +257,32 @@ def make_transition(images, transition):
 
     return results
 
-@functools.cache
-def make_art(ttype, transition):
+def get_art_path(ttype, transition) -> Path:
     t_name = Path(transition).stem.replace("-", "_")
+    filepath = Path(args.imagedir, ttype, t_name).with_suffix(".webp")
+    ic(ttype, transition, t_name, filepath)
+
+    if filepath.exists():
+        return filepath
+
     match ttype:
         case "groups":
-            images = proto_images()[:3]
+            images = proto_images()
             out = transitions.TransitionGroups(t_name)
-            ic(out, images)
-            return make_group(images, out)
+            #ic(out, images)
+            images = make_group(images, out)
         case "transitions":
             images = proto_images()
             out = transitions.TransitionTypes(t_name)
-            ic(out, images)
-            return make_transition(images, out)
-    return None
+            #ic(out, images)
+            images = make_transition(images, out)
+        case _:
+            raise ValueError(f"{ttype}/{transition}")
+
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    images[0].save(filepath, save_all=True, append_images=images[1:], optimize=True, lossless=False, loop=0, duration=1*len(images))
+    ic(filepath)
+    return filepath
 
 
 def get_wifi_connection():
@@ -312,9 +319,11 @@ def write_config(filename, config):
 class Prerenderer(threading.Thread):
     def run(self):
         for g in transitions.TransitionGroups:
-            make_art("groups", str(g) + ".webp")
+            print(g)
+            z = get_art_path("groups", str(g) + ".webp")
         for t in transitions.TransitionTypes:
-            make_art("types", str(t) + ".webp")
+            print(t)
+            z = get_art_path("transitions", str(t) + ".webp")
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
@@ -322,6 +331,7 @@ def processCommandLine():
     parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
     parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
+    parser.add_argument("--imagedir", type=Path, default=Path("/opt/share/lmsdisplay"), help="Location of image files")
     parser.add_argument("--version", action="version", version =__version__)
 
     return parser.parse_args()

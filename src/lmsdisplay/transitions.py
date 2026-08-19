@@ -679,7 +679,9 @@ class TransitionTypes(StrEnum):
     Lean_FlipHoriz = auto(), "Lean the old image out to the left, and flip the new one in from the right", leanfliphoriz
     #LowerFlip = auto(), "Complicated", lowerflip
     #PageTurn = auto(), "Page Turn", pageturn
-    Boxes = auto(), "Replace boxes one at a time, top to bottom", boxes
+    Boxes_Down = auto(), "Replace boxes one at a time, top to bottom", boxes
+    Boxes_Left = auto(), "Replace boxes one at a time, top to bottom", partial(boxes, rotation=90)
+    Boxes_Right = auto(), "Replace boxes one at a time, top to bottom", partial(boxes, rotation=270)
     Boxes_Up = auto(), "Replace boxes one at a time, bottom to top", partial(boxes, rotation=180)
     Boxes_Random = auto(), "Replace boxes one at a time, randomly", boxesrandom
     Boxes_Snake = auto(), "Replace boxes one at a time, top to bottom, snaking", boxessnake
@@ -750,7 +752,7 @@ class TransitionGroups(StrEnum):
     Spin = auto(), "Spin an image in or out", InOrOut
     Lean = auto(), "Lean image in or out", OutIn
     Flip = auto(), "Flip image in or out", InOrOut
-    Boxes = auto(), "Replace the image box by box", [None, "Up", "Random", "Snake"]
+    Boxes = auto(), "Replace the image box by box", Cardinal + ["Random", "Snake"]
     Bars = auto(), "Slide alternating bars in or out", UpDown
     Streak = auto(), "Replace the image by Streak", Cardinal
     Drip = auto(), "Drip the new image in over the old", Cardinal
@@ -791,6 +793,8 @@ def test():
     import sys
     import flaschen
 
+    from datetime import datetime
+
     size = 64
 
     sys.argv.pop(0)
@@ -820,9 +824,14 @@ def test():
         f.send()
 
     def doTransition(f, transition, pause=0.1):
+        start = datetime.now()
+        frames = 0
         for i in transition:
             sendArt(f, i)
             time.sleep(pause)
+            frames += 1
+        end = datetime.now()
+        print(frames, end - start)
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
