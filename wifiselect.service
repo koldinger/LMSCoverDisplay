@@ -12,15 +12,15 @@ Type=simple
 # --force-hotspot      Always take over, even if currently connected to WiFi
 # --no-dnsmasq         Disable dnsmasq (use NM built-in DHCP, no captive DNS)
 # ────────────────────────────────────────────────────────────────────────────
-ExecStart=/usr/bin/python3 /opt/wifiselect/app.py \
+ExecStart=/usr/bin/python3 /usr/local/bin/wifiselect \
     --hotspot-ssid SetupPortal \
     --hotspot-subnet 10.42.0.1/24 \
-    --port 80 \
-    --force-hotspot
+    --port 80
+#   --force-hotspot
 #   --hotspot-password s3cret
 #   --no-dnsmasq
 
-WorkingDirectory=/opt/wifiselect
+WorkingDirectory=/tmp
 Restart=on-failure
 RestartSec=5
 User=root
