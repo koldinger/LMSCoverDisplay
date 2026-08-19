@@ -327,9 +327,9 @@ class Prerenderer(threading.Thread):
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
-    parser.add_argument("--port", default=80, type=util.port_number, help="Listen on this port.")
+    parser.add_argument("--port", default=5000, type=util.port_number, help="Listen on this port.")
     parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
-    parser.add_argument("--displayconfig", type=Path,   help="Config file for the display process")
+    parser.add_argument("--config", type=Path,   help="Config file for the display process")
     parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
     parser.add_argument("--imagedir", type=Path, default=Path("/opt/share/lmsdisplay"), help="Location of image files")
     parser.add_argument("--version", action="version", version =__version__)

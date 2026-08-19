@@ -3,7 +3,7 @@ Description=LMS Cover Art Display configuration tool
 After=ft-server.service
 
 [Service]
-ExecStart=/usr/local/bin/lmsconfig --displayconfig /etc/lmsdisplay.conf --pidfiles /run/lmsdisplay.pid /run/lmsremote.pid --prerender
+ExecStart=/usr/local/bin/lmsconfig --config /etc/lmsdisplay.conf --pidfiles /run/lmsdisplay.pid /run/lmsremote.pid --prerender
 WorkingDirectory=/tmp
 Restart=always
 User=root
