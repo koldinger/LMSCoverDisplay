@@ -41,7 +41,7 @@ uv pip install --system git+https://github.com/koldinger/WifiSelect
 #uv pip install --system git+https://github.com/koldinger/WifiSelect
 
 # Install service files
-#SERVICES=("ft-server.service" "lmsconfig.service" "lmsdisplay.service" "lmsremote.service" "wifiselect.service")
-SERVICES=("ft-server.service lmsconfig.service" "lmsdisplay.service" "lmsremote.service" "wifiselect.service")
+SERVICES=("ft-server.service" "lmsconfig.service" "lmsdisplay.service" "lmsremote.service" "wifiselect.service")
+
 cp "${SERVICES[@]}" /usr/lib/systemd/system
 systemctl enable "${SERVICES[@]}"
