@@ -33,7 +33,7 @@ import socket
 
 from PIL import Image, ImageOps
 
-CONFIG_PORT=80
+CONFIG_PORT=5000
 
 def get_ip_address(ifname):
     interfaces = psutil.net_if_addrs()
