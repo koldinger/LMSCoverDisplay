@@ -36,7 +36,6 @@ import socket
 import subprocess
 import functools
 import threading
-from io import BytesIO
 from pathlib import Path
 
 import nmcli
@@ -54,7 +53,7 @@ from LMSTools import server
 from . import defaults, discovery, transitions, util
 
 ic.configureOutput(includeContext=True)
-ic.disable()
+# ic.disable()
 
 args: argparse.Namespace
 rich.traceback.install()
@@ -214,6 +213,7 @@ def proto_images():
 
     return images
 
+FRAME_DURATION = 50         # 20 fps
 def make_group(images, grp):
     ic(grp)
     trans = transitions.make_transitions(grp)
@@ -223,6 +223,7 @@ def make_group(images, grp):
         trans = trans * 2
 
     images = images[:len(trans)]
+    ic(images)
 
     results = []
 
@@ -232,12 +233,18 @@ def make_group(images, grp):
         transition = trans[i % len(trans)]
         ic(i, transition)
 
+        t = list(transition.function(f, s, 16))
+
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
         # the image builder.
-        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        #results.extend([i.copy() for i in transition.function(f, s, 16)])
         # add extra copies to extend
-        results.extend([s] * 5)
+        #results.extend([s] * 5)
+
+        results.extend([(img.copy(), FRAME_DURATION) for img in transition.function(f, s, 16)])
+        # add extra copies to extend
+        results.append((s, 5 * FRAME_DURATION))
 
     return results
 
@@ -251,9 +258,9 @@ def make_transition(images, transition):
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
         # the image builder.
-        results.extend([i.copy() for i in transition.function(f, s, 16)])
-        # add extra copies to pause
-        results.extend([s] * 5)
+        results.extend([(img.copy(), FRAME_DURATION) for img in transition.function(f, s, 16)])
+        # add extra copies to extend
+        results.append((s, 5 * FRAME_DURATION))
 
     return results
 
@@ -281,7 +288,8 @@ def get_art_path(ttype, transition) -> Path:
             raise ValueError(f"{ttype}/{transition}")
 
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    images[0].save(filepath, save_all=True, append_images=images[1:], optimize=True, lossless=False, loop=0, duration=1*len(images))
+    i, d = zip(*images)
+    i[0].save(filepath, save_all=True, append_images=i[1:], optimize=True, lossless=False, loop=0, duration=d, quality=20, method=0)
     ic(filepath)
     return filepath
 

@@ -37,8 +37,12 @@ import util
 
 from icecream import ic
 
+FRAME_DURATION = 50
+
 def save_images(outname: Path, images):
-    images[0].save(outname, save_all=True, append_images=images[1:], optimize=True, lossless=False, loop=0, duration=1*len(images))
+    i, d = zip(*images)
+
+    i[0].save(outname, save_all=True, append_images=i[1:], optimize=True, lossless=False, loop=0, duration=d, quality=10, method=0)
 
 
 def makeImage(outputdir: Path, images, transition):
@@ -52,9 +56,13 @@ def makeImage(outputdir: Path, images, transition):
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
         # the image builder.
-        results.extend([i.copy() for i in transition.function(f, s, 16)])
-        # add extra copies to pause
-        results.extend([s] * 5)
+        # results.extend([i.copy() for i in transition.function(f, s, 16)])
+        # # add extra copies to pause
+        # results.extend([s] * 5)
+
+        results.extend([(img.copy(), FRAME_DURATION) for img in transition.function(f, s, 16)])
+        # add extra copies to extend
+        results.append((s, 5 * FRAME_DURATION))
 
     outname = outputdir.joinpath(str(transition).replace("_", "-")).with_suffix(".webp")
 
@@ -82,8 +90,9 @@ def doTheTransitionThing():
 
     util.makedir(output)
 
-    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg"]
-    names = [Path("art", x) for x in names]
+    #$names = ["cover1.jpg", "cover2.jpg", "cover3.jpg"]
+    #$names = [Path("art", x) for x in names]
+    names = sorted(Path("art").glob("cover*"))
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
 
@@ -104,13 +113,15 @@ def makeGrpImage(outputdir: Path, images, grp):
         f = images[i % len(images)]
         s = images[(i + 1) % len(images)]
         transition = trans[i % len(trans)]
+        ic(transition)
 
         # Do the transition, and then make a copy of all images.
         # Have to do this because some transitions return the same object each time, which screws up
         # the image builder.
-        results.extend([i.copy() for i in transition.function(f, s, 16)])
+        results.extend([(img.copy(), FRAME_DURATION) for img in transition.function(f, s, 16)])
         # add extra copies to extend
-        results.extend([s] * 5)
+        results.append((s, 5 * FRAME_DURATION))
+        ic(len(results))
 
     # Generate a name for the file.
     # Due to a bug in the web page, we need to replace the _ (underscores) with
@@ -118,7 +129,7 @@ def makeGrpImage(outputdir: Path, images, grp):
     #
     outname = outputdir.joinpath(str(grp).replace("_", "-")).with_suffix(".webp")
 
-    print(f"Transition: {grp} {outname} {len(results)}")
+    print(f"Group: {grp} {outname} {len(results)}")
 
     save_images(outname, results)
 
@@ -144,8 +155,7 @@ def doTheGroupThing():
 
     util.makedir(output)
 
-    names = ["cover1.jpg", "cover2.jpg", "cover3.jpg", "cover4.jpg", "cover5.jpg", "cover6.jpg"]
-    names = [Path("art", x) for x in names]
+    names = sorted(Path("art").glob("cover*"))
 
     images = [Image.open(i).resize([size, size]).convert("RGB") for i in names]
 
