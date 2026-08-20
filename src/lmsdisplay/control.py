@@ -105,11 +105,11 @@ def index():
 
     presets = {}
     errmsg = ""
-    if args.displayconfig:
+    if args.config:
         try:
-            presets = toml.load(args.displayconfig)
+            presets = toml.load(args.config)
         except FileNotFoundError:
-            errmsg = f"{args.displayconfig} does not exist"
+            errmsg = f"{args.config} does not exist"
             print(errmsg)
 
     trans = makeTransitions()
@@ -138,7 +138,7 @@ def save_config():
         print(result)
 
     try:
-        write_config(args.displayconfig, config)
+        write_config(args.config, config)
     except Exception as e:
         return str(e), 500
 
@@ -149,10 +149,10 @@ def save_config():
 
 @app.route("/reset_config", methods=["POST"])
 def reset_config():
-    print(f"Resetting configuration: {args.displayconfig}")
+    print(f"Resetting configuration: {args.config}")
 
     try:
-        write_config(args.displayconfig, defaults.defaults)
+        write_config(args.config, defaults.defaults)
     except Exception as e:
         return str(e), 500
 
@@ -259,10 +259,11 @@ def make_transition(images, transition):
 
 def get_art_path(ttype, transition) -> Path:
     t_name = Path(transition).stem.replace("-", "_")
-    filepath = Path(args.imagedir, ttype, t_name).with_suffix(".webp")
+    filepath = Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
     ic(ttype, transition, t_name, filepath)
 
     if filepath.exists():
+        ic()
         return filepath
 
     match ttype:
@@ -348,8 +349,8 @@ def main():
             Prerenderer().start()
 
         # Generate a config file if it doesn't exist already
-        if args.displayconfig and not args.displayconfig.exists():
-            write_config(args.displayconfig, defaults.defaults)
+        if args.config and not args.config.exists():
+            write_config(args.config, defaults.defaults)
 
         waitress.serve(app, host="0.0.0.0", port=args.port)
         #app.run(host="0.0.0.0", port=args.port)
