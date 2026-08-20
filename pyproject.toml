@@ -28,6 +28,7 @@ dependencies = [
     "telnetlib3>=2.0.8",
     "toml>=0.10.2",
     "waitress>=3.0.2",
+    "watchfiles>=1.2.0",
 ]
 
 [project.scripts]

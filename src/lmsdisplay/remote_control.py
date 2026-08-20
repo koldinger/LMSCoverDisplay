@@ -80,6 +80,7 @@ def process_cmdline():
     parser.suggest_on_error = True
 
     parser.add_argument("--config", dest="config", default=None, type=Path, help="Load configuration from file", required=True)
+    parser.add_argument("--watch-config", action=argparse.BooleanOptionalAction, default=True, help="Automatically watch the config file for changes")
     parser.add_argument("--version", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -190,10 +191,20 @@ def pollButtons():
                 event_q.put(KeyEvents(pin._pin))
         time.sleep(0.05)
 
-def reloadConfig(_signum, _frame):
+def handle_signal(_signum, _frame):
+    ic()
+    reloadConfig()
+
+def watch_config(configfile):
+    ic()
+    for _ in watchfiles.watch(configfile):
+        ic()
+        reloadConfig()
+
+def reloadConfig():
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args, config
-    ic()
+    print("Reloading Configuration")
     args, config = process_cmdline()
     event_q.put(KeyEvents.RELOAD_CONFIG)
     # clear the cache on getArt so we get changes to images immediately

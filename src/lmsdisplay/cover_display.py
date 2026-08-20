@@ -34,12 +34,14 @@ import itertools
 import random
 import signal
 import time
+import threading
 from datetime import datetime, timedelta
 from queue import Queue, Empty
 from pathlib import Path
 
 import rich.traceback
 import nmcli
+import watchfiles
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
@@ -51,7 +53,6 @@ rich.traceback.install()
 args: argparse.Namespace
 
 monitor: lms_monitor.PlayerMonitor | None = None
-reloaded: bool = False
 
 from icecream import ic
 ic.configureOutput(includeContext=True)
@@ -206,18 +207,26 @@ class ReloadEvent:
     pass
 
 
-def reloadConfig(_signum, _frame):
-    """ Receive a SIGHUP and reload the configuration file and command line. """
-    global args, config, reloaded
+def handle_signal(_signum, _frame):
     ic()
+    reloadConfig()
+
+def reloadConfig():
+    """ Receive a SIGHUP and reload the configuration file and command line. """
+    global args, config
+    print("Reloading Configuration")
     args, config = process_cmdline()
     # clear the cache on getArt so we get changes to images immediately
     if monitor:
         monitor.clear_art_cache()
 
-    reloaded = True
     event_q.put(ReloadEvent())
 
+def watch_config(configfile):
+    ic()
+    for _ in watchfiles.watch(configfile):
+        ic()
+        reloadConfig()
 
 def getPlayer(servers, name):
     for srv in servers:
@@ -302,6 +311,7 @@ def process_cmdline():
     parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
     parser.add_argument("--check-conn", action=argparse.BooleanOptionalAction, default=True, help="Check the connection")
     parser.add_argument("--check-player", action=argparse.BooleanOptionalAction, default=True, help="Check the player configuration")
+    parser.add_argument("--watch-config", action=argparse.BooleanOptionalAction, default=True, help="Automatically watch the config file for changes")
     parser.add_argument("--version", "-v", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -330,7 +340,11 @@ def main():
     args, config = process_cmdline()
     console = Console()
 
-    signal.signal(signal.SIGHUP, reloadConfig)
+    signal.signal(signal.SIGHUP, handle_signal)
+    if args.watch_config:
+        ic()
+        threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
+
 
     with PidFile("lmsdisplay"):
         backoff = 1
