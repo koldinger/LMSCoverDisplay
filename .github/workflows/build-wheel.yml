@@ -27,7 +27,21 @@ jobs:
       - name: Build wheel and source distribution
         run: python -m build
 
+      - name: Create tar file
+        uses: a7ul/tar-action@v1.1.0
+        with:
+          command: c
+          file: |
+            ./install.sh
+            ./*.service
+          outPath: lmsdisplay-assets.tgz
+
       - name: Upload wheel to Release Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.whl
+          files: |
+            dist/*.whl
+            ./*.tgz
+
+
+
