@@ -28,6 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import contextlib
 import importlib.metadata
 import signal
 import threading
@@ -36,24 +37,21 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from queue import Queue
-import contextlib
 from types import SimpleNamespace
-
-from digitalio import Direction, Pull
-from pid import PidFile
-from rich.console import Console
-
-from LMSTools import player, server
-
-import watchfiles
 
 import board
 import busio
-from adafruit_mcp230xx.mcp23017 import MCP23017
+import watchfiles
 from adafruit_debouncer import Button
+from adafruit_mcp230xx.mcp23017 import MCP23017
+from digitalio import Direction, Pull
+from pid import PidFile
+from rich.console import Console
 from RPi import GPIO
 
-from . import discovery, util, defaults
+from LMSTools import player, server
+
+from . import defaults, discovery, util
 
 #rich.traceback.install()
 args: argparse.Namespace

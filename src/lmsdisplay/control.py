@@ -29,24 +29,25 @@
 
 import argparse
 import contextlib
+import functools
 import importlib
 import os
 import signal
 import socket
 import subprocess
-import functools
 import threading
 from pathlib import Path
 
 import nmcli
 import rich.traceback
 import toml
-from flask import Flask, render_template, request, send_from_directory, send_file
+import waitress
+from flask import (Flask, render_template, request, send_file,
+                   send_from_directory)
 from icecream import ic
 from pid import PidFile
 from PIL import Image
 from rich import print
-import waitress
 
 from LMSTools import server
 

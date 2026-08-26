@@ -33,21 +33,23 @@ import importlib.metadata
 import itertools
 import random
 import signal
-import time
 import threading
+import time
 from datetime import datetime, timedelta
-from queue import Queue, Empty
 from pathlib import Path
+from queue import Empty, Queue
 
-import rich.traceback
 import nmcli
+import rich.traceback
 import watchfiles
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
+
 from LMSTools import server
 
-from . import discovery, lms_monitor, transitions, util, volume, defaults, events, display, qrcodes
+from . import (defaults, discovery, display, events, lms_monitor, qrcodes,
+               transitions, util, volume)
 
 rich.traceback.install()
 args: argparse.Namespace
@@ -55,6 +57,7 @@ args: argparse.Namespace
 monitor: lms_monitor.PlayerMonitor | None = None
 
 from icecream import ic
+
 ic.configureOutput(includeContext=True)
 ic.disable()
 
