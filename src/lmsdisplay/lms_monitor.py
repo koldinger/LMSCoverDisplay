@@ -50,11 +50,11 @@ from . import events, util
 #     return f'{now.strftime("%H:%M:%S")} --> '
 
 ic.configureOutput(includeContext=True)
-ic.disable()
+# ic.disable()
 
-idpat = re.compile(r" id:\s*(\d+)")
-playpat = re.compile(r" mode:\s*(\w+)")
-volpat = re.compile(r" volume:\s*(\d+)")
+IDPAT = re.compile(r" id:\s*(\d+)")
+PLAYPAT = re.compile(r" mode:\s*(\w+)")
+VOLPAT = re.compile(r" volume:\s*(\d+)")
 
 MAX_BACKOFF = 120
 
@@ -76,7 +76,7 @@ class PlayerMonitor(threading.Thread):
         self.queue = queue
         self.login = login
         self.password = password
-        self.tn: telnetlib.Telnet
+        self.tn: telnetlib.Telnet | None = None
         self.backoff = 1
         self.closed = False
         self.adjuster = adjuster
@@ -109,6 +109,7 @@ class PlayerMonitor(threading.Thread):
     def getArt(self, trackID: str):
         """ Get the art for a track ID. """
         url = urljoin(self.base_url, f"music/{trackID}/cover.jpg")
+        ic(url)
         resp = requests.get(url, timeout=(5, 10))
         if resp.status_code == requests.codes["ok"]:
             img = Image.open(BytesIO(resp.content))
@@ -186,7 +187,9 @@ class PlayerMonitor(threading.Thread):
                         break
                     time.sleep(.5)
 
+                
                 subscribe_cmd = command_string(f"{self.player_id} status - 1 subscribe:10")
+
                 self.sendLine(subscribe_cmd)
 
                 while True:
@@ -196,9 +199,11 @@ class PlayerMonitor(threading.Thread):
                         #print(f"Unexpected line: {line}")
                         #continue
 
-                    playmatch = playpat.search(line)
-                    idmatch = idpat.search(line)
-                    volmatch = volpat.search(line)
+                    print(line)
+
+                    playmatch = PLAYPAT.search(line)
+                    idmatch = IDPAT.search(line)
+                    volmatch = VOLPAT.search(line)
 
                     play = playmatch.group(1) if playmatch else None
                     song_id = idmatch.group(1) if idmatch else None
@@ -228,7 +233,9 @@ class PlayerMonitor(threading.Thread):
 
     def close(self):
         self.closed = True
-        self.tn.close()
+        if self.tn:
+            self.tn.close()
+            self.tn = None
 
 
 if __name__ == "__main__":
