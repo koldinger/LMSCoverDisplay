@@ -45,6 +45,8 @@ from rich.console import Console
 
 from LMSTools import player, server
 
+import watchfiles
+
 import board
 import busio
 from adafruit_mcp230xx.mcp23017 import MCP23017
@@ -192,13 +194,10 @@ def pollButtons():
         time.sleep(0.05)
 
 def handle_signal(_signum, _frame):
-    ic()
     reloadConfig()
 
 def watch_config(configfile):
-    ic()
     for _ in watchfiles.watch(configfile):
-        ic()
         reloadConfig()
 
 def reloadConfig():
@@ -235,6 +234,8 @@ def main():
     #pidfile = args.pidfile.name
 
     signal.signal(signal.SIGHUP, reloadConfig)
+    if args.watch_config:
+        threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
 
     with PidFile("lmsremote"):
         polling_thread = threading.Thread(target=pollButtons)
