@@ -27,7 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import RgbMatrixDriver
+#import RgbMatrixDriver
 from PIL import Image
 
 from . import flaschen
@@ -47,31 +47,31 @@ class FlashenDisplay:
         self.disp.send()
 
 
-ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
-ADAFRUIT_HAT = "adafruit-hat"
-DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
-
-class InternalDisplay:
-    def __init__(self, xsize: int, ysize: int, gpio_slowdown: int, max_refresh: int):
-        options = RgbMatrixDriver.RGBMatrixOptions()
-        options.cols = xsize
-        options.rows = ysize
-        options.chain_length = 1
-        options.parallel = 1
-        options.brightness = 100
-        options.gpio_slowdown = gpio_slowdown
-        options.hardware_mapping = DEFAULT_HARDWARE
-        options.pwm_bits = 11
-        options.limit_refresh_rate_hz = max_refresh
-        options.disable_hardware_pulsing = False
-
-        self.options = options                      # Oh why not
-        self.matrix = RgbMatrixDriver.RGBMatrix(options=options)
-        self.canvas = self.matrix.CreateFrameCanvas()
-
-    def send_image(self, art: Image.Image) -> None:
-        self.canvas.SetImage(art.convert("RGB"))
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-    def clear(self) -> None:
-        self.matrix.Clear()
+# ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
+# ADAFRUIT_HAT = "adafruit-hat"
+# DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
+#
+# class InternalDisplay:
+#     def __init__(self, xsize: int, ysize: int, gpio_slowdown: int, max_refresh: int):
+#         options = RgbMatrixDriver.RGBMatrixOptions()
+#         options.cols = xsize
+#         options.rows = ysize
+#         options.chain_length = 1
+#         options.parallel = 1
+#         options.brightness = 100
+#         options.gpio_slowdown = gpio_slowdown
+#         options.hardware_mapping = DEFAULT_HARDWARE
+#         options.pwm_bits = 11
+#         options.limit_refresh_rate_hz = max_refresh
+#         options.disable_hardware_pulsing = False
+#
+#         self.options = options                      # Oh why not
+#         self.matrix = RgbMatrixDriver.RGBMatrix(options=options)
+#         self.canvas = self.matrix.CreateFrameCanvas()
+#
+#     def send_image(self, art: Image.Image) -> None:
+#         self.canvas.SetImage(art.convert("RGB"))
+#         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+#
+#     def clear(self) -> None:
+#         self.matrix.Clear()
