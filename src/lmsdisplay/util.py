@@ -88,20 +88,25 @@ class ImageAdjuster:
 
 
     def adjustImage(self, img: Image.Image) -> Image.Image:
-        """ Pump up the contrast and color if requested. """
+        """ Resize the image, Pump up the contrast and color if requested. """
+        # Resize the image.   If it's not the same size we expect, pad it out.
+        # Keeps the aspect ratio, but centered with black bounds.
+        print(img.size)
+        img.thumbnail(self.size, Image.Resampling.BOX)
+        if img.size != self.size:
+            img = ImageOps.pad(img, self.size, color="black")
+
+        # Adjust the contrast and color, if requested
         if self.contrast != 1.0:
             img = ImageEnhance.Contrast(img).enhance(self.contrast)
         if self.color != 1.0:
             img = ImageEnhance.Color(img).enhance(self.color)
-        # Resize the image.   If it's not the same size we expect, pad it out.
-        # Keeps the aspect ratio, but centered with black bounds.
-        img.thumbnail(self.size, Image.Resampling.BILINEAR)
-        if img.size != self.size:
-            img = ImageOps.pad(img, self.size, color="black")
 
+        # Turn it into RGB, just in case
         if img.mode not in ["RGB", "RGBA"]:
             img = img.convert("RGB")
 
+        print(img.size)
         return img
 
 def get_internal_art(name: str) -> Image.Image:
