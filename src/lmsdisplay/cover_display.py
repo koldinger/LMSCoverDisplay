@@ -42,14 +42,12 @@ from queue import Empty, Queue
 import nmcli
 import rich.traceback
 import watchfiles
+from LMSTools import server
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
 
-from LMSTools import server
-
-from . import (defaults, discovery, display, events, lms_monitor, qrcodes,
-               transitions, util, volume)
+from . import defaults, discovery, display, events, lms_monitor, qrcodes, transitions, util, volume
 
 rich.traceback.install()
 args: argparse.Namespace
@@ -88,7 +86,7 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     return color
 
 
-def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
+def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
@@ -109,9 +107,9 @@ def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
             event = event_q.get(timeout = timeout)
         except Empty:
             if playing:
-                sendArt(disp, lastimg)
+                send_art(disp, lastimg)
             elif cleartime and datetime.now() >= cleartime:
-                sendTransition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
+                send_transition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
                 timeout = TIMEOUT_DEF
             continue
 
@@ -142,9 +140,9 @@ def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
                         overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    sendTransition(disp, art, lastimg, transitions.getTransition(random.choice(trans)))
+                    send_transition(disp, art, lastimg, transitions.getTransition(random.choice(trans)))
                 else:
-                    sendArt(disp, art, overlay=overlay)
+                    send_art(disp, art, overlay=overlay)
                 lastimg = art
 
             case events.EventType.PAUSE | events.EventType.STOP:
@@ -159,7 +157,7 @@ def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
                 if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
                     # If we're past the pause_delay, switch to the pause display
                     if lastimg != blank:
-                        sendTransition(disp, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
+                        send_transition(disp, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
                     # else:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
@@ -167,19 +165,19 @@ def handleEvents(disp, trans: list[transitions.TransitionTypes]) -> None:
                     timeout = TIMEOUT_DEF
                 else:
                     # Else, still in the pause delay, just blast the last image
-                    sendArt(disp, lastimg)
+                    send_art(disp, lastimg)
             case _:
                 print(event)
 
 
-def dimImage(image):
+def dim_image(image):
     """ Dim an image. """
     if config.dim_at_night:
         image = ImageEnhance.Brightness(image).enhance(config.dimmed_brightness)
     return image
 
 
-def sendArt(disp, art, overlay=None):
+def send_art(disp, art, overlay=None):
     """
     Send art to the display, dimming it if necessary.
 
@@ -192,7 +190,7 @@ def sendArt(disp, art, overlay=None):
         art.paste(overlay, (0, 0), overlay)
 
     if config.dim_at_night and util.betweentimes(datetime.now().time(), util.parsetime(config.dim_start_time), util.parsetime(config.dim_end_time)):
-        art = dimImage(art)
+        art = dim_image(art)
 
     if config.orientation:
         art = art.rotate(config.orientation)
@@ -200,9 +198,9 @@ def sendArt(disp, art, overlay=None):
     disp.send_image(art)
 
 
-def sendTransition(f, art, lastimg, transition, overlay=None):
+def send_transition(f, art, lastimg, transition, overlay=None):
     for i in transition(lastimg, art, config.transition_frames):
-        sendArt(f, i, overlay)
+        send_art(f, i, overlay)
         time.sleep(config.frame_delay)
 
 
@@ -212,9 +210,9 @@ class ReloadEvent:
 
 def handle_signal(_signum, _frame):
     ic()
-    reloadConfig()
+    reload_config()
 
-def reloadConfig():
+def reload_config():
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args, config
     print("Reloading Configuration")
@@ -229,9 +227,9 @@ def watch_config(configfile):
     ic()
     for _ in watchfiles.watch(configfile):
         ic()
-        reloadConfig()
+        reload_config()
 
-def getPlayer(servers, name):
+def get_player(servers, name):
     for srv in servers:
         s = server.LMSServer(srv.host, int(srv.port))
         if s:
@@ -240,7 +238,6 @@ def getPlayer(servers, name):
                 if name in (plr.ref ,plr.name):
                     return plr
     raise PlayerNotFoundError(name)
-
 
 WIFISELECT_CONN = "wifiselect-hotspot"
 WIFI_INTERFACE = "wlan0"
@@ -262,15 +259,15 @@ class RotatingDisplay:
 
             if self.last_image and art != self.last_image:
                 ic()
-                sendTransition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
+                send_transition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
             else:
-                sendArt(self.display, art)
+                send_art(self.display, art)
 
             self.last_image = art
             self.next = datetime.now() + timedelta(seconds=delay)
             ic(self.next)
         else:
-            sendArt(self.display, self.last_image)
+            send_art(self.display, self.last_image)
 
 def check_connection(dis):
     nmcli.disable_use_sudo()
@@ -311,7 +308,7 @@ def process_cmdline():
                                            # formatter_class=argparse.RawTextHelpFormatter)
     parser.suggest_on_error = True
 
-    parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")                                                     
+    parser.add_argument("--config", dest="config", default=None, type=Path, required=True, help="Load configuration from file")
     parser.add_argument("--check-conn", action=argparse.BooleanOptionalAction, default=True, help="Check the connection")
     parser.add_argument("--check-player", action=argparse.BooleanOptionalAction, default=True, help="Check the player configuration")
     parser.add_argument("--watch-config", action=argparse.BooleanOptionalAction, default=True, help="Automatically watch the config file for changes")
@@ -362,7 +359,7 @@ def main():
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
                 ic(servers)
-                plr = getPlayer(servers, config.player)
+                plr = get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
                 monitor = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
@@ -370,7 +367,7 @@ def main():
 
                 backoff = 1
 
-                handleEvents(disp, config.transitions)
+                handle_events(disp, config.transitions)
                 monitor.close()
             except Exception:
                 console.print_exception()

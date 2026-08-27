@@ -42,19 +42,17 @@ import nmcli
 import rich.traceback
 import toml
 import waitress
-from flask import (Flask, render_template, request, send_file,
-                   send_from_directory)
+from flask import Flask, render_template, request, send_file, send_from_directory
 from icecream import ic
+from LMSTools import server
 from pid import PidFile
 from PIL import Image
 from rich import print
 
-from LMSTools import server
-
 from . import defaults, discovery, transitions, util
 
 ic.configureOutput(includeContext=True)
-# ic.disable()
+ic.disable()
 
 args: argparse.Namespace
 rich.traceback.install()
@@ -162,7 +160,7 @@ def reset_config():
 
 @app.route("/reset-networking", methods=["POST"])
 def reset_networking():
-    print(f"Resetting network configuration")
+    print("Resetting network configuration")
 
     try:
         delete_config = request.json.get("delete_config", False)
@@ -300,7 +298,7 @@ def get_wifi_connection():
     for c in connections:
         if c.device == "wlan0":
             return c
-    raise ValueError(f"No current wifi connection")
+    raise ValueError("No current wifi connection")
 
 def signal_proc(pidfile):
     if pidfile:
@@ -329,11 +327,11 @@ def write_config(filename, config):
 class Prerenderer(threading.Thread):
     def run(self):
         for g in transitions.TransitionGroups:
-            print(g)
-            z = get_art_path("groups", str(g) + ".webp")
+            print(f"Generating group {g}")
+            get_art_path("groups", str(g) + ".webp")
         for t in transitions.TransitionTypes:
-            print(t)
-            z = get_art_path("transitions", str(t) + ".webp")
+            print(f"Generating transition {t}")
+            get_art_path("transitions", str(t) + ".webp")
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
