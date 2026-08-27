@@ -45,11 +45,10 @@ import watchfiles
 from adafruit_debouncer import Button
 from adafruit_mcp230xx.mcp23017 import MCP23017
 from digitalio import Direction, Pull
+from LMSTools import player, server
 from pid import PidFile
 from rich.console import Console
 from RPi import GPIO
-
-from LMSTools import player, server
 
 from . import defaults, discovery, util
 
@@ -112,9 +111,6 @@ INTERRUPT_PIN = board.D17
 MCP23017_ADDR = 0x27
 
 def initI2C():
-    global mcp
-    ic()
-
     i2c = busio.I2C(board.SCL, board.SDA)
     mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
 
@@ -152,36 +148,9 @@ def initI2C():
     # every time an interrupt gets triggered.
     #GPIO.add_event_detect(INTERRUPT_PIN, GPIO.FALLING, callback=checkPins, bouncetime=10)
 
+    return mcp
 
-def checkPins(port):
-    ic(port)
-    for pin in mcp.int_flag:
-        value = pins[pin].value
-        if not value:
-            ic()
-            try:
-                event_q.put(KeyEvents(pin))
-            except ValueError:
-                print(f"Unknown button {pin}")
-
-    mcp.clear_ints()
-
-pin_value = {}
-
-def pollPins():
-    while True:
-        for pin in pins:
-            value = pin.value
-            if value != pin_value.get(pin, True):
-                #ic(pin, value, pin_value.get(pin, True))
-                if not value:
-                    ic(KeyEvents(pin._pin))
-                    event_q.put(KeyEvents(pin._pin))
-            pin_value[pin] = value
-        #ic(pin_value.values())
-        time.sleep(0.1)
-
-def pollButtons():
+def poll_buttons():
     while True:
         for pin, button in buttons.items():
             button.update()
@@ -192,13 +161,13 @@ def pollButtons():
         time.sleep(0.05)
 
 def handle_signal(_signum, _frame):
-    reloadConfig()
+    reload_config()
 
 def watch_config(configfile):
     for _ in watchfiles.watch(configfile):
-        reloadConfig()
+        reload_config()
 
-def reloadConfig():
+def reload_config():
     """ Receive a SIGHUP and reload the configuration file and command line. """
     global args, config
     print("Reloading Configuration")
@@ -207,7 +176,7 @@ def reloadConfig():
     # clear the cache on getArt so we get changes to images immediately
 
 
-def getPlayer(servers, name) -> player.LMSPlayer | None:
+def get_player(servers, name) -> player.LMSPlayer | None:
     ic()
     for srv in servers:
         s = server.LMSServer(srv.host, int(srv.port))
@@ -221,22 +190,22 @@ def getPlayer(servers, name) -> player.LMSPlayer | None:
 
 
 def main():
-    global args, config
+    global args, config, mcp
     print(f"Running.   Version: {__version__}")
     args, config = process_cmdline()
     console = Console()
 
-    initI2C()
+    mcp = initI2C()
 
     #piddir = args.pidfile.parent
     #pidfile = args.pidfile.name
 
-    signal.signal(signal.SIGHUP, reloadConfig)
+    signal.signal(signal.SIGHUP, reload_config)
     if args.watch_config:
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
 
     with PidFile("lmsremote"):
-        polling_thread = threading.Thread(target=pollButtons)
+        polling_thread = threading.Thread(target=poll_buttons)
         polling_thread.daemon = True
         polling_thread.start()
 
@@ -245,7 +214,7 @@ def main():
             try:
                 servers = discovery.discover_lms()
                 ic(servers)
-                plr = getPlayer(servers, config.player)
+                plr = get_player(servers, config.player)
                 ic(plr)
 
                 while True:
@@ -268,7 +237,7 @@ def main():
                             plr.volume_down()
                         case KeyEvents.RELOAD_CONFIG:
                             break
-            except Exception as e:
+            except Exception:
                 console.print_exception()
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 120)
