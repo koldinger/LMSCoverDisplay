@@ -199,8 +199,6 @@ class PlayerMonitor(threading.Thread):
                         #print(f"Unexpected line: {line}")
                         #continue
 
-                    print(line)
-
                     playmatch = PLAYPAT.search(line)
                     idmatch = IDPAT.search(line)
                     volmatch = VOLPAT.search(line)
