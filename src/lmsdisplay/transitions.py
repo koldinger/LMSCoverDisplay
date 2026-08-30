@@ -483,6 +483,15 @@ def _makeSquares(chunks, size, snake):
             xseq.reverse()
     return squares
 
+def _makeLines(chunks, size):
+    x, y = size
+    chunk_sz = int(x / chunks)
+    lines = []
+    for i in range(0, chunks):
+        first = i * chunk_sz
+        lines.append((first, 0, first + chunk_sz, y))
+    return lines
+
 def _doBoxes(oimg, nimg, squares):
     image = oimg.copy()
     for i in squares:
@@ -611,6 +620,13 @@ def bars(oimg, nimg, steps, rotation=0):
     yield from _rotate(rotation, _doBars, oimg, nimg, steps)
     yield nimg
 
+def lines(oimg, nimg, steps, rotation=0):
+    lines = _makeLines(steps, oimg.size)
+    random.shuffle(lines)
+    yield oimg
+    yield from _rotate(rotation, _doBoxes, oimg, nimg, lines)
+    yield nimg
+
 
 def instant(oimg, nimg, _):
     """ Instantly transition to the new image. """
@@ -701,8 +717,10 @@ class TransitionTypes(StrEnum):
     Diagonal_Down = auto(), "Diagonal", partial(diagonal, rotation=270)
     Rip_Horiz = auto(), "Rip apart horizontally", partial(rip, rotation=0)
     Rip_Vert = auto(), "Rip apart vertically", partial(rip, rotation=90)
-    Unrip_Horiz = auto(), "Rip apart horizontally", partial(unrip, rotation=0)
-    Unrip_Vert = auto(), "Rip apart vertically", partial(unrip, rotation=90)
+    Unrip_Horiz = auto(), "Push image together horizontally", partial(unrip, rotation=0)
+    Unrip_Vert = auto(), "Push image together vertically", partial(unrip, rotation=90)
+    Lines_Horiz = auto(), "Draw lines horizontally", partial(lines, rotation=90)
+    Lines_Vert = auto(), "Draw lines vertically", partial(lines, rotation=0)
 
 class Directions(StrEnum):
     Up = auto()
@@ -758,7 +776,8 @@ class TransitionGroups(StrEnum):
     Drip = auto(), "Drip the new image in over the old", Cardinal
     Diagonal = auto(), "Biagonal", Cardinal
     Rip = auto(), "Rip the image apart", UpDown
-    Unrip = auto(), "Rip the image apart", UpDown
+    Unrip = auto(), "Push the image together", UpDown
+    Lines = auto(), "Draw lines one at a time", UpDown
 
 
 def make_transitions(group):
