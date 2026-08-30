@@ -35,9 +35,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import toml
+from LMSTools import server, player
 from PIL import Image, ImageEnhance, ImageOps
 from rich import print
 
+class PlayerNotFoundError(Exception):
+    pass
 
 def parsetime(timestr):
     """ Parse a time string, with different possible formats. """
@@ -79,6 +82,16 @@ def port_number(value):
         raise ArgumentTypeError(f"'{value}' is not a valid port number (0-65535)")
 
     return ivalue
+
+def get_player(servers, name):
+    for srv in servers:
+        s = server.LMSServer(srv.host, int(srv.port))
+        if s:
+            players = s.get_players()
+            for plr in players:
+                if name in (plr.ref ,plr.name):
+                    return plr
+    raise PlayerNotFoundError(name)
 
 class ImageAdjuster:
     def __init__(self, contrast, color, size):

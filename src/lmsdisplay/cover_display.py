@@ -42,7 +42,6 @@ from queue import Empty, Queue
 import nmcli
 import rich.traceback
 import watchfiles
-from LMSTools import server
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
@@ -62,10 +61,6 @@ ic.disable()
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     __version__ = importlib.metadata.version("lmsdisplay")
-
-
-class PlayerNotFoundError(Exception):
-    pass
 
 
 event_q = Queue()
@@ -229,16 +224,6 @@ def watch_config(configfile):
         ic()
         reload_config()
 
-def get_player(servers, name):
-    for srv in servers:
-        s = server.LMSServer(srv.host, int(srv.port))
-        if s:
-            players = s.get_players()
-            for plr in players:
-                if name in (plr.ref ,plr.name):
-                    return plr
-    raise PlayerNotFoundError(name)
-
 WIFISELECT_CONN = "wifiselect-hotspot"
 WIFI_INTERFACE = "wlan0"
 SETUP_SSID = "LMSCoverSetup"
@@ -351,7 +336,7 @@ def main():
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
                 ic(servers)
-                plr = get_player(servers, config.player)
+                plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
                 monitor = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
