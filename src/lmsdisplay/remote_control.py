@@ -164,8 +164,17 @@ def handle_signal(_signum, _frame):
     reload_config()
 
 def watch_config(configfile):
-    for _ in watchfiles.watch(configfile):
+    c = Path(configfile).absolute()
+
+    def filter_for_config(change: watchfiles.Change, path: str) -> bool:
+        return Path(path) == c and change in [watchfiles.Change.added, watchfiles.Change.modified]
+
+    # watch the parent directory because if the config file is "changed", it may Automatically
+    # be deleted, and then readded.   This causes subesquent changes to be lost
+    for _ in watchfiles.watch(c.parent, watch_filter=filter_for_config):
         reload_config()
+
+
 
 def reload_config():
     """ Receive a SIGHUP and reload the configuration file and command line. """

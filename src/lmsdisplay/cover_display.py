@@ -56,7 +56,7 @@ monitor: lms_monitor.PlayerMonitor | None = None
 from icecream import ic
 
 ic.configureOutput(includeContext=True)
-ic.disable()
+# ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
@@ -218,13 +218,20 @@ def reload_config():
 
     event_q.put(ReloadEvent())
 
+
 def watch_config(configfile):
-    ic()
-    for _ in watchfiles.watch(configfile):
-        ic()
+    c = Path(configfile).absolute()
+
+    def filter_for_config(change: watchfiles.Change, path: str) -> bool:
+        return Path(path) == c and change in [watchfiles.Change.added, watchfiles.Change.modified]
+
+    # watch the parent directory because if the config file is "changed", it may Automatically
+    # be deleted, and then readded.   This causes subesquent changes to be lost
+    for _ in watchfiles.watch(c.parent, watch_filter=filter_for_config):
         reload_config()
 
-WIFISELECT_CONN = "wifiselect-hotspot"
+
+WIFISELECT_CONN_NAME = "wifiselect-hotspot"
 WIFI_INTERFACE = "wlan0"
 SETUP_SSID = "LMSCoverSetup"
 
@@ -240,17 +247,14 @@ class RotatingDisplay:
         now = datetime.now()
         if now > self.next:
             art, delay = next(self.images)
-            ic(art, delay)
 
             if self.last_image and art != self.last_image:
-                ic()
                 send_transition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
             else:
                 send_art(self.display, art)
 
             self.last_image = art
             self.next = datetime.now() + timedelta(seconds=delay)
-            ic(self.next)
         else:
             send_art(self.display, self.last_image)
 
@@ -267,7 +271,7 @@ def check_connection(dis):
         conns = nmcli.connection.show_all(active=True)
         # Find the active wifi connection
         for c in conns:
-            if c.conn_type == "wifi" and c.name != WIFISELECT_CONN:
+            if c.conn_type == "wifi" and c.name != WIFISELECT_CONN_NAME:
                 ic(c.name, c.conn_type)
                 return
 
@@ -283,10 +287,20 @@ def check_player(display):
     logo =  util.get_internal_art("configure.jpg").resize((config.image_size, config.image_size), resample=Image.Resampling.NEAREST)
 
     rd = RotatingDisplay(display, [(qr, 10), (logo, 5)])
-    ic(config.player)
-    while not config.player:
+
+    while True:
+        print(config.player)
+        with contextlib.suppress(util.PlayerNotFoundError):
+            servers = discovery.discover_lms()
+            if servers and config.player:
+                print(config.player)
+                player = util.get_player(servers, config.player)
+                if player:
+                    return
+
         time.sleep(1)
         rd.update()
+        servers = discovery.discover_lms()
 
 def process_cmdline():
     parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
