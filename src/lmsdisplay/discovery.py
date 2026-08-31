@@ -33,7 +33,7 @@ from collections import namedtuple
 
 
 DISCOVERY_PORT = 3483
-DEFAULT_DISCOVERY_TIMEOUT = 1
+DEFAULT_DISCOVERY_TIMEOUT = .5
 
 ATTR_HOST = "host"
 ATTR_PORT = "port"
