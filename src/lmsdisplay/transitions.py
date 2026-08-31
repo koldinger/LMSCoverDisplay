@@ -45,10 +45,6 @@ from strenum import StrEnum
 
 rich.traceback.install()
 
-from icecream import ic
-ic.configureOutput(includeContext=True)
-
-
 """
 Helper functions.   Perform an action.   In many cases, the images can be rotated before the
 transition, and then rotated back to perform the operation in a certain direction.
@@ -486,10 +482,10 @@ def _makeSquares(chunks, size, snake):
 def _makeLines(chunks, size):
     x, y = size
     chunk_sz = int(x / chunks)
+
     lines = []
-    for i in range(0, chunks):
-        first = i * chunk_sz
-        lines.append((first, 0, first + chunk_sz, y))
+    for i in range(0, x, chunk_sz):
+        lines.append((i, 0, i + chunk_sz, y))
     return lines
 
 def _doBoxes(oimg, nimg, squares):
@@ -621,10 +617,10 @@ def bars(oimg, nimg, steps, rotation=0):
     yield nimg
 
 def lines(oimg, nimg, steps, rotation=0):
-    lines = _makeLines(steps, oimg.size)
-    random.shuffle(lines)
+    strips = _makeLines(steps, oimg.size)
+    random.shuffle(strips)
     yield oimg
-    yield from _rotate(rotation, _doBoxes, oimg, nimg, lines)
+    yield from _rotate(rotation, _doBoxes, oimg, nimg, strips)
     yield nimg
 
 
@@ -867,7 +863,7 @@ def test():
         sendArt(f, cur[0])
         time.sleep(2.0)
         trans = i.function
-        doTransition(f, trans(cur[0], nxt[0], 21))
+        doTransition(f, trans(cur[0], nxt[0], 20))
         cur = nxt
         nxt = next(images)
 
