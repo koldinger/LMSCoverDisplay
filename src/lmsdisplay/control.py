@@ -145,6 +145,10 @@ def save_config():
     return "Saved"
 
 
+@app.route("/rescan_players", methods=["POST"])
+def rescan_players():
+    return getPlayers()
+
 @app.route("/reset_config", methods=["POST"])
 def reset_config():
     print(f"Resetting configuration: {args.config}")

@@ -241,6 +241,13 @@
   .modal-btn-confirm { font-size: 13px; padding: 7px 18px; border-radius: var(--border-radius-md); border: none; background: #c0392b; color: #fff; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 6px; }
   .modal-btn-confirm:hover { background: #a93226; }
   .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rescan-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .btn-rescan { font-size: 13px; padding: 5px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
+  .btn-rescan:hover { background: var(--color-background-secondary); }
+  .btn-rescan:active { transform: scale(0.97); }
+  .btn-rescan:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rescan-status { font-size: 12px; color: var(--color-text-secondary); }
+  .rescan-status.error { color: #c0392b; }
   .net-reset-row { display: flex; justify-content: flex-end; margin-top: 0.75rem; }
   .btn-net-reset { font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md); border: 0.5px solid rgba(192,57,43,0.4); background: var(--color-background-primary); color: #c0392b; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
   .btn-net-reset:hover { background: #fdf0ee; }
@@ -274,6 +281,7 @@
 
   {# ── Player select ─────────────────────────────────────────────────────── #}
   <div class="section-label">Select player</div>
+  {% if players %}
   <div class="select-wrap">
     <i class="ti ti-device-audio icon-left" aria-hidden="true"></i>
     <select id="player-select">
@@ -287,6 +295,22 @@
       {% endfor %}
     </select>
     <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
+  </div>
+  {% else %}
+  <div class="select-wrap">
+    <i class="ti ti-device-audio icon-left" aria-hidden="true"></i>
+    <select id="player-select" disabled>
+      <option value="" selected>No players available.  Rescan or "Reset Networking" to change networks.</option>
+    </select>
+    <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
+  </div>
+  <style>#player-select:disabled { color: #c0392b; }</style>
+  {% endif %}
+  <div class="rescan-row">
+    <button class="btn-rescan" id="btn-rescan">
+      <i class="ti ti-refresh" aria-hidden="true"></i> Rescan players
+    </button>
+    <span class="rescan-status" id="rescan-status"></span>
   </div>
 
   <div class="divider"></div>
@@ -777,6 +801,72 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
     showStatus('No server found.', 'error');
   } finally {
     confirmBtn.disabled = false;
+  }
+});
+
+// ── Rescan players ─────────────────────────────────────────────────────────
+function buildPlayerSelect(players) {
+  const sel = document.getElementById("player-select");
+  const currentVal = sel.value;
+  sel.innerHTML = "";
+  if (!players || Object.keys(players).length === 0) {
+    sel.disabled = true;
+    sel.style.color = "#c0392b";
+    const opt = document.createElement("option");
+    opt.value = ""; opt.selected = true; opt.textContent = "No players available";
+    sel.appendChild(opt);
+  } else {
+    sel.disabled = false;
+    sel.style.color = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = ""; placeholder.disabled = true;
+    placeholder.textContent = "Choose a player\u2026";
+    if (!currentVal) placeholder.selected = true;
+    sel.appendChild(placeholder);
+    Object.entries(players).forEach(([serverName, serverPlayers]) => {
+      const grp = document.createElement("optgroup");
+      grp.label = serverName;
+      serverPlayers.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id; opt.textContent = p.label;
+        if (p.id === currentVal) opt.selected = true;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    });
+  }
+}
+
+let rescanStatusTimer = null;
+function setRescanStatus(msg, type) {
+  const el = document.getElementById("rescan-status");
+  el.textContent = msg;
+  el.className = "rescan-status" + (type ? " " + type : "");
+  clearTimeout(rescanStatusTimer);
+  if (msg) rescanStatusTimer = setTimeout(() => { el.textContent = ""; el.className = "rescan-status"; }, 4000);
+}
+
+document.getElementById("btn-rescan").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-rescan");
+  btn.disabled = true;
+  setRescanStatus("Scanning\u2026", "");
+  try {
+    const response = await fetch("/rescan_players", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (response.ok) {
+      const players = await response.json();
+      buildPlayerSelect(players);
+      const count = Object.values(players).reduce((n, arr) => n + arr.length, 0);
+      setRescanStatus(count ? count + " player" + (count !== 1 ? "s" : "") + " found." : "", "");
+    } else {
+      setRescanStatus("Server error: " + response.status, "error");
+    }
+  } catch (err) {
+    setRescanStatus("Could not reach server.", "error");
+  } finally {
+    btn.disabled = false;
   }
 });
 
