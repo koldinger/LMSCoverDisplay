@@ -56,7 +56,7 @@ monitor: lms_monitor.PlayerMonitor | None = None
 from icecream import ic
 
 ic.configureOutput(includeContext=True)
-# ic.disable()
+ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
