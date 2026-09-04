@@ -245,9 +245,10 @@ def _doLean(oimg, nimg, steps, out):
             yield res
 
 def _doPageTurn(oimg, nimg, steps):
+    numblanks = 3
     blank = Image.new("RGBA", oimg.size)
-    left  = itertools.chain(_doLean(oimg, blank, steps, True), [blank])
-    right = itertools.chain([blank], _rotate(180, _doLean, nimg, blank, steps, False))
+    left  = itertools.chain(_doLean(oimg, blank, steps, True), [blank] * numblanks)
+    right = itertools.chain([blank] * numblanks, _rotate(180, _doLean, nimg, blank, steps, False))
 
     for i in zip(left, right, strict=True):
         res = i[1].copy()
@@ -690,7 +691,7 @@ class TransitionTypes(StrEnum):
     Lean_Flip = auto(), "Lean the old image out at the bottom, and flip the new one in from the top", leanflip
     Lean_FlipHoriz = auto(), "Lean the old image out to the left, and flip the new one in from the right", leanfliphoriz
     #LowerFlip = auto(), "Complicated", lowerflip
-    #PageTurn = auto(), "Page Turn", pageturn
+    PageTurn = auto(), "Page Turn", pageturn
     Boxes_Down = auto(), "Replace boxes one at a time, top to bottom", boxes
     Boxes_Left = auto(), "Replace boxes one at a time, top to bottom", partial(boxes, rotation=90)
     Boxes_Right = auto(), "Replace boxes one at a time, top to bottom", partial(boxes, rotation=270)
@@ -766,7 +767,7 @@ class TransitionGroups(StrEnum):
     Spin = auto(), "Spin an image in or out", InOrOut
     Lean = auto(), "Lean image in or out", OutIn
     Flip = auto(), "Flip image in or out", InOrOut
-    Boxes = auto(), "Replace the image box by box", Cardinal + ["Random", "Snake"]
+    Boxes = auto(), "Replace the image box by box", [*Cardinal, "Random", "Snake"]
     Bars = auto(), "Slide alternating bars in or out", UpDown
     Streak = auto(), "Replace the image by Streak", Cardinal
     Drip = auto(), "Drip the new image in over the old", Cardinal
@@ -774,6 +775,7 @@ class TransitionGroups(StrEnum):
     Rip = auto(), "Rip the image apart", UpDown
     Unrip = auto(), "Push the image together", UpDown
     Lines = auto(), "Draw lines one at a time", UpDown
+    PageTurn = auto(), "Turn a page", None
 
 
 def make_transitions(group):
