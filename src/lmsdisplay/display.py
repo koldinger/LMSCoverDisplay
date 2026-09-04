@@ -34,11 +34,17 @@ from . import flaschen
 
 
 class FlashenDisplay:
-    def __init__(self, host: str, port: int, xsize: int, ysize: int):
+    def __init__(self, host: str, port: int, xsize: int, ysize: int, orientation: int):
         self.disp = flaschen.Flaschen(host, port, xsize, ysize)
+        self.orientation = orientation
 
     def send_image(self, art: Image.Image) -> None:
         """ Send art to the flashchen-taschen display, over the network. """
+
+        # Check that no orientation is needed
+        if self.orientation:
+            art.rotate(self.orientation)
+
         px = art.load()
         for x in range(art.width):
             for y in range(art.height):

@@ -187,9 +187,6 @@ def send_art(disp, art, overlay=None):
     if config.dim_at_night and util.betweentimes(datetime.now().time(), util.parsetime(config.dim_start_time), util.parsetime(config.dim_end_time)):
         art = dim_image(art)
 
-    if config.orientation:
-        art = art.rotate(config.orientation)
-
     disp.send_image(art)
 
 
@@ -322,7 +319,7 @@ def process_cmdline():
 
 def init_display():
     x = y = config.image_size
-    return display.FlashenDisplay(config.display_host, config.display_port, x, y)
+    return display.FlashenDisplay(config.display_host, config.display_port, x, y, config.orientation)
 
 
 def main():
@@ -333,9 +330,7 @@ def main():
 
     signal.signal(signal.SIGHUP, handle_signal)
     if args.watch_config:
-        ic()
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
-
 
     with PidFile("lmsdisplay"):
         backoff = 1
