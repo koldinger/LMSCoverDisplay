@@ -36,6 +36,7 @@ import signal
 import socket
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 import nmcli
@@ -331,11 +332,17 @@ def write_config(filename, config):
 class Prerenderer(threading.Thread):
     def run(self):
         for g in transitions.TransitionGroups:
-            print(f"Generating group {g}")
-            get_art_path("groups", str(g) + ".webp")
+            print(f"Generating group {g} ", end="", flush=True)
+            s_time = time.thread_time()
+            p = get_art_path("groups", str(g) + ".webp")
+            e_time = time.thread_time()
+            print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
         for t in transitions.TransitionTypes:
-            print(f"Generating transition {t}")
+            s_time = time.thread_time()
+            print(f"Generating transition {t} ", end="", flush=True)
             get_art_path("transitions", str(t) + ".webp")
+            e_time = time.thread_time()
+            print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
