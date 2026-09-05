@@ -42,11 +42,12 @@ from queue import Empty, Queue
 import nmcli
 import rich.traceback
 import watchfiles
+from LMSTools import LMSPlayer
 from pid import PidFile
 from PIL import Image, ImageEnhance
 from rich.console import Console
 
-from . import defaults, discovery, display, events, lms_monitor, qrcodes, transitions, util, volume
+from . import defaults, discovery, display, events, lms_monitor, qrcodes, screensaver, transitions, util, volume
 
 rich.traceback.install()
 args: argparse.Namespace
@@ -81,7 +82,7 @@ def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
     return color
 
 
-def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
+def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPlayer, adjuster: util.ImageAdjuster) -> None:
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
@@ -92,7 +93,10 @@ def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
     # Setup as if we're paused at the start.
     playing = False
     pause_delta = timedelta(seconds=config.pause_delay)
+    ss_delta = timedelta(seconds=config.screensaver_delay)
     cleartime = None
+    ss_time = None
+    saver = None
 
     timeout = TIMEOUT_DEF
 
@@ -106,6 +110,8 @@ def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
             elif cleartime and datetime.now() >= cleartime:
                 send_transition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
                 timeout = TIMEOUT_DEF
+                cleartime = None
+                lastimg = blank
             continue
 
         # Grab the current playing status from the stream
@@ -124,6 +130,11 @@ def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
             case events.EventType.PLAY:
                 playing = True
                 art = event.artwork
+
+                if saver:
+                    saver.stop()
+                    saver.join()
+                    saver = None
 
                 if config.show_volume_bar:
                     vol = int(event.volume)
@@ -144,6 +155,7 @@ def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
                 if playing and config.pause_delay:
                     pausestart = datetime.now()
                     cleartime = pausestart + pause_delta
+                    ss_time = None
                     timeout = min(config.pause_delay, TIMEOUT_DEF)
 
                 playing = False
@@ -157,10 +169,14 @@ def handle_events(disp, trans: list[transitions.TransitionTypes]) -> None:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
                     cleartime = None
+                    ss_time = datetime.now() + ss_delta
                     timeout = TIMEOUT_DEF
-                else:
+                elif config.enable_screensaver and not saver and ss_time and datetime.now() > ss_time:
+                    saver = screensaver.ScreenSaver(player.server, disp, config.display_time, config.frame_delay, adjuster)
+                    saver.start()
+                elif lastimg != blank:
                     # Else, still in the pause delay, just blast the last image
-                    send_art(disp, lastimg)
+                        send_art(disp, lastimg)
             case _:
                 print(event)
 
@@ -179,6 +195,7 @@ def send_art(disp, art, overlay=None):
     If an overlay image is presented, it will be overlaid over the artwork
     before sending.
     """
+    ic()
     if overlay:
         overlay = overlay.resize(art.size)
         art = art.copy()
@@ -199,10 +216,12 @@ def send_transition(f, art, lastimg, transition, overlay=None):
 class ReloadEvent:
     pass
 
+# Code to handle reloads.
 
 def handle_signal(_signum, _frame):
     ic()
     reload_config()
+
 
 def reload_config():
     """ Receive a SIGHUP and reload the configuration file and command line. """
@@ -256,6 +275,13 @@ class RotatingDisplay:
             send_art(self.display, self.last_image)
 
 def check_connection(dis):
+    """
+    Check to see if we're running on the wifiselect hotspot.
+
+    If the current connection is the wifiselect hotspot, run a rotating display
+    that shows a WiFi QRCode for the hotspot, and an image of the WiFi logo.
+    """
+
     nmcli.disable_use_sudo()
     if not args.check_conn:
         return
@@ -277,6 +303,12 @@ def check_connection(dis):
 
 
 def check_player(display):
+    """
+    Check to see if we're in need of configuration.
+
+    Configuration need is assumed if either the player has not been specied, or 
+    the specified player cannot be found.
+    """
     if not args.check_player:
         return
 
@@ -353,7 +385,7 @@ def main():
 
                 backoff = 1
 
-                handle_events(disp, config.transitions)
+                handle_events(disp, config.transitions, plr, adjuster)
                 monitor.close()
             except Exception:
                 console.print_exception()

@@ -15,4 +15,8 @@ defaults = {
     "display_port" : 1337,
     "orientation" : 0,
     "image_size" : 64,
+    "enable_screensaver": False,
+    "disable_screensaver_dimmed": True,
+    "screensaver_delay": 30,
+    "display_time": 80,
 }

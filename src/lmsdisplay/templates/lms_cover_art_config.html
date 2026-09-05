@@ -12,6 +12,10 @@
                     "transition_frames"         : int   (1–64,   default 20)
                     "frame_delay"               : float (0–2,    default 0.15)
                     "pause_delay"               : int   (0–300s, default 0)
+                    "display_time"              : int   (1–600s, default 30)
+                    "enable_screensaver"        : bool  (default false)
+                    "disable_screensaver_dimmed": bool  (default false)
+                    "screensaver_delay"         : int   (seconds, positive integer, default 60)
                     "show_volume_bar"           : bool  (default false)
                     "dim_at_night"              : bool  (default false)
                     "dim_start_time"            : str   "HH:MM"  (default "22:00")
@@ -300,7 +304,7 @@
   <div class="select-wrap">
     <i class="ti ti-device-audio icon-left" aria-hidden="true"></i>
     <select id="player-select" disabled>
-      <option value="" selected>No players available.  Rescan or "Reset Networking" to change networks.</option>
+      <option value="" selected>No players available</option>
     </select>
     <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
   </div>
@@ -329,6 +333,7 @@
       </div>
     </div>
   </div>
+  <p style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:8px;line-height:1.5">Will randomly choose between all selected transitions. If none are selected, it will choose from all transitions.</p>
   <div class="transitions-panel" id="transitions-panel">
     <div class="list" id="list"></div>
   </div>
@@ -336,6 +341,8 @@
   <div class="divider"></div>
 
   {# ── Sliders ───────────────────────────────────────────────────────────── #}
+  <div class="list-section-label" style="cursor:default;pointer-events:none;margin-bottom:12px">Display controls</div>
+
   <div class="slider-block">
     <div class="section-label">Color saturation</div>
     <div class="slider-row">
@@ -381,6 +388,7 @@
     <div class="range-ends"><span>0s</span><span>300s</span></div>
   </div>
 
+
   <div class="divider"></div>
 
   {# ── Checkboxes ────────────────────────────────────────────────────────── #}
@@ -413,6 +421,41 @@
       </div>
       <div class="range-ends"><span>0%</span><span>100%</span></div>
     </div>
+  </div>
+
+  <div class="divider"></div>
+
+  {# ── Screensaver ───────────────────────────────────────────────────────── #}
+  <div class="list-section-label" style="cursor:default;pointer-events:none;margin-bottom:12px">Screensaver</div>
+
+  <div class="check-row">
+    <input type="checkbox" id="enable-screensaver"{% if presets.enable_screensaver %} checked{% endif %}>
+    <label for="enable-screensaver">Enable screensaver</label>
+  </div>
+  <div class="time-section{% if presets.enable_screensaver %} enabled{% endif %}" id="screensaver-sub">
+  <div class="check-row">
+    <input type="checkbox" id="disable-screensaver-dimmed"{% if presets.disable_screensaver_dimmed %} checked{% endif %}>
+    <label for="disable-screensaver-dimmed">Disable screensaver when dimmed</label>
+  </div>
+
+  <div class="slider-block" style="margin-top:1rem">
+    <div class="section-label">Screensaver delay</div>
+    <div class="slider-row">
+      <input type="range" id="screensaver-delay" min="0" max="300" step="1"
+             value="{{ presets.screensaver_delay | default(60) }}">
+      <span class="slider-val" id="screensaver-delay-val">{{ presets.screensaver_delay | default(60) }}s</span>
+    </div>
+    <div class="range-ends"><span>0s</span><span>300s</span></div>
+  </div>
+
+  <div class="slider-block" style="margin-bottom:0">
+    <div class="section-label">Display time</div>
+    <div class="slider-row">
+      <input type="range" id="displaytime" min="1" max="600" step="1" value="{{ presets.display_time | default(30) }}">
+      <span class="slider-val" id="displaytime-val">{{ presets.display_time | default(30) }}s</span>
+    </div>
+    <div class="range-ends"><span>1s</span><span>600s</span></div>
+  </div>
   </div>
 
   <div class="divider"></div>
@@ -582,6 +625,10 @@ function setAll(checked) {
   render();
 }
 
+document.getElementById('enable-screensaver').addEventListener('change', function () {
+  document.getElementById('screensaver-sub').classList.toggle('enabled', this.checked);
+});
+
 document.getElementById('dim').addEventListener('change', function () {
   document.getElementById('time-section').classList.toggle('enabled', this.checked);
 });
@@ -656,6 +703,12 @@ displayPortEl.addEventListener('blur', () => {
 });
 
 // ── Driver radio toggle ───────────────────────────────────────────────────
+// ── Screensaver delay slider ────────────────────────────────────────────────
+const screensaverDelayEl = document.getElementById("screensaver-delay");
+screensaverDelayEl.addEventListener("input", () => {
+  document.getElementById("screensaver-delay-val").textContent = screensaverDelayEl.value + "s";
+});
+
 function collectFormData() {
   const transitions = [];
   data.forEach(g => {
@@ -670,6 +723,10 @@ function collectFormData() {
     transition_frames:           parseInt(document.getElementById('transition_frames').value, 10),
     frame_delay:                 parseFloat(document.getElementById('frame_delay').value),
     pause_delay:                 parseInt(document.getElementById('pausedelay').value, 10),
+    display_time:                parseInt(document.getElementById('displaytime').value, 10),
+    enable_screensaver:          document.getElementById('enable-screensaver').checked,
+    disable_screensaver_dimmed:  document.getElementById('disable-screensaver-dimmed').checked,
+    screensaver_delay:           parseInt(document.getElementById('screensaver-delay').value, 10),
     show_volume_bar:             document.getElementById('volume').checked,
     dim_at_night:                dimChecked,
     dim_start_time:              dimChecked ? document.getElementById('start-time').value : null,
@@ -706,6 +763,7 @@ function isFormValid() {
   if (isNaN(port) || port < 1 || port > 65535) return false;
   const imgSize = parseInt(imageSizeEl.value, 10);
   if (isNaN(imgSize) || imgSize < 1) return false;
+
   return true;
 }
 
@@ -1005,6 +1063,7 @@ document.getElementById('btn-none').addEventListener('click', () => setAll(false
   ['transition_frames', v => parseInt(v)],
   ['frame_delay',       v => parseFloat(v).toFixed(2)],
   ['pausedelay',       v => parseInt(v) + 's'],
+  ['displaytime',      v => parseInt(v) + 's'],
 ].forEach(([id, fmt]) => {
   const el  = document.getElementById(id);
   const out = document.getElementById(id + '-val');
