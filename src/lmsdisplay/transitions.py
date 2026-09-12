@@ -33,9 +33,9 @@ import time
 from contextlib import suppress
 from enum import auto
 from functools import partial
-from pathlib import Path
 from hashlib import md5
 from math import ceil
+from pathlib import Path
 
 import numpy as np
 import rich.traceback
@@ -63,7 +63,7 @@ def _doPush(oimg, nimg, steps):
     width, height = oimg.size
     inc = width / steps
 
-    # Create a big image, twice as wide as a single one, and put the two 
+    # Create a big image, twice as wide as a single one, and put the two
     # base images side by side.
     cimage = Image.new("RGB", (width * 2, height))
     cimage.paste(oimg, (0, 0))
@@ -808,9 +808,9 @@ def expandGroups(transitions):
 
 def test():
     import sys
-    import flaschen
-
     from datetime import datetime
+
+    import flaschen
 
     size = 64
 
