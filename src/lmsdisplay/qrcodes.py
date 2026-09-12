@@ -27,10 +27,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import qrcode
-import psutil
 import socket
 
+import psutil
+import qrcode
 from PIL import Image, ImageOps
 
 CONFIG_PORT=5000
@@ -66,8 +66,9 @@ def generate_wifi_qrcode(ssid:str, size:int) -> Image.Image:
     return ImageOps.pad(q.get_image(), (size, size), color="green")
 
 if __name__ == "__main__":
-    import flaschen
     import time
+
+    import flaschen
     def sendArt(f, i):
         px = i.load()
         for x in range(i.width):
