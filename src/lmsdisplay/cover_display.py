@@ -33,6 +33,7 @@ import importlib.metadata
 import itertools
 import random
 import signal
+import functools
 import threading
 import time
 from datetime import datetime, timedelta
@@ -57,7 +58,7 @@ monitor: lms_monitor.PlayerMonitor | None = None
 from icecream import ic
 
 ic.configureOutput(includeContext=True)
-ic.disable()
+#ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
@@ -86,7 +87,8 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
     lastimg = Image.new("RGB", (config.image_size, config.image_size))
     lastvol = 0
 
-    blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
+    #blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
+    blank = None
 
     trans = trans or list(transitions.TransitionTypes)
 
@@ -97,6 +99,9 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
     cleartime = None
     ss_time = None
     saver = None
+    dimming = False
+    dim_start = util.parsetime(config.dim_start_time)
+    dim_end = util.parsetime(config.dim_end_time)
 
     timeout = TIMEOUT_DEF
 
@@ -105,16 +110,24 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
         try:
             event = event_q.get(timeout = timeout)
         except Empty:
-            if playing:
-                send_art(disp, lastimg)
-            elif cleartime and datetime.now() >= cleartime:
-                send_transition(display, blank, lastimg, transitions.getTransition(random.choice(trans)))
+            if cleartime and datetime.now() >= cleartime:
+                disp.transition(lastimg, blank)
                 timeout = TIMEOUT_DEF
                 cleartime = None
                 lastimg = blank
+            elif lastimg != blank:
+                disp.refresh()
             continue
 
-        # Grab the current playing status from the stream
+        if config.dim_at_night and util.betweentimes(datetime.now().time(), dim_start, dim_end):
+            if not dimming:
+                disp.dim(config.dimmed_brightness)
+            dimming = True
+        else:
+            if dimming:
+                disp.undim()
+            dimming = False
+
         overlay = None
 
         # Continue on if no event was discovered
@@ -146,9 +159,9 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
                         overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
 
                 if art != lastimg:
-                    send_transition(disp, art, lastimg, transitions.getTransition(random.choice(trans)))
+                    disp.transition(lastimg, art)
                 else:
-                    send_art(disp, art, overlay=overlay)
+                    disp.show_artwork(art)
                 lastimg = art
 
             case events.EventType.PAUSE | events.EventType.STOP:
@@ -164,7 +177,7 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
                 if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
                     # If we're past the pause_delay, switch to the pause display
                     if lastimg != blank:
-                        send_transition(disp, pause_img, lastimg, transitions.getTransition(random.choice(trans)))
+                        disp.transition(pause_img, lastimg)
                     # else:
                     #    sendArt(display, pause_img)
                     lastimg = pause_img
@@ -176,41 +189,25 @@ def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPla
                     saver.start()
                 elif lastimg != blank:
                     # Else, still in the pause delay, just blast the last image
-                        send_art(disp, lastimg)
+                    # disp.show_artwork(lastimg)
+                    disp.refresh()
             case _:
                 print(event)
 
+    # and we're done with this loop.   Shut down the screen saver if there is one.
+    if saver:
+        saver.stop()
+        saver.join()
+        saver = None
 
+
+
+@functools.lru_cache(maxsize=8)
 def dim_image(image):
     """ Dim an image. """
     if config.dim_at_night:
         image = ImageEnhance.Brightness(image).enhance(config.dimmed_brightness)
     return image
-
-
-def send_art(disp, art, overlay=None):
-    """
-    Send art to the display, dimming it if necessary.
-
-    If an overlay image is presented, it will be overlaid over the artwork
-    before sending.
-    """
-    ic()
-    if overlay:
-        overlay = overlay.resize(art.size)
-        art = art.copy()
-        art.paste(overlay, (0, 0), overlay)
-
-    if config.dim_at_night and util.betweentimes(datetime.now().time(), util.parsetime(config.dim_start_time), util.parsetime(config.dim_end_time)):
-        art = dim_image(art)
-
-    disp.send_image(art)
-
-
-def send_transition(f, art, lastimg, transition, overlay=None):
-    for i in transition(lastimg, art, config.transition_frames):
-        send_art(f, i, overlay)
-        time.sleep(config.frame_delay)
 
 
 class ReloadEvent:
@@ -265,14 +262,15 @@ class RotatingDisplay:
             art, delay = next(self.images)
 
             if self.last_image and art != self.last_image:
-                send_transition(self.display, art, self.last_image, transitions.TransitionTypes.Fade.function)
+                self.display.transition(self.last_image, art, transitions.TransitionTypes.Fade)
             else:
-                send_art(self.display, art)
+                self.display.show_artwork(art)
 
             self.last_image = art
             self.next = datetime.now() + timedelta(seconds=delay)
         else:
-            send_art(self.display, self.last_image)
+            # self.display.show_artwork(self.last_image)
+            self.display.refresh()
 
 def check_connection(dis):
     """
@@ -351,7 +349,7 @@ def process_cmdline():
 
 def init_display():
     x = y = config.image_size
-    return display.FlashenDisplay(config.display_host, config.display_port, x, y, config.orientation)
+    return display.FlashenDisplay(config.transitions, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
 
 
 def main():

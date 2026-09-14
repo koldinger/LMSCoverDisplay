@@ -89,6 +89,7 @@ class ScreenSaver(Thread):
         self.stop_event.set()
 
     def run(self):
+        ic()
         changetime = datetime.now()
         waittime = min(10.0, self.display_time)
         time.sleep(0.1)
@@ -106,26 +107,17 @@ class ScreenSaver(Thread):
                     continue
 
                 next_img = self.adjustor.adjustImage(art)
-                self.send_transition(next_img, self.last_img, transitions.TransitionTypes.PageTurn.function)
+                self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
                 changetime = datetime.now() + self.pause_delta
                 self.last_img = next_img
             else:
-                self.send_art(self.last_img)
+                self.display.refresh()
 
             # now wait for appropriate time, unless we're woken up.
             self.stop_event.wait(timeout=waittime)
 
-        self.send_transition(BLANK, self.last_img, transitions.TransitionTypes.PageTurn.function)
+        self.display.transition(self.last_img, None, transitions.TransitionTypes.PageTurn)
 
-
-    def send_art(self, img):
-        self.display.send_image(img)
-
-    def send_transition(self, art, lastimg, transition):
-        ic(art, lastimg)
-        for i in transition(lastimg, art, 24):
-            self.send_art(i)
-            time.sleep(self.frame_delay)
 
 
 if __name__ == "__main__":

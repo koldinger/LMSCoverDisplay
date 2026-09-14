@@ -27,30 +27,114 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-#import RgbMatrixDriver
-from PIL import Image
+import random
+import threading
+import time
 
-from . import flaschen
+from PIL import Image, ImageEnhance
 
+from . import flaschen, screensaver, transitions
 
-class FlashenDisplay:
-    def __init__(self, host: str, port: int, xsize: int, ysize: int, orientation: int):
+# --------------------------------------------------------------------------
+# Display interface - subclass this to drive real hardware/UI
+# --------------------------------------------------------------------------
+
+class Display:
+    """
+    Override these methods to drive real hardware (LED matrix, framebuffer,
+    a GUI window, whatever). The default implementations just log, which is
+    enough to see the state machine working end to end.
+    """
+
+    def __init__(self,
+                 translist: list[transitions.TransitionTypes],
+                 frames: int,
+                 frame_delay: float,
+                 saver: screensaver.ScreenSaver | None = None):
+        self.dimming: float | None = None
+        self.saver: screensaver.ScreenSaver | None = None
+        self.translist = translist or list(transitions.TransitionTypes)
+        self.frames = frames
+        self.frame_delay = frame_delay
+        self.saver = saver
+        self.blank: Image.Image
+
+    def show_artwork(self, artwork: Image.Image) -> None:
+        pass
+
+    def transition(self, old_artwork: Image.Image, new_artwork: Image.Image, trans: transitions.TransitionTypes | None = None) -> None:
+        if not trans:
+            trans = random.choice(self.translist)
+
+        if not old_artwork:
+            old_artwork = self.blank
+        if not new_artwork:
+            new_artwork = self.blank
+
+        func = trans.function
+        for i in func(old_artwork, new_artwork, self.frames):
+            self.show_artwork(i)
+            time.sleep(self.frame_delay)
+
+    def refresh(self):
+        pass
+
+    def start_screensaver(self, saver):
+        self.saver = saver
+        self.saver_thread = threading.Thread(target=self.saver.run)
+        self.saver_thread.start()
+
+    def stop_screensaver(self) -> None:
+        if self.saver and self.saver_thread:
+            self.saver.stop()
+            self.saver_thread.join()
+            self.saver_thread = None
+
+    def clear(self) -> None:
+        pass
+
+    def dim(self, amount: float) -> None:
+        self.dimming = amount
+
+    def undim(self) -> None:
+        self.dimming = None
+
+class FlashenDisplay(Display):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
+        super().__init__(translist, frames, frame_delay)
         self.disp = flaschen.Flaschen(host, port, xsize, ysize)
         self.orientation = orientation
 
-    def send_image(self, art: Image.Image) -> None:
+        self.blank = Image.new("RGB", (xsize, ysize))
+        self.lock = threading.Lock()
+
+
+    def show_artwork(self, art: Image.Image) -> None:
         """ Send art to the flashchen-taschen display, over the network. """
+        #ic(art)
+        if not art:
+            art = self.blank
 
         # Check that no orientation is needed
         if self.orientation:
             art.rotate(self.orientation)
 
+        if self.dimming is not None:
+            # Wish there was some way to cache this.
+            art = ImageEnhance.Brightness(art).enhance(self.dimming)
+
         px = art.load()
-        for x in range(art.width):
-            for y in range(art.height):
-                pixel = tuple(px[x, y])
-                self.disp.set(x, y, pixel)
-        self.disp.send()
+        with self.lock:
+            for x in range(art.width):
+                for y in range(art.height):
+                    pixel = tuple(px[x, y])
+                    self.disp.set(x, y, pixel)
+            self.disp.send()
+
+    def refresh(self):
+        with self.lock:
+            self.disp.send()
+
 
 
 # ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
