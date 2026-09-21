@@ -61,9 +61,9 @@ def generate_wifi_qrcode(ssid:str, size:int) -> Image.Image:
     data = f"WIFI:S:{ssid};T:nopass;P:;;"
     print(data, len(data))
     qr.add_data(data)
-    q = qr.make_image(fill_color="black", back_color="green")
+    q = qr.make_image(fill_color="black", back_color="lightgreen")
 
-    return ImageOps.pad(q.get_image(), (size, size), color="green")
+    return ImageOps.pad(q.get_image(), (size, size), color="lightgreen")
 
 if __name__ == "__main__":
     import time
@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     import imgcat
     #q = generate_config_qrcode("enp7s0")
-    q = generate_wifi_qrcode("SetupPortal")
+    q = generate_wifi_qrcode("SetupPortal", 64)
     imgcat.imgcat(q)
 
     display = "coverpi.local"
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     time.sleep(5)
 
-    q = generate_config_qrcode("enp7s0")
+    q = generate_config_qrcode("enp7s0", 64)
     imgcat.imgcat(q)
     sendArt(f, q)
 
