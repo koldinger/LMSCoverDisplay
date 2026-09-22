@@ -31,194 +31,44 @@ import argparse
 import contextlib
 import importlib.metadata
 import itertools
-import random
 import signal
-import functools
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Queue
+from typing import Optional
 
 import nmcli
 import rich.traceback
 import watchfiles
-from LMSTools import LMSPlayer
 from pid import PidFile
-from PIL import Image, ImageEnhance
+from PIL import Image
 from rich.console import Console
 
-from . import defaults, discovery, display, events, lms_monitor, qrcodes, screensaver, transitions, util, volume
+from . import (defaults, discovery, display, events, lms_monitor, qrcodes, statemachine, transitions, util)
 
 rich.traceback.install()
 args: argparse.Namespace
 
-monitor: lms_monitor.PlayerMonitor | None = None
+monitor: Optional[lms_monitor.PlayerMonitor] = None
 
 from icecream import ic
 
 ic.configureOutput(includeContext=True)
-#ic.disable()
+# ic.disable()
 
 __version__ = "Unknown"
 with contextlib.suppress(importlib.metadata.PackageNotFoundError):
     __version__ = importlib.metadata.version("lmsdisplay")
 
-
 event_q = Queue()
 
 TIMEOUT_DEF = 20    # 20 second timeout.   Screen should flush at 30
 
-def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
-    try:
-        # Get the averoge color of the current screen.
-        # Do this by resizing the picture to 1 pixel, and grabbing the color
-        small = art.resize((1, 1), resample=Image.Resampling.LANCZOS).convert("RGB")
-        r, g, b = small.getpixel((0, 0))
-        # Compute the contrasting color, based on the luma
-        luma = 0.299*r + 0.587*g + 0.114*b
-        color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
-    except:
-        color = (255, 255, 255, 200)
-    return color
-
-
-def handle_events(disp, trans: list[transitions.TransitionTypes], player: LMSPlayer, adjuster: util.ImageAdjuster) -> None:
-    lastimg = Image.new("RGB", (config.image_size, config.image_size))
-    lastvol = 0
-
-    #blank = Image.new("RGB", (config.image_size, config.image_size), color=(0, 0, 0))
-    blank = None
-
-    trans = trans or list(transitions.TransitionTypes)
-
-    # Setup as if we're paused at the start.
-    playing = False
-    pause_delta = timedelta(seconds=config.pause_delay)
-    ss_delta = timedelta(seconds=config.screensaver_delay)
-    cleartime = None
-    ss_time = None
-    saver = None
-    dimming = False
-    dim_start = util.parsetime(config.dim_start_time)
-    dim_end = util.parsetime(config.dim_end_time)
-
-    timeout = TIMEOUT_DEF
-
-    while True:
-        event = None            # Clear the previous event
-        try:
-            event = event_q.get(timeout = timeout)
-        except Empty:
-            if cleartime and datetime.now() >= cleartime:
-                disp.transition(lastimg, blank)
-                timeout = TIMEOUT_DEF
-                cleartime = None
-                lastimg = blank
-            elif lastimg != blank:
-                disp.refresh()
-            continue
-
-        if config.dim_at_night and util.betweentimes(datetime.now().time(), dim_start, dim_end):
-            if not dimming:
-                disp.dim(config.dimmed_brightness)
-            dimming = True
-        else:
-            if dimming:
-                disp.undim()
-            dimming = False
-
-        overlay = None
-
-        # Continue on if no event was discovered
-        if not event:
-            continue
-
-        # Handle a reload event and break out of the loop
-        if type(event) is ReloadEvent:
-            event = None
-            break
-
-        match event.mode:
-            case events.EventType.PLAY:
-                playing = True
-                art = event.artwork
-
-                if saver:
-                    saver.stop()
-                    saver.join()
-                    saver = None
-
-                if config.show_volume_bar:
-                    vol = int(event.volume)
-
-                    # If the volume has changed,
-                    if vol != lastvol:
-                        lastvol = vol
-                        color = contrasting_color(art)
-                        overlay = volume.drawVolume(vol, (500,500), color = color, xoffset=.05, yoffset=.9, yheight=.05)
-
-                if art != lastimg:
-                    disp.transition(lastimg, art)
-                else:
-                    disp.show_artwork(art)
-                lastimg = art
-
-            case events.EventType.PAUSE | events.EventType.STOP:
-                if playing and config.pause_delay:
-                    pausestart = datetime.now()
-                    cleartime = pausestart + pause_delta
-                    ss_time = None
-                    timeout = min(config.pause_delay, TIMEOUT_DEF)
-
-                playing = False
-                pause_img = blank
-
-                if (config.pause_delay == 0) or (cleartime and datetime.now() >= cleartime):
-                    # If we're past the pause_delay, switch to the pause display
-                    if lastimg != blank:
-                        disp.transition(pause_img, lastimg)
-                    # else:
-                    #    sendArt(display, pause_img)
-                    lastimg = pause_img
-                    cleartime = None
-                    ss_time = datetime.now() + ss_delta
-                    timeout = TIMEOUT_DEF
-                elif config.enable_screensaver and not saver and ss_time and datetime.now() > ss_time:
-                    saver = screensaver.ScreenSaver(player.server, disp, config.display_time, config.frame_delay, adjuster)
-                    saver.start()
-                elif lastimg != blank:
-                    # Else, still in the pause delay, just blast the last image
-                    # disp.show_artwork(lastimg)
-                    disp.refresh()
-            case _:
-                print(event)
-
-    # and we're done with this loop.   Shut down the screen saver if there is one.
-    if saver:
-        saver.stop()
-        saver.join()
-        saver = None
-
-
-
-@functools.lru_cache(maxsize=8)
-def dim_image(image):
-    """ Dim an image. """
-    if config.dim_at_night:
-        image = ImageEnhance.Brightness(image).enhance(config.dimmed_brightness)
-    return image
-
-
-class ReloadEvent:
-    pass
-
-# Code to handle reloads.
-
 def handle_signal(_signum, _frame):
     ic()
     reload_config()
-
 
 def reload_config():
     """ Receive a SIGHUP and reload the configuration file and command line. """
@@ -229,7 +79,8 @@ def reload_config():
     if monitor:
         monitor.clear_art_cache()
 
-    event_q.put(ReloadEvent())
+    # Stop the statemachine.
+    event_q.put(events.PlayEvent(events.EventType.END))
 
 
 def watch_config(configfile):
@@ -242,7 +93,6 @@ def watch_config(configfile):
     # be deleted, and then readded.   This causes subesquent changes to be lost
     for _ in watchfiles.watch(c.parent, watch_filter=filter_for_config):
         reload_config()
-
 
 WIFISELECT_CONN_NAME = "wifiselect-hotspot"
 WIFI_INTERFACE = "wlan0"
@@ -279,7 +129,6 @@ def check_connection(dis):
     If the current connection is the wifiselect hotspot, run a rotating display
     that shows a WiFi QRCode for the hotspot, and an image of the WiFi logo.
     """
-
     nmcli.disable_use_sudo()
     if not args.check_conn:
         return
@@ -349,7 +198,8 @@ def process_cmdline():
 
 def init_display():
     x = y = config.image_size
-    return display.FlashenDisplay(config.transitions, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
+    trans_list = [transitions.TransitionTypes(x) for x in config.transitions]
+    return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
 
 
 def main():
@@ -374,16 +224,16 @@ def main():
             try:
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
-                ic(servers)
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                monitor = lms_monitor.PlayerMonitor(plr, event_q, adjuster)
+                sm = statemachine.StateMachine(config, disp, plr, adjuster, event_q)
+                monitor = lms_monitor.PlayerMonitor(plr, sm.queue, adjuster)
                 monitor.start()
 
                 backoff = 1
 
-                handle_events(disp, config.transitions, plr, adjuster)
+                sm.run()
                 monitor.close()
             except Exception:
                 console.print_exception()

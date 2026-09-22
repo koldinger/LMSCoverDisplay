@@ -28,7 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from enum import StrEnum, auto
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 from PIL import Image
 
@@ -36,10 +36,17 @@ class EventType(StrEnum):
     PLAY = auto()
     PAUSE = auto()
     STOP = auto()
+    DIM = auto()
+    UNDIM = auto()
+    START_SAVER = auto()
+    STOP_SAVER = auto()
+    END_PAUSE_DELAY = auto()
+    END_OVERLAY = auto()
+    END = auto()
 
 class PlayEvent(NamedTuple):
     mode: EventType
-    song: int
-    volume: int
-    artwork: Image.Image
+    song: int = 0
+    volume: int = 0
+    artwork: Optional[Image.Image] = None
 

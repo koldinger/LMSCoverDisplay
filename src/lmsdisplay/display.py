@@ -28,12 +28,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import random
-import threading
+from threading import Thread, RLock
 import time
+from typing import Optional
 
 from PIL import Image, ImageEnhance
 
 from . import flaschen, screensaver, transitions
+
+from icecream import ic
 
 # --------------------------------------------------------------------------
 # Display interface - subclass this to drive real hardware/UI
@@ -58,11 +61,12 @@ class Display:
         self.frame_delay = frame_delay
         self.saver = saver
         self.blank: Image.Image
+        self.overlay: Optional[Image.Image] = None
 
-    def show_artwork(self, artwork: Image.Image) -> None:
+    def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         pass
 
-    def transition(self, old_artwork: Image.Image, new_artwork: Image.Image, trans: transitions.TransitionTypes | None = None) -> None:
+    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None) -> None:
         if not trans:
             trans = random.choice(self.translist)
 
@@ -81,17 +85,24 @@ class Display:
 
     def start_screensaver(self, saver):
         self.saver = saver
-        self.saver_thread = threading.Thread(target=self.saver.run)
+        self.saver_thread = Thread(target=self.saver.run)
         self.saver_thread.start()
 
     def stop_screensaver(self) -> None:
+        ic()
         if self.saver and self.saver_thread:
             self.saver.stop()
             self.saver_thread.join()
             self.saver_thread = None
 
+    def set_overlay(self, overlay: Optional[Image.Image]):
+        self.overlay = overlay
+
     def clear(self) -> None:
         pass
+
+    def size(self) -> (int, int):
+        return (500, 500)
 
     def dim(self, amount: float) -> None:
         self.dimming = amount
@@ -105,11 +116,11 @@ class FlashenDisplay(Display):
         self.disp = flaschen.Flaschen(host, port, xsize, ysize)
         self.orientation = orientation
 
-        self.blank = Image.new("RGB", (xsize, ysize))
-        self.lock = threading.Lock()
+        self._size = (xsize, ysize)
+        self.blank = Image.new("RGB", self._size)
+        self.lock = RLock()
 
-
-    def show_artwork(self, art: Image.Image) -> None:
+    def show_artwork(self, art: Optional[Image.Image]) -> None:
         """ Send art to the flashchen-taschen display, over the network. """
         #ic(art)
         if not art:
@@ -117,8 +128,14 @@ class FlashenDisplay(Display):
 
         # Check that no orientation is needed
         if self.orientation:
-            art.rotate(self.orientation)
+            art = art.rotate(self.orientation)
 
+        # If there's an overlay, paste it over the image.
+        if self.overlay:
+            art = art.copy()
+            art.paste(self.overlay, (0, 0), self.overlay)
+
+        # If dimming is on, dim the image.
         if self.dimming is not None:
             # Wish there was some way to cache this.
             art = ImageEnhance.Brightness(art).enhance(self.dimming)
@@ -131,9 +148,16 @@ class FlashenDisplay(Display):
                     self.disp.set(x, y, pixel)
             self.disp.send()
 
+    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None) -> None:
+        with self.lock:
+            super().transition(old_artwork, new_artwork, trans)
+
     def refresh(self):
         with self.lock:
             self.disp.send()
+
+    def size(self) -> tuple[int, int]:
+        return self._size
 
 
 

@@ -27,49 +27,55 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import time
 import random
-from io import BytesIO
-from threading import Thread, Event
+import threading
+import time
 from datetime import datetime, timedelta
-
-from LMSTools import LMSServer
+from io import BytesIO
 from urllib.parse import urljoin
+
 import requests
+from icecream import ic
+from LMSTools import LMSServer
 from PIL import Image
 
-from icecream import ic
-
-from lmsdisplay import util, transitions, display
+from lmsdisplay import display, transitions, util
 
 ic.configureOutput(includeContext=True)
 
 BLANK = Image.new("RGB", (64, 64), color=(0, 0, 0))
 
-class ScreenSaver(Thread):
-    def __init__(self, server: LMSServer, display, display_time, frame_delay, adjustor: util.ImageAdjuster):
-        super().__init__()
-        ic("__INIT__", display_time, frame_delay)
-
-        self.server = server
+class ScreenSaver:
+    def __init__(self, display):
         self.display = display
         self.stopped = False
+        self.stop_event = threading.Event()
+
+    def stop(self):
+        ic()
+        self.stopped = True
+        self.stop_event.set()
+
+    def run(self):
+        pass
+
+class CoverFlowScreensaver(ScreenSaver):
+    def __init__(self, display, server, display_time, frame_delay, adjustor):
+        super().__init__(display)
         self.frame_delay = frame_delay
-        self.adjustor = adjustor
         self.pause_delta = timedelta(seconds=display_time)
         self.display_time = display_time
+        self.server = server
+        self.adjustor = adjustor
         self.last_img = BLANK
-        self.stop_event = Event()
-
-        # Make sure we shutdown if everything else does, rather than hanging around forever.
-        self.daemon = True
 
     def num_albums(self):
         resp = self.server.request(params="info total albums ?")
         return resp["_albums"]
 
     def album(self, number):
-        resp = self.server.request(params=["albums", number, 1, "tags:jlt"])
+        # TODO:: replace the 'j' with the appropriate LMSTags value
+        resp = self.server.request(params=["albums", number, 1, "tags:j"])
         return resp["albums_loop"][0]
 
     def random_album(self):
@@ -84,14 +90,11 @@ class ScreenSaver(Thread):
         img = Image.open(BytesIO(resp.content)) if resp.status_code == requests.codes["ok"] else None
         return img
 
-    def stop(self):
-        self.stopped = True
-        self.stop_event.set()
-
     def run(self):
-        ic()
+        self.stopped = False
         changetime = datetime.now()
         waittime = min(10.0, self.display_time)
+
         time.sleep(0.1)
 
         while not self.stopped:
@@ -107,26 +110,31 @@ class ScreenSaver(Thread):
                     continue
 
                 next_img = self.adjustor.adjustImage(art)
+                ic(self.display)
                 self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
                 changetime = datetime.now() + self.pause_delta
                 self.last_img = next_img
             else:
+                #self.send_art(self.last_img)
                 self.display.refresh()
 
             # now wait for appropriate time, unless we're woken up.
             self.stop_event.wait(timeout=waittime)
 
-        self.display.transition(self.last_img, None, transitions.TransitionTypes.PageTurn)
-
+        ic()
+        self.display.transition(self.last_img, BLANK, transitions.TransitionTypes.PageTurn)
+        ic("Done")
 
 
 if __name__ == "__main__":
     server = LMSServer()
-    display = display.FlashenDisplay("localhost", 1337, 64, 64, 0)
+    #display = display.FlashenDisplay("localhost", 1337, 64, 64, 0)
+    disp = display.FlashenDisplay([], 25, 0.05, "localhost", 1337, 64, 64, 0)
     adjustor = util.ImageAdjuster(1.0, 1.0, 64)
-    s = ScreenSaver(server, display, 15, 0.05, adjustor)
-    s.start()
+    s = CoverFlowScreensaver(disp, server, 5, 0.05, adjustor)
+    t = threading.Thread(target=s.run)
+    t.start()
     time.sleep(65)
     s.stop()
-    s.join()
+    t.join()
 
