@@ -35,9 +35,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import toml
-from LMSTools import server, player
+from LMSTools import player, server
 from PIL import Image, ImageEnhance, ImageOps
 from rich import print
+
 
 class PlayerNotFoundError(Exception):
     pass
@@ -62,28 +63,48 @@ def betweentimes(now, start, end):
         return start <= now <= end
     return now <= end or now >= start
 
+def next_time(when: datetime.time):
+    """
+    Calculate the next occurance of a time.
+
+    If the time is earlier in the day than now, add a day to it, so we can
+    have the time later.
+    No idea what happens around daylight savings time.   Probably close enough
+    for our purposes.
+    """
+    d = datetime.datetime.today()
+    if when <= d.time():
+        d += datetime.timedelta(days=1)
+    then = datetime.datetime.combine(d.date(), when)
+    return then
+
+
 def makedir(name: Path):
+    """ Create a directory, and error check along the way. """
     if not name.exists():
         name.mkdir()
     elif not name.is_dir():
         raise NotADirectoryError
 
 def loadtoml(file, defaults):
+    """ Load a toml file, with a list of default values. """
     values = defaults | toml.load(file)
     return SimpleNamespace(**values)
 
 def port_number(value):
+    """ Make sure an integer is a valid port number, ie between 0 65535. """
     try:
         ivalue = int(value)
     except ValueError:
         raise ArgumentTypeError(f"'{value}' is not a valid integer") from None
 
-    if ivalue not in range(0, 65535):
-        raise ArgumentTypeError(f"'{value}' is not a valid port number (0-65535)")
+    if not 1 <= ivalue <= 65535:
+        raise ArgumentTypeError(f"'{value}' is not a valid port number (1-65535)")
 
     return ivalue
 
 def get_player(servers, name):
+    """ Get a player by name, or reference, from all servers out there. """
     for srv in servers:
         s = server.LMSServer(srv.host, int(srv.port))
         if s:
@@ -92,6 +113,20 @@ def get_player(servers, name):
                 if name in (plr.ref ,plr.name):
                     return plr
     raise PlayerNotFoundError(name)
+
+def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
+    """ Figure out a contrasting color to the "dominant" color of an image. """
+    try:
+        # Get the averoge color of the current screen.
+        # Do this by resizing the picture to 1 pixel, and grabbing the color
+        small = art.resize((1, 1), resample=Image.Resampling.LANCZOS).convert("RGB")
+        r, g, b = small.getpixel((0, 0))
+        # Compute the contrasting color, based on the luma
+        luma = 0.299*r + 0.587*g + 0.114*b
+        color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
+    except:
+        color = (255, 255, 255, 200)
+    return color
 
 class ImageAdjuster:
     def __init__(self, contrast, color, size):
@@ -121,6 +156,7 @@ class ImageAdjuster:
         return img
 
 def get_internal_art(name: str) -> Image.Image:
+    """ Retrieve an art file from the current resource bundles. """
     path = importlib.resources.files("lmsdisplay").joinpath("art").joinpath(name)
     print(path)
     img = Image.open(str(path))
