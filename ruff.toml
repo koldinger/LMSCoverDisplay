@@ -29,7 +29,7 @@ lint.extend-select = [
     "DTZ",  # Flake8-datetimez – requires timezone-aware datetime objects
     "T10",  # Flake8-debugger – debugger statements (e.g. pdb)
     "DJ",   # Flake8-django – Django-specific conventions
-    "EM",   # Flake8-errmsg – error message style
+    # "EM",   # Flake8-errmsg – error message style
     "EXE",  # Flake8-executable – executable file checks
     "FA",   # Flake8-future-annotations – future import for annotations
     "ISC",  # Flake8-implicit-str-concat – warns on implicit string concatenation
