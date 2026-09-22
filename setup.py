@@ -12,6 +12,7 @@ def custom_local_scheme(version):
     if version.distance and version.distance > 0:
         #parts.append(f"+{version.node[1:9]}-{version.distance}")
         parts.append(f"+{version.distance}")
+        parts.append(f"-{version.node[1:13]}")
 
     # Append dirty flag if workspace has uncommitted changes
     if version.dirty:
@@ -25,5 +26,5 @@ setup(
     use_scm_version={
         "version_scheme": custom_version_scheme,
         "local_scheme": custom_local_scheme,
-    }
+    },
 )
