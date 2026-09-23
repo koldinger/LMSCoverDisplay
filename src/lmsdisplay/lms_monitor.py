@@ -29,39 +29,43 @@
 
 import functools
 import queue
-import re
 import threading
 import time
 from io import BytesIO
-from urllib.parse import unquote, urljoin
+from urllib.parse import unquote, urljoin, quote
 
 import requests
 from icecream import ic
 from PIL import Image
 from telnetlib3 import telnetlib
+from rich import print
 
 import LMSTools
 
-from . import events, util
-
-#from datetime import datetime
-# def time_format():
-#     now = datetime.now()
-#     return f'{now.strftime("%H:%M:%S")} --> '
+from . import events, util, discovery
 
 ic.configureOutput(includeContext=True)
-# ic.disable()
-
-IDPAT = re.compile(r" id:\s*(\d+)")
-PLAYPAT = re.compile(r" mode:\s*(\w+)")
-VOLPAT = re.compile(r" volume:\s*(\d+)")
 
 MAX_BACKOFF = 120
+
 
 def command_string(string, query=False):
     if query:
         string = string + " ?"
     return string + "\r\n"
+
+@functools.lru_cache(maxsize=128)
+def get_track_art(base_url: str, trackID: str, adjuster: util.ImageAdjuster):
+    """ Get the art for a track ID. """
+    url = urljoin(base_url, f"music/{trackID}/cover.jpg")
+    ic(url)
+    resp = requests.get(url, timeout=(5, 10))
+    if resp.status_code == requests.codes["ok"]:
+        img = Image.open(BytesIO(resp.content))
+    else:
+        img = util.get_internal_art("questionmark.jpg")
+
+    return adjuster.adjustImage(img)
 
 class MonitorEndedEvent:
     pass
@@ -76,49 +80,40 @@ class PlayerMonitor(threading.Thread):
         self.queue = queue
         self.login = login
         self.password = password
-        self.tn: telnetlib.Telnet | None = None
-        self.backoff = 1
-        self.closed = False
         self.adjuster = adjuster
 
+        self.backoff = 1
+        self.closed = False
+
         self.base_url = f"http://{player.server.host}:{player.server.port}"
+
+        self.artcache = util.LruCache(64)
+
+        self.tn: telnetlib.Telnet
+
         self.daemon = True
 
-    def getLine(self):
+    def get_line(self):
         try:
             line = self.tn.read_until(b"\n")
             if line:
-                line = unquote(line.strip())
-                return line
-
-            #ic("EOF")
+                return line.decode("utf-8").strip()
             raise EOFError
         except AttributeError as e:
             # This is where we end up when the telnet session has been closed by another
             # thread.   Doesn't quite seem right, but it's what happens.
             raise ConnectionError("Closed") from e
 
-    def sendLine(self, line):
+    def send_line(self, line):
         self.tn.write(bytes(line, "ascii"))
 
+    def get_track_art(self, trackid):
+        return get_track_art(self.base_url, trackid, self.adjuster)
 
     def clear_art_cache(self):
-        self.getArt.cache_clear()
+        get_track_art.cache_clear()
 
-    @functools.lru_cache(maxsize=128)
-    def getArt(self, trackID: str):
-        """ Get the art for a track ID. """
-        url = urljoin(self.base_url, f"music/{trackID}/cover.jpg")
-        ic(url)
-        resp = requests.get(url, timeout=(5, 10))
-        if resp.status_code == requests.codes["ok"]:
-            img = Image.open(BytesIO(resp.content))
-        else:
-            img = util.get_internal_art("questionmark.jpg")
-
-        return self.adjuster.adjustImage(img)
-
-    def getCurrentArt(self):
+    def get_current_art(self):
         """
         Get the art for the currently playing track.
 
@@ -133,38 +128,50 @@ class PlayerMonitor(threading.Thread):
 
         return self.adjuster.adjustImage(img)
 
-    def getCliPort(self):
+    def get_art(self, data) -> tuple[int, Image.Image]:
+        # Get the artwork
+        # First, gather some information about the track
+        trackid = data.get("id")
+        albumid = data.get("album_id")
+        coverart = data.get("coverart")
+        artid = (albumid, coverart)
+
+        # if we've got a trackid, and these other things, look it up in the caches.
+        if trackid:
+            # First check the artcache, which is indexed by album_id and coverart, the artid
+            art = self.artcache.get(artid) if albumid and coverart else None
+
+            # If not there, get it from the track cache
+            if not art:
+                art = self.get_track_art(trackid)
+                if albumid and coverart:
+                    self.artcache[artid] = art
+            trackid = int(trackid)
+        else:
+            # Otherwise, just go get the info the current track for this player
+            trackid = -1
+            art = self.get_current_art()
+        return (trackid, art)
+
+    def get_cli_port(self):
         """ Retrieve the CLI port number from the server.   Use the jsonrpc web interface. """
-        ic()
-        params = { "id": 1,
-                   "method": "slim.request",
-                   "params": ["-", ["pref", "plugin.cli:cliport", "?"]],
-                  }
-        ic(params)
-        headers = { "Content-Type": "application/json" }
-        ic(headers)
-        url = urljoin(self.base_url, "jsonrpc.js")
-        ic(url)
-        res = requests.post(url, json=params, headers=headers)
-        res.raise_for_status()
-        ic(res)
-        ic(res.text)
-        return int(res.json()["result"]["_p2"])
+        port = int(self.server.get_setting("plugin.cli:cliport"))
+        return port
 
     def run(self):
-        ic()
         while True:
-            ic()
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
                 # Get the CLI port
-                cli_port = self.getCliPort()
+                cli_port = self.get_cli_port()
                 ic(self.server.host, cli_port)
 
                 self.tn = telnetlib.Telnet(self.server.host, cli_port)
+
                 if self.login:
-                    self.sendLine(command_string(f"login {self.login} {self.password}"))
+                    self.send_line(command_string(f"login {self.login} {self.password}"))
+
                 self.backoff = 1            # Reset the backoff time
                 print(f"Connection complete with {self.server}")
             except Exception as e:
@@ -175,48 +182,32 @@ class PlayerMonitor(threading.Thread):
                 continue
 
             try:
-                # Try to get the player name for the player.
-                # This will return nothing until the player is recognized.
+                # Build the subscribe command, and send it.
+                # Adds a few extra tags in, for fun
+                subscribe_cmd = f"{self.player_id} status - 1 tags:ejl subscribe:10"
+                self.send_line(command_string(subscribe_cmd))
+                subscribe_quoted = quote(subscribe_cmd.strip(), safe=" ")
+
+                # Retrieve the lines from the 
                 while True:
-                    name_cmd = f"player name {self.player_id}"
-                    self.sendLine(command_string(name_cmd, True))
-                    line = self.getLine()
-                    if line != name_cmd:
-                        # if the returned line does not equal the command, it's got a name, indicatirng the player exists
-                        #
-                        break
-                    time.sleep(.5)
+                    # Get the line, and strip it down
+                    line = self.get_line()
 
-                
-                subscribe_cmd = command_string(f"{self.player_id} status - 1 subscribe:10")
+                    # Check to make user it's a valid line
+                    if not line.startswith(subscribe_quoted):
+                        print(f"Unexpected line: {line}")
+                        continue
 
-                self.sendLine(subscribe_cmd)
+                    # Remove the command, and any extra spaces.
+                    line = line.removeprefix(subscribe_quoted).lstrip()
 
-                while True:
-                    line = self.getLine()
-                    # TODO: Check if we're the status command.
-                    #if not line.startswith(subscribe_cmd):
-                        #print(f"Unexpected line: {line}")
-                        #continue
+                    # Make a dictionary
+                    data = dict([unquote(x).split(":", 1) for x in line.split(" ")])
+                    ic(data)
 
-                    playmatch = PLAYPAT.search(line)
-                    idmatch = IDPAT.search(line)
-                    volmatch = VOLPAT.search(line)
+                    trackid, art = self.get_art(data)
 
-                    play = playmatch.group(1) if playmatch else None
-                    song_id = idmatch.group(1) if idmatch else None
-                    volume = volmatch.group(1) if volmatch else None
-
-                    playtype = events.EventType(play.lower())
-
-                    if song_id:
-                        trackid = song_id
-                        art = self.getArt(int(trackid))
-                    else:
-                        trackid = None
-                        art = self.getCurrentArt()
-
-                    p = events.PlayEvent(playtype, trackid, volume, art)
+                    p = events.PlayEvent(events.EventType(data["mode"]), trackid, int(data["mixer volume"]), art)
                     self.queue.put(p)
 
             except (EOFError, ConnectionResetError) as e:
@@ -238,10 +229,12 @@ class PlayerMonitor(threading.Thread):
 
 if __name__ == "__main__":
     q = queue.Queue()
-    mon = PlayerMonitor("d8:3a:dd:55:b2:c9", "localhost", q)
+    servers = discovery.discover_lms()
+    plr = util.get_player(servers, "d8:3a:dd:55:b2:c9")
+    mon = PlayerMonitor(plr, q, util.ImageAdjuster(1.0, 1.0, 64))
     mon.start()
 
-    for _ in range(5):
+    for _ in range(20):
         thing = q.get()
         print(thing)
 
