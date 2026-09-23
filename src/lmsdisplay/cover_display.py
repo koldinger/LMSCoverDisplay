@@ -165,11 +165,9 @@ def check_player(display):
     rd = RotatingDisplay(display, [(qr, 10), (logo, 5)])
 
     while True:
-        print(config.player)
         with contextlib.suppress(util.PlayerNotFoundError):
             servers = discovery.discover_lms()
             if servers and config.player:
-                print(config.player)
                 player = util.get_player(servers, config.player)
                 if player:
                     return
@@ -187,6 +185,7 @@ def process_cmdline():
     parser.add_argument("--check-conn", action=argparse.BooleanOptionalAction, default=True, help="Check the connection")
     parser.add_argument("--check-player", action=argparse.BooleanOptionalAction, default=True, help="Check the player configuration")
     parser.add_argument("--watch-config", action=argparse.BooleanOptionalAction, default=True, help="Automatically watch the config file for changes")
+    parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=False, help="Enable icecream debugging messages")
     parser.add_argument("--version", "-v", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -206,6 +205,8 @@ def main():
     global args, config, monitor
     print(f"Running.   Version: {__version__}")
     args, config = process_cmdline()
+    if not args.debug:
+        ic.disable()
     console = Console()
 
     signal.signal(signal.SIGHUP, handle_signal)
