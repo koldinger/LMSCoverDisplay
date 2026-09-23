@@ -180,7 +180,6 @@ class LruCache(OrderedDict):
 def get_internal_art(name: str) -> Image.Image:
     """ Retrieve an art file from the current resource bundles. """
     path = importlib.resources.files("lmsdisplay").joinpath("art").joinpath(name)
-    print(path)
     img = Image.open(str(path))
 
     return img
