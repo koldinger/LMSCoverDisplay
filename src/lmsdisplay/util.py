@@ -33,9 +33,10 @@ from argparse import ArgumentTypeError
 from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
+from collections import OrderedDict
 
 import toml
-from LMSTools import player, server
+from LMSTools import server
 from PIL import Image, ImageEnhance, ImageOps
 from rich import print
 
@@ -154,6 +155,27 @@ class ImageAdjuster:
             img = ImageEnhance.Color(img).enhance(self.color)
 
         return img
+
+class LruCache(OrderedDict):
+    def __init__(self, maxsize):
+        super().__init__()
+        self.maxsize = maxsize
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.move_to_end(key)
+        if len(self) > self.maxsize:
+            self.popitem(last=False)
+
+    def __getitem__(self, key):
+        self.move_to_end(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if key in self:
+            return self[key]
+        return default
+
 
 def get_internal_art(name: str) -> Image.Image:
     """ Retrieve an art file from the current resource bundles. """
