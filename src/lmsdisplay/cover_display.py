@@ -67,7 +67,6 @@ event_q = Queue()
 TIMEOUT_DEF = 20    # 20 second timeout.   Screen should flush at 30
 
 def handle_signal(_signum, _frame):
-    ic()
     reload_config()
 
 def reload_config():
@@ -203,8 +202,8 @@ def init_display():
 
 def main():
     global args, config, monitor
-    print(f"Running.   Version: {__version__}")
     args, config = process_cmdline()
+    print(f"Running.   Version: {__version__}")
     if not args.debug:
         ic.disable()
     console = Console()

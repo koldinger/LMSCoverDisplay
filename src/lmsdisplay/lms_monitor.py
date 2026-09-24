@@ -89,7 +89,7 @@ class PlayerMonitor(threading.Thread):
 
         self.artcache = util.LruCache(64)
 
-        self.tn: telnetlib.Telnet
+        self.tn: telnetlib.Telnet | None = None
 
         self.daemon = True
 
@@ -159,7 +159,7 @@ class PlayerMonitor(threading.Thread):
         return port
 
     def run(self):
-        while True:
+        while not self.closed:
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
@@ -173,7 +173,7 @@ class PlayerMonitor(threading.Thread):
                     self.send_line(command_string(f"login {self.login} {self.password}"))
 
                 self.backoff = 1            # Reset the backoff time
-                print(f"Connection complete with {self.server}")
+                print(f"Connection complete with {self.server.host}")
             except Exception as e:
                 print(e)
                 print(f"Could not make connection.  Backing off for {self.backoff} seconds")
@@ -188,8 +188,8 @@ class PlayerMonitor(threading.Thread):
                 self.send_line(command_string(subscribe_cmd))
                 subscribe_quoted = quote(subscribe_cmd.strip(), safe=" ")
 
-                # Retrieve the lines from the 
-                while True:
+                # Receive the status lines from the server, parse them, and do the stuff
+                while not self.closed:
                     # Get the line, and strip it down
                     line = self.get_line()
 
@@ -203,11 +203,12 @@ class PlayerMonitor(threading.Thread):
 
                     # Make a dictionary
                     data = dict([unquote(x).split(":", 1) for x in line.split(" ")])
-                    ic(data)
+                    # ic(data)
 
                     trackid, art = self.get_art(data)
 
                     p = events.PlayEvent(events.EventType(data["mode"]), trackid, int(data["mixer volume"]), art)
+                    ic(p)
                     self.queue.put(p)
 
             except (EOFError, ConnectionResetError) as e:
@@ -217,10 +218,8 @@ class PlayerMonitor(threading.Thread):
                 # self.queue.put(MonitorEndedEvent)
                 print(f"Other connection error: {e}")
 
-            if self.closed:
-                return
-
     def close(self):
+        ic()
         self.closed = True
         if self.tn:
             self.tn.close()

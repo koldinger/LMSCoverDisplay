@@ -120,10 +120,11 @@ class CoverFlowScreensaver(ScreenSaver):
 
             # now wait for appropriate time, unless we're woken up.
             self.stop_event.wait(timeout=waittime)
+            self.stop_event.clear()
 
         ic()
         self.display.transition(self.last_img, BLANK, transitions.TransitionTypes.PageTurn)
-        ic("Done")
+        ic("Screensaver Done")
 
 
 if __name__ == "__main__":
