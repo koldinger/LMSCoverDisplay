@@ -122,7 +122,7 @@ def initI2C():
         pin.pull = Pull.UP
         #ic(pin, pin._pin)
         button = Button(pin, long_duration_ms=500)
-        print(button.value)
+        # print(button.value)
         pins.append(pin)
         buttons[pin] = button
 
