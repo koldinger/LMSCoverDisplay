@@ -193,23 +193,25 @@ class PlayerMonitor(threading.Thread):
                     # Get the line, and strip it down
                     line = self.get_line()
 
-                    # Check to make user it's a valid line
-                    if not line.startswith(subscribe_quoted):
-                        print(f"Unexpected line: {line}")
-                        continue
+                    try:
+                        # Check to make user it's a valid line
+                        if not line.startswith(subscribe_quoted):
+                            print(f"Unexpected line: {line}")
+                            continue
 
-                    # Remove the command, and any extra spaces.
-                    line = line.removeprefix(subscribe_quoted).lstrip()
+                        # Remove the command, and any extra spaces.
+                        line = line.removeprefix(subscribe_quoted).lstrip()
 
-                    # Make a dictionary
-                    data = dict([unquote(x).split(":", 1) for x in line.split(" ")])
-                    # ic(data)
+                        # Make a dictionary
+                        data = dict([unquote(x).split(":", 1) for x in line.split(" ")])
+                        # ic(data)
 
-                    trackid, art = self.get_art(data)
+                        trackid, art = self.get_art(data)
 
-                    p = events.PlayEvent(events.EventType(data["mode"]), trackid, int(data["mixer volume"]), art)
-                    ic(p)
-                    self.queue.put(p)
+                        p = events.PlayEvent(events.EventType(data["mode"]), trackid, int(data["mixer volume"]), art)
+                        self.queue.put(p)
+                    except ValueError as e:
+                        print(f"Problem with {line}: {e}")
 
             except (EOFError, ConnectionResetError) as e:
                 # self.queue.put(MonitorEndedEvent)
@@ -217,6 +219,9 @@ class PlayerMonitor(threading.Thread):
             except ConnectionError as e:
                 # self.queue.put(MonitorEndedEvent)
                 print(f"Other connection error: {e}")
+            finally:
+                self.close()
+
 
     def close(self):
         ic()
