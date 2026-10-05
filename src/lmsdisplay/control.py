@@ -35,6 +35,7 @@ import os
 import signal
 import socket
 import subprocess
+from sys import meta_path
 import threading
 import time
 from pathlib import Path
@@ -195,6 +196,17 @@ def reset_networking():
 
     # This is sort of unnecessary, as the client is probably connected to new network, and this has failed.
     return "Reset"
+
+@app.route("/check_updates", methods=["POST"])
+def check_updates():
+    print(request)
+    # updates = []
+    return { "updates": [] }
+
+@app.route("/update_now", methods=["POST"])
+def update_now():
+    print(request)
+    return "Update not yet implemented", 501
 
 
 @app.route("/favicon.ico")
