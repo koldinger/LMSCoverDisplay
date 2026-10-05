@@ -48,4 +48,7 @@ defaults = {
     "disable_screensaver_dimmed": True,
     "screensaver_delay": 30,
     "display_time": 80,
+    "driver": "internal",
+    "gpio_slowdown": 2,
+    "max_framerate": 120,
 }
