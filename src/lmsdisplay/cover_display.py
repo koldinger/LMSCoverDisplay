@@ -197,8 +197,13 @@ def process_cmdline():
 def init_display():
     x = y = config.image_size
     trans_list = [transitions.TransitionTypes(x) for x in config.transitions]
-    return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
-
+    match config.driver:
+        case "flaschen":
+            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
+        case "internal":
+            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, x, y, config.orientation, config.gpio_slowdown, config.max_framerate)
+        case _:
+            raise ValueError(config.driver)
 
 def main():
     global args, config, monitor

@@ -32,15 +32,32 @@ from threading import Thread, RLock
 import time
 from typing import Optional
 
+#import RGBMatrixEmulator as rgbmatrix
 from PIL import Image, ImageEnhance
 
-from . import flaschen, screensaver, transitions
+from . import screensaver, transitions
 
 from icecream import ic
+try:
+    import flaschen
+    HAS_FLASHCEN = True
+except ModuleNotFoundError:
+    HAS_FLASHCEN = False
+
+try:
+    import rgbmatrix
+    HAS_RGBMATRIX = True
+except ModuleNotFoundError:
+    HAS_RGBMATRIX = False
 
 # --------------------------------------------------------------------------
 # Display interface - subclass this to drive real hardware/UI
 # --------------------------------------------------------------------------
+
+ic(HAS_RGBMATRIX, HAS_FLASHCEN)
+
+if not any([HAS_FLASHCEN, HAS_RGBMATRIX]):
+    raise Exception("No display driver available")
 
 class Display:
     """
@@ -85,7 +102,8 @@ class Display:
 
     def start_screensaver(self, saver):
         self.saver = saver
-        self.saver_thread = Thread(target=self.saver.run)
+        self.saver_thread = Thread(target=self.saver.run, daemon=True)
+        self.saver_thread.daemon = True
         self.saver_thread.start()
 
     def stop_screensaver(self) -> None:
@@ -110,19 +128,7 @@ class Display:
     def undim(self) -> None:
         self.dimming = None
 
-class FlashenDisplay(Display):
-    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
-        super().__init__(translist, frames, frame_delay)
-        self.disp = flaschen.Flaschen(host, port, xsize, ysize)
-        self.orientation = orientation
-
-        self._size = (xsize, ysize)
-        self.blank = Image.new("RGB", self._size)
-        self.lock = RLock()
-
-    def show_artwork(self, art: Optional[Image.Image]) -> None:
-        """ Send art to the flashchen-taschen display, over the network. """
-        #ic(art)
+    def _prepare_artwork(self, art):
         if not art:
             art = self.blank
 
@@ -140,10 +146,30 @@ class FlashenDisplay(Display):
             # Wish there was some way to cache this.
             art = ImageEnhance.Brightness(art).enhance(self.dimming)
 
-        px = art.load()
+        return art
+
+class FlashenDisplay(Display):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
+        super().__init__(translist, frames, frame_delay)
+        if not HAS_FLASHCEN:
+            raise ImportError("Flaschen-Taschen driver not installed.")
+        self.disp = flaschen.Flaschen(host, port, xsize, ysize)
+        self.orientation = orientation
+
+        self._size = (xsize, ysize)
+        self.blank = Image.new("RGB", self._size)
+        self.lock = RLock()
+
+    def show_artwork(self, artwork: Optional[Image.Image]) -> None:
+        """ Send art to the flashchen-taschen display, over the network. """
+        #ic(art)
+
+        artwork = self._prepare_artwork(artwork)
+
+        px = artwork.load()
         with self.lock:
-            for x in range(art.width):
-                for y in range(art.height):
+            for x in range(artwork.width):
+                for y in range(artwork.height):
                     pixel = tuple(px[x, y])
                     self.disp.set(x, y, pixel)
             self.disp.send()
@@ -161,31 +187,44 @@ class FlashenDisplay(Display):
 
 
 
-# ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
-# ADAFRUIT_HAT = "adafruit-hat"
-# DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
-#
-# class InternalDisplay:
-#     def __init__(self, xsize: int, ysize: int, gpio_slowdown: int, max_refresh: int):
-#         options = RgbMatrixDriver.RGBMatrixOptions()
-#         options.cols = xsize
-#         options.rows = ysize
-#         options.chain_length = 1
-#         options.parallel = 1
-#         options.brightness = 100
-#         options.gpio_slowdown = gpio_slowdown
-#         options.hardware_mapping = DEFAULT_HARDWARE
-#         options.pwm_bits = 11
-#         options.limit_refresh_rate_hz = max_refresh
-#         options.disable_hardware_pulsing = False
-#
-#         self.options = options                      # Oh why not
-#         self.matrix = RgbMatrixDriver.RGBMatrix(options=options)
-#         self.canvas = self.matrix.CreateFrameCanvas()
-#
-#     def send_image(self, art: Image.Image) -> None:
-#         self.canvas.SetImage(art.convert("RGB"))
-#         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-#
-#     def clear(self) -> None:
-#         self.matrix.Clear()
+ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
+ADAFRUIT_HAT = "adafruit-hat"
+DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
+
+class InternalDisplay(Display):
+    # def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, xsize: int, ysize: int, orientation: int, gpio_slowdown: int, max_refresh: int):
+        super().__init__(translist, frames, frame_delay)
+        if not HAS_RGBMATRIX:
+            raise ImportError("RGB Matix Driver not installed.")
+        options = rgbmatrix.RGBMatrixOptions()
+        options.cols = xsize
+        options.rows = ysize
+        options.chain_length = 1
+        options.parallel = 1
+        options.brightness = 100
+        options.gpio_slowdown = gpio_slowdown
+        options.hardware_mapping = DEFAULT_HARDWARE
+        options.pwm_bits = 11
+        options.limit_refresh_rate_hz = max_refresh
+        options.disable_hardware_pulsing = False
+
+        self.options = options                      # Oh why not
+        self.matrix = rgbmatrix.RGBMatrix(options=options)
+        self.canvas = self.matrix.CreateFrameCanvas()
+
+        self.orientation = orientation
+        self._size = (xsize, ysize)
+
+        self.blank = Image.new("RGB", self._size)
+
+
+    def show_artwork(self, artwork: Optional[Image.Image]) -> None:
+        """ Send art to the display. """
+        artwork = self._prepare_artwork(artwork)
+
+        self.canvas.SetImage(artwork.convert("RGB"))
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def clear(self) -> None:
+        self.matrix.Clear()
