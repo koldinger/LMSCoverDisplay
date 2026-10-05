@@ -88,3 +88,6 @@ Once you're connected, it should show another QR code to go to a configuration p
 
 Go to this webpage, and configure the platform.   Be sure to select a player to watch, and any options you might like.
 If you are using the Flaschen-Taschen server, be sure to select the Flaschen driver under the advanced options button.
+
+----- Note:
+On the configuration page, the Update button does not yet work.   Next release, I hope.
