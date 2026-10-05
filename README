@@ -21,19 +21,35 @@ Hardware Preparation:
 Prepare the matrix bonnet per instructions here: https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/matrix-setup
 Use both the "Configure for 64x64 matrix" (short Jumper E to pin 8), and "Configure for Quality/Convienenc" (connect a wire from Pin 4 to pin 18)
 
-Gather the software:
-Get the Flaschen Taschen server code.   This is an RGB driver that listens on UDP port 1337 and displays what it receives on the display.
+A note on display drivers.
+  LMSDisplay supports running the display thorugh either the rgb-matrix-driver or a flasch-taschen server.   The former
+  is preferred, but it cannot be built on the Pi Zero 2W.   It seems to run out of memory during the build process, and crashes 
+  the system.   You can build it on a larger system, for example a Raspberry PI 4 or 5, you just need to make sure 
+  you are running the same OS on each, at the point in time where I wrote this, I was using a 64 bit version of Raspbian Trixie.
+
+  If you don't have access to another machine, you can use the Flaschen-Taschen driver.   This will build on a Raspberry PI 2.   flaschen-taschen
+  is a network server that sits on UDP port 1337, and displays images sent to it.
+
+Building the Flaschen-Taschen server:
   - git clone https://github.com/hzeller/flaschen-taschen
+  - pip install flaschen-taschen/api/python
   - cd flaschen-taschen/server
   - make FT_BACKEND=rgb-matrix
+  - sudo cp ft-server /usr/local/bin
 
-I hope to switch to using the normal driver, but it doesn't build directly on a Pi Zero 2w.  Appears to run out of memory and crash the Pi.
+Building the rpi rgb-matrix-driver
+  On a more powerful machine, running the same OS as the Pi Zero 2W, execute the following command.
+    pip wheel git+https://github.com/hzeller/rpi-rgb-led-matrix
+  This will generate a file with a name like:
+    rgbmatrix-0.0.1+20260125-cp313-cp313-linux_aarch64.whl
+  Copy this file to the Pi Zero 2w and install it there
+    - sudo pip install rgbmatrix-0.0.1+20260125-cp313-cp313-linux_aarch64.whl
 
+Gather the software:
 Get the following github projects:
   - https://github.com/koldinger/LMSCoverDisplay/release/latest
   - https://github.com/koldinger/LMSTools/release/latest
   - https://github.com/koldinger/WifiSelect/release/latest
-  You can just download the Zip file, and unzip it on your build machine.   
 
 I like to build them into wheels, and install from them.  Personally, I use "uv", but your favorite way will work.   For example:
   - git clone https://github.com/koldinger/LMSCoverDisplay
@@ -57,5 +73,18 @@ XXXX will probably be different for each wheel.
 
 Once this is done, you should be able to reboot.
 
-After a bit, the display should show a QR code for the config web page.
-Scan, and configure, and run.
+If you plan on using the flaschen-taschen server, enable the ft-server service
+  - sudo systemctl enable ft-server.service
+
+---- Running
+When everything is installed, you can reboot the box, and the service should just come up.
+
+At first, if your display server is not connected to a wifi network, it will show a QRCode.  Scan the QR code
+and it will take you to a wifi hotspot you can use to select the wifinetwork that your LMS server is on.
+
+Once you're connected, it should show another QR code to go to a configuration page.    The page is on port
+5000 on your box, so it should have a URL like:
+  http://<ip address of your display>:500
+
+Go to this webpage, and configure the platform.   Be sure to select a player to watch, and any options you might like.
+If you are using the Flaschen-Taschen server, be sure to select the Flaschen driver under the advanced options button.
