@@ -201,7 +201,7 @@ def init_display():
         case "flaschen":
             return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
         case "internal":
-            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, x, y, config.orientation, config.gpio_slowdown, config.max_framerate)
+            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, x, y, config.orientation, config.gpio_slowdown, config.max_framerate, config.brightness)
         case _:
             raise ValueError(config.driver)
 

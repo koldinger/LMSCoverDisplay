@@ -527,11 +527,23 @@
                  value="{{ presets.max_framerate | default(120) }}">
           <div class="field-hint" id="max-framerate-hint">Frames per second. A positive integer.</div>
         </div>
-        <div class="field-block" style="margin:0">
+        <div class="slider-block" style="margin:0">
           <div class="section-label">GPIO slowdown</div>
-          <input class="field-input" type="number" id="gpio-slowdown" min="0" step="1"
-                 value="{{ presets.gpio_slowdown | default(2) }}">
-          <div class="field-hint" id="gpio-slowdown-hint">GPIO timing slowdown factor. A non-negative integer.</div>
+          <div class="slider-row">
+            <input type="range" id="gpio-slowdown" min="0" max="5" step="1"
+                   value="{{ presets.gpio_slowdown | default(2) }}">
+            <span class="slider-val" id="gpio-slowdown-val">{{ presets.gpio_slowdown | default(2) }}</span>
+          </div>
+          <div class="range-ends"><span>0</span><span>5</span></div>
+        </div>
+        <div class="slider-block" style="margin:0">
+          <div class="section-label">LED brightness</div>
+          <div class="slider-row">
+            <input type="range" id="led-brightness" min="0" max="100" step="1"
+                   value="{{ presets.led_brightness | default(75) }}">
+            <span class="slider-val" id="led-brightness-val">{{ presets.led_brightness | default(75) }}%</span>
+          </div>
+          <div class="range-ends"><span>0%</span><span>100%</span></div>
         </div>
       </div>
 
@@ -583,12 +595,14 @@
       <i class="ti ti-refresh" aria-hidden="true"></i> Reset configuration
     </button>
   </div>
+  {# ── Check for updates row (temporarily disabled) ─────────────────────────
   <div class="updates-row">
     <button class="btn-check-updates" id="btn-check-updates">
       <i class="ti ti-cloud-download" aria-hidden="true"></i> Check for updates
     </button>
     <span class="updates-status" id="updates-status"></span>
   </div>
+  ── end disabled ─────────────────────────────────────────────────────────── #}
   <div class="net-reset-row">
     <button class="btn-net-reset" id="btn-net-reset">
       <i class="ti ti-wifi-off" aria-hidden="true"></i> Reset networking
@@ -817,6 +831,7 @@ function collectFormData() {
     driver:                      document.getElementById('driver').value,
     max_framerate:               parseInt(document.getElementById('max-framerate').value, 10),
     gpio_slowdown:               parseInt(document.getElementById('gpio-slowdown').value, 10),
+    led_brightness:              parseInt(document.getElementById('led-brightness').value, 10),
   };
 }
 
@@ -1023,7 +1038,15 @@ function updateDriverSub() {
 driverSelect.addEventListener("change", updateDriverSub);
 updateDriverSub();
 
-// ── Check for updates ──────────────────────────────────────────────────────
+// ── Internal driver slider wirers ───────────────────────────────────────────
+document.getElementById("gpio-slowdown").addEventListener("input", () => {
+  document.getElementById("gpio-slowdown-val").textContent = document.getElementById("gpio-slowdown").value;
+});
+document.getElementById("led-brightness").addEventListener("input", () => {
+  document.getElementById("led-brightness-val").textContent = document.getElementById("led-brightness").value + "%";
+});
+
+/* ── Check for updates (temporarily disabled) ──────────────────────────────
 const updatesModal = document.getElementById("updates-modal");
 
 function openUpdatesModal(updates) {
@@ -1103,6 +1126,7 @@ document.getElementById("updates-modal-confirm").addEventListener("click", async
     btn.innerHTML = '<i class="ti ti-download" aria-hidden="true"></i> Update now';
   }
 });
+── end disabled ─────────────────────────────────────────────────────────── */
 
 function showStatus(msg, type) {
   const el = document.getElementById('save-status');

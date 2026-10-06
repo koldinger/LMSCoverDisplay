@@ -32,7 +32,6 @@ from threading import Thread, RLock
 import time
 from typing import Optional
 
-#import RGBMatrixEmulator as rgbmatrix
 from PIL import Image, ImageEnhance
 
 from . import screensaver, transitions
@@ -45,7 +44,8 @@ except ModuleNotFoundError:
     HAS_FLASHCEN = False
 
 try:
-    import rgbmatrix
+    #import rgbmatrix
+    import RGBMatrixEmulator as rgbmatrix
     HAS_RGBMATRIX = True
 except ModuleNotFoundError:
     HAS_RGBMATRIX = False
@@ -53,8 +53,6 @@ except ModuleNotFoundError:
 # --------------------------------------------------------------------------
 # Display interface - subclass this to drive real hardware/UI
 # --------------------------------------------------------------------------
-
-ic(HAS_RGBMATRIX, HAS_FLASHCEN)
 
 if not any([HAS_FLASHCEN, HAS_RGBMATRIX]):
     raise Exception("No display driver available")
@@ -193,7 +191,7 @@ DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
 
 class InternalDisplay(Display):
     # def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
-    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, xsize: int, ysize: int, orientation: int, gpio_slowdown: int, max_refresh: int):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, xsize: int, ysize: int, orientation: int, gpio_slowdown: int, max_refresh: int, brightness: int):
         super().__init__(translist, frames, frame_delay)
         if not HAS_RGBMATRIX:
             raise ImportError("RGB Matix Driver not installed.")
@@ -202,7 +200,7 @@ class InternalDisplay(Display):
         options.rows = ysize
         options.chain_length = 1
         options.parallel = 1
-        options.brightness = 100
+        options.brightness = brightness
         options.gpio_slowdown = gpio_slowdown
         options.hardware_mapping = DEFAULT_HARDWARE
         options.pwm_bits = 11

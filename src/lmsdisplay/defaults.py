@@ -51,4 +51,5 @@ defaults = {
     "driver": "internal",
     "gpio_slowdown": 2,
     "max_framerate": 120,
+    "brightness": 75,
 }
