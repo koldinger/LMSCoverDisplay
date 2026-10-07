@@ -44,8 +44,8 @@ except ModuleNotFoundError:
     HAS_FLASHCEN = False
 
 try:
-    #import rgbmatrix
-    import RGBMatrixEmulator as rgbmatrix
+    import rgbmatrix
+    #import RGBMatrixEmulator as rgbmatrix
     HAS_RGBMATRIX = True
 except ModuleNotFoundError:
     HAS_RGBMATRIX = False
