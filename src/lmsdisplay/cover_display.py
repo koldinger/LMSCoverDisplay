@@ -244,7 +244,7 @@ def main():
                 console.print_exception()
                 print(f"Backing off for {backoff}")
                 time.sleep(backoff)
-                backoff = min(backoff * 2, 120)
+                backoff = min(backoff * 2, 30)
 
 
 if __name__ == "__main__":

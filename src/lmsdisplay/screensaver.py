@@ -92,6 +92,7 @@ class CoverFlowScreensaver(ScreenSaver):
 
     def run(self):
         self.stopped = False
+        ic("Screensaver Starting")
         changetime = datetime.now()
         waittime = min(10.0, self.display_time)
 
@@ -104,13 +105,13 @@ class CoverFlowScreensaver(ScreenSaver):
             if now >= changetime:
                 album = self.random_album()
                 track_id = album["artwork_track_id"]
+                ic(album)
                 art = self.get_art(track_id)
                 if not art:
                     ic("No art")
                     continue
 
                 next_img = self.adjustor.adjustImage(art)
-                ic(self.display)
                 self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
                 changetime = datetime.now() + self.pause_delta
                 self.last_img = next_img
