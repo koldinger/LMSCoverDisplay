@@ -31,6 +31,7 @@ import random
 from threading import Thread, RLock
 import time
 from typing import Optional
+from types import SimpleNamespace
 
 from PIL import Image, ImageEnhance
 
@@ -147,14 +148,14 @@ class Display:
         return art
 
 class FlashenDisplay(Display):
-    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
         super().__init__(translist, frames, frame_delay)
         if not HAS_FLASHCEN:
             raise ImportError("Flaschen-Taschen driver not installed.")
-        self.disp = flaschen.Flaschen(host, port, xsize, ysize)
+        self.disp = flaschen.Flaschen(driver_config.host, driver_config.port, size[0], size[1])
         self.orientation = orientation
 
-        self._size = (xsize, ysize)
+        self._size = size
         self.blank = Image.new("RGB", self._size)
         self.lock = RLock()
 
@@ -185,26 +186,22 @@ class FlashenDisplay(Display):
 
 
 
-ADAFRUIT_HAT_PWM = "adafruit-hat-pwm"
-ADAFRUIT_HAT = "adafruit-hat"
-DEFAULT_HARDWARE = ADAFRUIT_HAT_PWM
-
 class InternalDisplay(Display):
     # def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
-    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, xsize: int, ysize: int, orientation: int, gpio_slowdown: int, max_refresh: int, brightness: int):
+    def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
         super().__init__(translist, frames, frame_delay)
         if not HAS_RGBMATRIX:
             raise ImportError("RGB Matix Driver not installed.")
         options = rgbmatrix.RGBMatrixOptions()
-        options.cols = xsize
-        options.rows = ysize
+        options.cols = size[0]
+        options.rows = size[1]
         options.chain_length = 1
         options.parallel = 1
-        options.brightness = brightness
-        options.gpio_slowdown = gpio_slowdown
-        options.hardware_mapping = DEFAULT_HARDWARE
+        options.brightness = driver_config.led_brightness
+        options.gpio_slowdown = driver_config.gpio_slowdown
+        options.hardware_mapping = driver_config.hw_mapping
         options.pwm_bits = 11
-        options.limit_refresh_rate_hz = max_refresh
+        options.limit_refresh_rate_hz = driver_config.max_framerate
         options.disable_hardware_pulsing = False
 
         self.options = options                      # Oh why not
@@ -212,7 +209,7 @@ class InternalDisplay(Display):
         self.canvas = self.matrix.CreateFrameCanvas()
 
         self.orientation = orientation
-        self._size = (xsize, ysize)
+        self._size = size
 
         self.blank = Image.new("RGB", self._size)
 

@@ -37,6 +37,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from queue import Queue
+from types import SimpleNamespace
 from typing import Optional
 
 import nmcli
@@ -196,12 +197,14 @@ def process_cmdline():
 
 def init_display():
     x = y = config.image_size
+    size = (x, y)
     trans_list = [transitions.TransitionTypes(x) for x in config.transitions]
-    match config.driver:
+    match config.drivers.get("driver"):
         case "flaschen":
-            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, config.display_host, config.display_port, x, y, config.orientation)
+            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, SimpleNamespace(**config.drivers["flaschen"]))
         case "internal":
-            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, x, y, config.orientation, config.gpio_slowdown, config.max_framerate, config.brightness)
+            print(config.drivers["internal"])
+            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, SimpleNamespace(**config.drivers["internal"]))
         case _:
             raise ValueError(config.driver)
 

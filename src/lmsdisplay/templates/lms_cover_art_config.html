@@ -23,13 +23,14 @@
                     "dimmed_brightness"         : float (0.0–1.0, default 0.2)
                     "hostname"                  : str   (default "")
 
-                    "display_host"              : str   (default "localhost")
-                    "display_port"              : int   (1–65535, default 1337)
                     "orientation"               : int   (0, 90, 180, or 270, default 0)
                     "image_size"                : int   (positive integer, default 64)
-                    "driver"                    : str   ("flaschen" | "internal", default "flaschen")
-                    "max_framerate"             : int   (positive integer, default 120)
-                    "gpio_slowdown"             : int   (positive integer, default 2)
+                    "drivers"                   : dict  {
+                        "driver"                : str   ("flaschen" | "internal", default "flaschen")
+                        "flaschen"              : dict  { "display_host": str, "display_port": int }
+                        "internal"              : dict  { "max_framerate": int, "gpio_slowdown": int,
+                                                          "led_brightness": int, "hw_mapping": str }
+                    }
                   }
 #}
 <!DOCTYPE html>
@@ -195,7 +196,7 @@
   .btn-advanced i.arrow { transition: transform 0.25s; }
   .btn-advanced.open i.arrow { transform: rotate(180deg); }
   .advanced-section { overflow: hidden; max-height: 0; transition: max-height 0.35s ease, opacity 0.3s ease; opacity: 0; }
-  .advanced-section.open { max-height: 600px; opacity: 1; }
+  .advanced-section.open { max-height: 2000px; opacity: 1; }
   .advanced-inner { padding-top: 1.5rem; }
   .advanced-heading { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
 
@@ -510,8 +511,8 @@
         <div class="select-wrap">
           <i class="ti ti-cpu icon-left" aria-hidden="true"></i>
           <select class="field-input" id="driver" style="padding-left:36px">
-            <option value="flaschen"{% if (presets.driver | default("flaschen")) == "flaschen" %} selected{% endif %}>Flaschen</option>
-            <option value="internal"{% if (presets.driver | default("flaschen")) == "internal" %} selected{% endif %}>Internal</option>
+            <option value="flaschen"{% if (presets.drivers.driver | default("flaschen")) == "flaschen" %} selected{% endif %}>Flaschen</option>
+            <option value="internal"{% if (presets.drivers.driver | default("flaschen")) == "internal" %} selected{% endif %}>Internal</option>
           </select>
           <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
         </div>
@@ -524,24 +525,36 @@
         <div class="field-block" style="margin:0">
           <div class="section-label">Maximum framerate</div>
           <input class="field-input" type="number" id="max-framerate" min="1" step="1"
-                 value="{{ presets.max_framerate | default(120) }}">
+                 value="{{ presets.drivers.internal.max_framerate | default(120) }}">
           <div class="field-hint" id="max-framerate-hint">Frames per second. A positive integer.</div>
         </div>
         <div class="slider-block" style="margin:0">
           <div class="section-label">GPIO slowdown</div>
           <div class="slider-row">
             <input type="range" id="gpio-slowdown" min="0" max="5" step="1"
-                   value="{{ presets.gpio_slowdown | default(2) }}">
-            <span class="slider-val" id="gpio-slowdown-val">{{ presets.gpio_slowdown | default(2) }}</span>
+                   value="{{ presets.drivers.internal.gpio_slowdown | default(2) }}">
+            <span class="slider-val" id="gpio-slowdown-val">{{ presets.drivers.internal.gpio_slowdown | default(2) }}</span>
           </div>
           <div class="range-ends"><span>0</span><span>5</span></div>
+        </div>
+        <div class="field-block" style="margin:0">
+          <div class="section-label">HW mapping</div>
+          <div class="select-wrap">
+            <i class="ti ti-circuit-board icon-left" aria-hidden="true"></i>
+            <select class="field-input" id="hw-mapping" style="padding-left:36px">
+              {% for opt in ["regular", "adafruit-hat", "adafruit-hat-pwm"] %}
+              <option value="{{ opt }}"{% if (presets.drivers.internal.hw_mapping | default("adafruit-hat-pwm")) == opt %} selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+            <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
+          </div>
         </div>
         <div class="slider-block" style="margin:0">
           <div class="section-label">LED brightness</div>
           <div class="slider-row">
             <input type="range" id="led-brightness" min="0" max="100" step="1"
-                   value="{{ presets.led_brightness | default(75) }}">
-            <span class="slider-val" id="led-brightness-val">{{ presets.led_brightness | default(75) }}%</span>
+                   value="{{ presets.drivers.internal.led_brightness | default(75) }}">
+            <span class="slider-val" id="led-brightness-val">{{ presets.drivers.internal.led_brightness | default(75) }}%</span>
           </div>
           <div class="range-ends"><span>0%</span><span>100%</span></div>
         </div>
@@ -551,18 +564,25 @@
         <div class="field-block" style="margin:0">
           <div class="section-label">Display host</div>
           <input class="field-input" type="text" id="display-host" maxlength="63"
-                 value="{{ presets.display_host | default('localhost') }}">
+                 value="{{ presets.drivers.flaschen.display_host | default('localhost') }}">
           <div class="field-hint" id="display-host-hint">Up to 63 alphanumeric characters and periods. Cannot be blank.</div>
         </div>
         <div class="field-block" style="margin:0">
           <div class="section-label">Display port</div>
           <input class="field-input" type="number" id="display-port" min="1" max="65535" step="1"
-                 value="{{ presets.display_port | default(1337) }}">
+                 value="{{ presets.drivers.flaschen.display_port | default(1337) }}">
           <div class="field-hint" id="display-port-hint">A number between 1 and 65535.</div>
         </div>
       </div>
 
       <hr style="border:none;border-top:0.5px solid var(--color-border-tertiary);margin:1rem 0">
+
+      <div class="field-block">
+        <div class="section-label">Image size</div>
+        <input class="field-input" type="number" id="image-size" min="1" step="1"
+               value="{{ presets.image_size | default(64) }}">
+        <div class="field-hint" id="image-size-hint">A positive integer.</div>
+      </div>
 
       <div class="field-block">
         <div class="section-label">Orientation</div>
@@ -575,13 +595,6 @@
           </select>
           <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
         </div>
-      </div>
-
-      <div class="field-block">
-        <div class="section-label">Image size</div>
-        <input class="field-input" type="number" id="image-size" min="1" step="1"
-               value="{{ presets.image_size | default(64) }}">
-        <div class="field-hint" id="image-size-hint">A positive integer.</div>
       </div>
     </div>
   </div>
@@ -824,14 +837,21 @@ function collectFormData() {
     dim_end_time:                dimChecked ? document.getElementById('end-time').value   : null,
     dimmed_brightness:           parseFloat(document.getElementById('dimmed-brightness').value),
     hostname:                    document.getElementById('hostname').value || null,
-    display_host:                document.getElementById('display-host').value,
-    display_port:                parseInt(document.getElementById('display-port').value, 10),
     orientation:                 parseInt(document.getElementById('orientation').value, 10),
     image_size:                  parseInt(document.getElementById('image-size').value, 10),
-    driver:                      document.getElementById('driver').value,
-    max_framerate:               parseInt(document.getElementById('max-framerate').value, 10),
-    gpio_slowdown:               parseInt(document.getElementById('gpio-slowdown').value, 10),
-    led_brightness:              parseInt(document.getElementById('led-brightness').value, 10),
+    drivers: {
+      driver:    document.getElementById('driver').value,
+      flaschen: {
+        display_host: document.getElementById('display-host').value,
+        display_port: parseInt(document.getElementById('display-port').value, 10),
+      },
+      internal: {
+        max_framerate:  parseInt(document.getElementById('max-framerate').value, 10),
+        gpio_slowdown:  parseInt(document.getElementById('gpio-slowdown').value, 10),
+        led_brightness: parseInt(document.getElementById('led-brightness').value, 10),
+        hw_mapping:     document.getElementById('hw-mapping').value,
+      },
+    },
   };
 }
 
