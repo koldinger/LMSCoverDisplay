@@ -30,7 +30,8 @@
 import argparse
 import contextlib
 import functools
-import importlib
+import importlib.metadata
+import importlib.resources
 import os
 import signal
 import socket
@@ -220,7 +221,6 @@ def art(ttype, transition):
 
 @functools.cache
 def proto_images():
-    ic()
     size = 256
 
     paths = importlib.resources.files("lmsdisplay").joinpath("art").glob("cover*")
