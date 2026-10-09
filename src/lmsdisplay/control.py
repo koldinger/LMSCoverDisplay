@@ -35,7 +35,6 @@ import os
 import signal
 import socket
 import subprocess
-from sys import meta_path
 import threading
 import time
 from pathlib import Path
@@ -292,14 +291,14 @@ def get_art_path(ttype, transition) -> Path:
     match ttype:
         case "groups":
             images = proto_images()
-            out = transitions.TransitionGroups(t_name)
+            trans = transitions.TransitionGroups(t_name)
             #ic(out, images)
-            images = make_group(images, out)
+            images = make_group(images, trans)
         case "transitions":
             images = proto_images()
-            out = transitions.TransitionTypes(t_name)
+            trans = transitions.TransitionTypes(t_name)
             #ic(out, images)
-            images = make_transition(images, out)
+            images = make_transition(images, trans)
         case _:
             raise ValueError(f"{ttype}/{transition}")
 
@@ -370,7 +369,7 @@ def processCommandLine():
 def main():
     global args
     args = processCommandLine()
-    ic(args)
+    print(f"Running.   Version: {__version__}")
 
     with PidFile("lmsconfig") as p:
         ic(p)
