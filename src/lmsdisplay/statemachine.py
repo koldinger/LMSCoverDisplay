@@ -90,7 +90,16 @@ class StateMachine(threading.Thread):
 
         # TODO: This should be a constructor argument, honestly.
         if config.enable_screensaver:
-            self._saver = screensaver.CoverFlowScreensaver(self._display, self._player.server, self._config.display_time, self._config.frame_delay, self._adjuster)
+            ss = config.screensavers.get("screensaver")
+            c = SimpleNamespace(**config.screensavers[ss])
+            ic(c)
+            match config.screensavers["screensaver"]:
+                case "coverflow":
+                    self._saver = screensaver.CoverFlowScreensaver(self._display, self._player.server, self._config.display_time, c.frame_delay, self._adjuster)
+                case "clock":
+                    self._saver = screensaver.DigitalClockScreenSaver(self._display, c.hour_format, c.font, self._adjuster)
+                case _:
+                    raise ValueError(config.screensavers["screensaver"])
 
 
     def stop(self):
