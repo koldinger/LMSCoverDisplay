@@ -209,7 +209,7 @@ def main():
     #piddir = args.pidfile.parent
     #pidfile = args.pidfile.name
 
-    signal.signal(signal.SIGHUP, reload_config)
+    signal.signal(signal.SIGHUP, handle_signal)
     if args.watch_config:
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
 
