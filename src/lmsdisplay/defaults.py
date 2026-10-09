@@ -46,6 +46,11 @@ defaults = {
     "disable_screensaver_dimmed": True,
     "screensaver_delay": 30,
     "display_time": 80,
+    "screensavers": {
+        "screensaver": "coverflow",
+        "coverflow": { "display_time": 30 },
+        "clock": { "hour_format": 12, "font": "regular" }
+    },
     "drivers": {
         "driver": "internal",
         "flaschen": {
