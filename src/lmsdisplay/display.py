@@ -82,7 +82,7 @@ class Display:
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         pass
 
-    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None) -> None:
+    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
         if not trans:
             trans = random.choice(self.translist)
 
@@ -90,11 +90,20 @@ class Display:
             old_artwork = self.blank
         if not new_artwork:
             new_artwork = self.blank
+        if frames is None:
+            frames = self.frames
+        if frame_delay is None:
+            frame_delay = self.frame_delay
 
         func = trans.function
-        for i in func(old_artwork, new_artwork, self.frames):
+        nframes = 0
+        for i in func(old_artwork, new_artwork, frames):
             self.show_artwork(i)
-            time.sleep(self.frame_delay)
+            time.sleep(frame_delay)
+            nframes += 1
+
+        return nframes
+
 
     def refresh(self):
         pass
@@ -173,9 +182,9 @@ class FlashenDisplay(Display):
                     self.disp.set(x, y, pixel)
             self.disp.send()
 
-    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None) -> None:
+    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
         with self.lock:
-            super().transition(old_artwork, new_artwork, trans)
+            return super().transition(old_artwork, new_artwork, trans, frames, frame_delay)
 
     def refresh(self):
         with self.lock:
@@ -203,6 +212,8 @@ class InternalDisplay(Display):
         options.pwm_bits = 11
         options.limit_refresh_rate_hz = driver_config.max_framerate
         options.disable_hardware_pulsing = False
+        options.daemon = False
+        options.drop_privileges = False
 
         self.options = options                      # Oh why not
         self.matrix = rgbmatrix.RGBMatrix(options=options)
