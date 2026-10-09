@@ -842,13 +842,13 @@ def test():
 
     def doTransition(f, transition, pause=0.1):
         start = datetime.now()
-        frames = 0
+        num_frames = 0
         for i in transition:
             sendArt(f, i)
             time.sleep(pause)
-            frames += 1
+            num_frames += 1
         end = datetime.now()
-        print(frames, end - start)
+        print(num_frames, end - start)
 
     # doTransition(f, expandRightDown(cur, next, 10))
     # time.sleep(3)
