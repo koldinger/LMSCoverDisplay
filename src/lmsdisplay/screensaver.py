@@ -33,11 +33,14 @@ import time
 from datetime import datetime, timedelta
 from io import BytesIO
 from urllib.parse import urljoin
+import importlib.resources
 
 import requests
 from icecream import ic
 from LMSTools import LMSServer
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+
+import imgcat
 
 from lmsdisplay import display, transitions, util
 
@@ -67,7 +70,7 @@ class CoverFlowScreensaver(ScreenSaver):
         self.display_time = display_time
         self.server = server
         self.adjustor = adjustor
-        self.last_img = BLANK
+        self.last_img = self.adjustor.adjustor(BLANK)
 
     def num_albums(self):
         resp = self.server.request(params="info total albums ?")
@@ -92,7 +95,7 @@ class CoverFlowScreensaver(ScreenSaver):
 
     def run(self):
         self.stopped = False
-        ic("Screensaver Starting")
+        ic("CoverFlowScreensaver Starting")
         changetime = datetime.now()
         waittime = min(10.0, self.display_time)
 
@@ -128,15 +131,69 @@ class CoverFlowScreensaver(ScreenSaver):
         ic("Screensaver Done")
 
 
+class DigitalClockScreenSaver(ScreenSaver):
+    def __init__(self, display, time_fmt, font, adjustor):
+        super().__init__(display)
+        self.adjustor = adjustor
+        self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
+        style = font.title().replace("_", "")
+        fontname = f"DSEG7Modern-{style}.woff2"
+        fontpath = importlib.resources.files("lmsdisplay").joinpath("fonts").joinpath(fontname)
+        ic(fontpath)
+        ic(font, style, fontpath)
+        self.font = ImageFont.truetype(fontpath, 48)
+
+    def run(self):
+        self.stopped = False
+        ic("Screensaver Starting")
+        minute = -1
+        last_img = self.adjustor.adjustImage(BLANK)
+        images = []
+
+        while not self.stopped:
+            now = datetime.now().time()
+            if now.minute != minute:
+                ic("Updating time", now)
+                minute = now.minute
+                images = [Image.new("RGB", (200, 200), color="black") for i in range(0, 2)]
+
+                for i in [0, 1]:
+                    drw = ImageDraw.Draw(images[i])
+                    txt = now.strftime(self.formats[i])
+                    drw.text((100, 100), txt, fill=(255, 0, 0), font=self.font, anchor="mm")
+
+                    images[i] = self.adjustor.adjustImage(images[i])
+                    ic(self.display.size(), images[i].size)
+
+            n = self.display.transition(last_img, images[0], transitions.TransitionTypes.Fade, frames=5)
+            s = max((1.0 - (n * self.display.frame_delay)), 0)
+            time.sleep(s)
+            n = self.display.transition(images[0], images[1], transitions.TransitionTypes.Fade, frames=5)
+            last_img = images[1]
+            self.stop_event.wait(timeout=s)
+            self.stop_event.clear()
+
+        ic()
+        self.display.transition(last_img, BLANK, transitions.TransitionTypes.Fade)
+        ic("Screensaver Done")
+
 if __name__ == "__main__":
+    from types import SimpleNamespace
+    def run_saver(saver):
+        t = threading.Thread(target=saver.run)
+        t.start()
+        time.sleep(65)
+        saver.stop()
+        t.join()
+
     server = LMSServer()
     #display = display.FlashenDisplay("localhost", 1337, 64, 64, 0)
-    disp = display.FlashenDisplay([], 25, 0.05, "localhost", 1337, 64, 64, 0)
+    config = {
+        "host": "localhost",
+        "port": 1337,
+    }
+    disp = display.FlashenDisplay([], 25, 0.05, (64, 64), 0, SimpleNamespace(**config))
     adjustor = util.ImageAdjuster(1.0, 1.0, 64)
-    s = CoverFlowScreensaver(disp, server, 5, 0.05, adjustor)
-    t = threading.Thread(target=s.run)
-    t.start()
-    time.sleep(65)
-    s.stop()
-    t.join()
-
+    #s = CoverFlowScreensaver(disp, server, 5, 0.05, adjustor)
+    s = DigitalClockScreenSaver(disp, 12, "bold-italic", adjustor)
+    run_saver(s)
