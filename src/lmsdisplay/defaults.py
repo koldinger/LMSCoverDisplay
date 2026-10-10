@@ -46,7 +46,7 @@ defaults = {
     "disable_screensaver_dimmed": True,
     "screensaver_delay": 30,
     "display_time": 80,
-    "timezone": "US/Pacific",
+    "timezone": "America/Los_Angeles",
     "screensavers": {
         "screensaver": "covers",
         "brightness" : 1,
