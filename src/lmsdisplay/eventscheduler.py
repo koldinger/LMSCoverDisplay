@@ -64,7 +64,7 @@ class EventScheduler:
 
             # Entry format: (time_to_run, sequence, action, argument, kwargs, active)
             # The 'active' list wrapper allows cancellation without expensive heap removal
-            ic(time_to_run, event_id, action, argument)
+            #ic(time_to_run, event_id, action, argument)
             entry = EventData(time_to_run, event_id, action, argument, kwargs)
             heapq.heappush(self._queue, entry)
 

@@ -45,8 +45,8 @@ except ModuleNotFoundError:
     HAS_FLASHCEN = False
 
 try:
-    import rgbmatrix
-    #import RGBMatrixEmulator as rgbmatrix
+    #import rgbmatrix
+    import RGBMatrixEmulator as rgbmatrix
     HAS_RGBMATRIX = True
 except ModuleNotFoundError:
     HAS_RGBMATRIX = False
@@ -69,15 +69,18 @@ class Display:
                  translist: list[transitions.TransitionTypes],
                  frames: int,
                  frame_delay: float,
-                 saver: screensaver.ScreenSaver | None = None):
+                 size: tuple[int, int],
+                 orientation: int):
         self.dimming: float | None = None
+        self.imgsize = size
+        self.orientation = orientation
         self.saver: screensaver.ScreenSaver | None = None
         self.translist = translist or list(transitions.TransitionTypes)
         self.frames = frames
         self.frame_delay = frame_delay
-        self.saver = saver
         self.blank: Image.Image
         self.overlay: Optional[Image.Image] = None
+        self.saver:   Optional[screensaver.ScreenSaver] = None
 
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         pass
@@ -115,7 +118,6 @@ class Display:
         self.saver_thread.start()
 
     def stop_screensaver(self) -> None:
-        ic()
         if self.saver and self.saver_thread:
             self.saver.stop()
             self.saver_thread.join()
@@ -127,16 +129,17 @@ class Display:
     def clear(self) -> None:
         pass
 
-    def size(self) -> (int, int):
-        return (500, 500)
-
     def dim(self, amount: float) -> None:
         self.dimming = amount
 
     def undim(self) -> None:
         self.dimming = None
 
+    def size(self) -> tuple[int, int]:
+        return self.imgsize
+
     def _prepare_artwork(self, art):
+        #ic(art, self.overlay)
         if not art:
             art = self.blank
 
@@ -158,19 +161,16 @@ class Display:
 
 class FlashenDisplay(Display):
     def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
-        super().__init__(translist, frames, frame_delay)
+        super().__init__(translist, frames, frame_delay, size, orientation)
         if not HAS_FLASHCEN:
             raise ImportError("Flaschen-Taschen driver not installed.")
         self.disp = flaschen.Flaschen(driver_config.host, driver_config.port, size[0], size[1])
-        self.orientation = orientation
 
-        self._size = size
-        self.blank = Image.new("RGB", self._size)
+        self.blank = Image.new("RGB", self.imgsize)
         self.lock = RLock()
 
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         """ Send art to the flashchen-taschen display, over the network. """
-        #ic(art)
 
         artwork = self._prepare_artwork(artwork)
 
@@ -190,15 +190,11 @@ class FlashenDisplay(Display):
         with self.lock:
             self.disp.send()
 
-    def size(self) -> tuple[int, int]:
-        return self._size
-
-
 
 class InternalDisplay(Display):
     # def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
     def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
-        super().__init__(translist, frames, frame_delay)
+        super().__init__(translist, frames, frame_delay, size, orientation)
         if not HAS_RGBMATRIX:
             raise ImportError("RGB Matix Driver not installed.")
         options = rgbmatrix.RGBMatrixOptions()
@@ -219,17 +215,14 @@ class InternalDisplay(Display):
         self.matrix = rgbmatrix.RGBMatrix(options=options)
         self.canvas = self.matrix.CreateFrameCanvas()
 
-        self.orientation = orientation
-        self._size = size
-
-        self.blank = Image.new("RGB", self._size)
+        self.blank = Image.new("RGB", self.imgsize)
 
 
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         """ Send art to the display. """
-        artwork = self._prepare_artwork(artwork)
+        art = self._prepare_artwork(artwork)
 
-        self.canvas.SetImage(artwork.convert("RGB"))
+        self.canvas.SetImage(art.convert("RGB"))
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def clear(self) -> None:
