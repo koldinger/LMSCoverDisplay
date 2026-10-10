@@ -37,7 +37,8 @@ from PIL import Image, ImageEnhance
 
 from . import screensaver, transitions
 
-from icecream import ic
+#from icecream import ic
+
 try:
     import flaschen
     HAS_FLASHCEN = True
@@ -45,8 +46,8 @@ except ModuleNotFoundError:
     HAS_FLASHCEN = False
 
 try:
-    import rgbmatrix
-    #import RGBMatrixEmulator as rgbmatrix
+    #import rgbmatrix
+    import RGBMatrixEmulator as rgbmatrix
     HAS_RGBMATRIX = True
 except ModuleNotFoundError:
     HAS_RGBMATRIX = False

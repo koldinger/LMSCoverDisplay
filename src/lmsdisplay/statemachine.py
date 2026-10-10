@@ -51,7 +51,7 @@ class States(Enum):
 TIMEOUT_DEF = 20
 
 class StateMachine(threading.Thread):
-    def __init__(self, config:SimpleNamespace, disp:display.Display, player: LMSPlayer, adjuster: util.ImageAdjuster, event_q: queue.Queue):
+    def __init__(self, config:SimpleNamespace, disp:display.Display, player: LMSPlayer, timezone: datetime.tzinfo, adjuster: util.ImageAdjuster, event_q: queue.Queue):
         self.queue = event_q
 
         self._display = disp
@@ -60,6 +60,8 @@ class StateMachine(threading.Thread):
 
         self._player= player
         self._adjuster = adjuster
+
+        self._timezone = timezone
 
         self._state = States.UNKNOWN
         self._saver: Optional[screensaver.ScreenSaver] = None
@@ -97,10 +99,20 @@ class StateMachine(threading.Thread):
             c = SimpleNamespace(**config.screensavers[ss])
             ic(c)
             match config.screensavers["screensaver"]:
-                case "coverflow":
-                    self._saver = screensaver.CoverFlowScreensaver(self._display, config.screensavers["brightness"], self._player.server, self._config.display_time, c.frame_delay, self._adjuster)
+                case "covers":
+                    self._saver = screensaver.CoversScreensaver(self._display,
+                                                                config.screensavers["brightness"],
+                                                                self._player.server,
+                                                                c.display_time,
+                                                                config.frame_delay,
+                                                                self._adjuster)
                 case "clock":
-                    self._saver = screensaver.DigitalClockScreenSaver(self._display, config.screensavers["brightness"], c.hour_format, c.font, self._adjuster)
+                    self._saver = screensaver.DigitalClockScreenSaver(self._display,
+                                                                      config.screensavers["brightness"],
+                                                                      c.hour_format,
+                                                                      c.font,
+                                                                      self._timezone,
+                                                                      self._adjuster)
                 case _:
                     raise ValueError(config.screensavers["screensaver"])
 
@@ -200,7 +212,9 @@ class StateMachine(threading.Thread):
         if self._config.disable_screensaver_dimmed and self._saver:
             self.stop_screensaver()
         self._display.dim(self._config.dimmed_brightness)
-        self._dim_event = self._scheduler.enterabs(util.next_time(self._dim_start).timestamp(), queue.Queue.put, (self.queue, PlayEvent(EventType.DIM)))
+        self._dim_event = self._scheduler.enterabs(util.next_time(self._dim_start, self._timezone).timestamp(),
+                                                   queue.Queue.put,
+                                                   (self.queue, PlayEvent(EventType.DIM)))
         self._dimmed = True
         if self._state == States.PLAYING:
             self._display.show_artwork(self._last_image)
@@ -209,7 +223,9 @@ class StateMachine(threading.Thread):
         ic()
         print("Undimming")
         self._display.undim()
-        self._undim_event = self._scheduler.enterabs(util.next_time(self._dim_end).timestamp(),  queue.Queue.put, (self.queue, PlayEvent(EventType.UNDIM)))
+        self._undim_event = self._scheduler.enterabs(util.next_time(self._dim_end, self._timezone).timestamp(),
+                                                     queue.Queue.put,
+                                                     (self.queue, PlayEvent(EventType.UNDIM)))
         self._dimmed = False
 
         if self._state == States.PAUSED and self._config.enable_screensaver:

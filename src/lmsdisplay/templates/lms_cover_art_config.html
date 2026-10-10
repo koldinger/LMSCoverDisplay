@@ -4,6 +4,7 @@
   Expected template variables:
     players     : dict  { server_name: [{"id": str, "label": str}, ...] }  each key becomes an <optgroup>
     transitions : list of dicts  [{ "id": "fade", "label": "Fade", "subs": [{ "id": "fade_slow", "label": "Fade Slow" }, ...] }, ...]
+    timezones   : list of str    ["America/Los_Angeles", "America/New_York", ...]  IANA timezone names
     presets     : dict of saved values {
                     "player"                    : str   (player id)
                     "transitions"               : list  [sub_id, ...]  (flat list of selected sub ids)
@@ -22,6 +23,7 @@
                         "clock"                 : dict  { "hour_format": int (12 | 24, default 12),
                                                           "font": str ("regular"|"bold"|"italic"|"bold_italic"|"light"|"light_italic") }
                     }
+                    "timezone"                  : str   (IANA timezone name, default "")
                     "show_volume_bar"           : bool  (default false)
                     "dim_at_night"              : bool  (default false)
                     "dim_start_time"            : str   "HH:MM"  (default "22:00")
@@ -444,6 +446,19 @@
         <input type="time" id="end-time" value="{{ presets.dim_end_time | default('07:00') }}">
       </div>
     </div>
+    <div class="field-block" style="margin-top:1rem">
+      <div class="section-label">Timezone</div>
+      <div class="select-wrap">
+        <i class="ti ti-clock icon-left" aria-hidden="true"></i>
+        <select id="timezone">
+          {% for tz in timezones %}
+          <option value="{{ tz }}"{% if tz == presets.timezone | default('') %} selected{% endif %}>{{ tz }}</option>
+          {% endfor %}
+        </select>
+        <div class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
+      </div>
+    </div>
+
     <div class="slider-block" style="margin-top:1.25rem;margin-bottom:0">
       <div class="section-label">Dimmed brightness</div>
       <div class="slider-row">
@@ -972,6 +987,7 @@ function collectFormData() {
     dim_at_night:                dimChecked,
     dim_start_time:              dimChecked ? document.getElementById('start-time').value : null,
     dim_end_time:                dimChecked ? document.getElementById('end-time').value   : null,
+    timezone:                    document.getElementById('timezone').value,
     dimmed_brightness:           parseFloat(document.getElementById('dimmed-brightness').value),
     hostname:                    document.getElementById('hostname').value || null,
     orientation:                 parseInt(document.getElementById('orientation').value, 10),

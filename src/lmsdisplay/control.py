@@ -38,6 +38,7 @@ import socket
 import subprocess
 import threading
 import time
+import zoneinfo
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -108,18 +109,24 @@ def index():
     errmsg = ""
     if args.config:
         try:
-            presets = toml.load(args.config)
+            # Load the current values, but do an "or" with the defaults to add any new values.
+            presets = defaults.defaults | toml.load(args.config)
         except FileNotFoundError:
             errmsg = f"{args.config} does not exist"
             print(errmsg)
 
     trans = makeTransitions()
+    timezones = sorted(zoneinfo.available_timezones())
 
-    print("Presets:    ", presets)
     #print("Players:    ", players)
     #print("Transitions:",  trans)
 
-    return render_template("lms_cover_art_config.html", presets=presets, players=players, transitions=trans, version=__version__)
+    return render_template("lms_cover_art_config.html",
+                           presets=presets,
+                           players=players,
+                           transitions=trans,
+                           timezones=timezones,
+                           version=__version__)
 
 
 @app.route("/save_config", methods=["POST"])
@@ -130,10 +137,9 @@ def save_config():
     message = "Saved"
 
     try:
-        presets = toml.load(args.config)
+        presets = defaults.defaults | toml.load(args.config)
     except FileNotFoundError:
         presets = SimpleNamespace(**defaults.defaults)
-    print("Presets ---", presets, "-----", "drivers" in presets)
 
     old_disp = presets["drivers"]["driver"]
     old_disp_conf = presets["drivers"][old_disp]

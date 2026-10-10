@@ -39,6 +39,7 @@ from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 from typing import Optional
+import zoneinfo
 
 import nmcli
 import rich.traceback
@@ -224,6 +225,7 @@ def main():
         disp = init_display()
         while True:
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
+            tz = zoneinfo.ZoneInfo(config.timezone)
 
             check_connection(disp)
             check_player(disp)
@@ -234,7 +236,7 @@ def main():
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                sm = statemachine.StateMachine(config, disp, plr, adjuster, event_q)
+                sm = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q)
                 monitor = lms_monitor.PlayerMonitor(plr, sm.queue, adjuster)
                 monitor.start()
 

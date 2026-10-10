@@ -64,7 +64,7 @@ def betweentimes(now, start, end):
         return start <= now <= end
     return now <= end or now >= start
 
-def next_time(when: datetime.time):
+def next_time(when: datetime.time, timezone=None):
     """
     Calculate the next occurance of a time.
 
@@ -73,7 +73,7 @@ def next_time(when: datetime.time):
     No idea what happens around daylight savings time.   Probably close enough
     for our purposes.
     """
-    d = datetime.datetime.today()
+    d = datetime.datetime.now(timezone)
     if when <= d.time():
         d += datetime.timedelta(days=1)
     then = datetime.datetime.combine(d.date(), when)

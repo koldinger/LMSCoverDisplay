@@ -71,7 +71,7 @@ class CoversScreensaver(ScreenSaver):
         self.display_time = display_time
         self.server = server
         self.adjustor = adjustor
-        self.last_img = self.adjustor.adjustor(BLANK)
+        self.last_img = self.adjustor.adjustImage(BLANK)
 
     def num_albums(self):
         resp = self.server.request(params="info total albums ?")
@@ -120,6 +120,7 @@ class CoversScreensaver(ScreenSaver):
                     next_img = ImageEnhance.Brightness(next_img).enhance(self.brightness)
                 self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
                 changetime = datetime.now() + self.pause_delta
+                ic(datetime.now(), self.pause_delta, changetime, waittime)
                 self.last_img = next_img
             else:
                 self.display.refresh()
@@ -134,10 +135,11 @@ class CoversScreensaver(ScreenSaver):
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display, brightness, time_fmt, font, adjustor):
+    def __init__(self, display, brightness, time_fmt, font, timezone, adjustor):
         super().__init__(display, brightness)
         self.adjustor = adjustor
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
+        self.timezone = timezone
         # Change the format name from something like bold-italic to BoldItalic
         style = font.title().replace("_", "")
         fontname = f"DSEG7Modern-{style}.woff2"
@@ -152,7 +154,7 @@ class DigitalClockScreenSaver(ScreenSaver):
         images = []
 
         while not self.stopped:
-            now = datetime.now().time()
+            now = datetime.now(self.timezone).time()
             if now.minute != minute:
                 ic("Updating time", now)
                 minute = now.minute

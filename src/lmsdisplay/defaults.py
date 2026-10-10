@@ -46,11 +46,12 @@ defaults = {
     "disable_screensaver_dimmed": True,
     "screensaver_delay": 30,
     "display_time": 80,
+    "timezone": "US/Pacific",
     "screensavers": {
         "screensaver": "covers",
         "brightness" : 1,
         "covers": { "display_time": 30 },
-        "clock": { "hour_format": 12, "font": "regular" }
+        "clock": { "hour_format": 12, "font": "regular" },
     },
     "drivers": {
         "driver": "internal",
