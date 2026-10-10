@@ -222,8 +222,8 @@ def main():
 
     with PidFile("lmsdisplay"):
         backoff = 1
+        disp = init_display()
         while True:
-            disp = init_display()
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
 
             check_connection(disp)
