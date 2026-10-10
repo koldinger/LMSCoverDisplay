@@ -39,6 +39,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import nmcli
 import rich.traceback
@@ -126,25 +127,48 @@ def save_config():
     #print("Index - POST")
 
     print("New Config:", request.json)
+    message = "Saved"
+
+    try:
+        presets = toml.load(args.config)
+    except FileNotFoundError:
+        presets = SimpleNamespace(**defaults.defaults)
+    print("Presets ---", presets, "-----", "drivers" in presets)
+
+    old_disp = presets["drivers"]["driver"]
+    old_disp_conf = presets["drivers"][old_disp]
 
     config = request.json
     # Remove values we don't save.
+    new_disp = config["drivers"]["driver"]
+    new_disp_conf = config["drivers"][new_disp]
 
+    # Remove the hostname, we don't want to save it.
     hostname = config.pop("hostname")
-    if hostname and hostname != socket.gethostname():
+    if hostname and hostname != socket.gethostname() and args.systemctl:
+        # If it's set, and changed, change it
         print(f"Setting hostname to {hostname}, was {socket.gethostname()}")
         command = ["hostnamectl", "set-hostname", hostname]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         print(result)
 
+    # Write the config
     try:
         write_config(args.config, config)
     except Exception as e:
         return str(e), 500
 
+    # If the display has changed configuration, restart the lmsdisplay service
+    if new_disp_conf != old_disp_conf and args.systemctl:
+        print("Display configuration changed.   Restarting LMSDisplay")
+        command = ["systemctl", "restart", "lmsdisplay"]
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        print(result)
+        message = "Saved.  Display server restarted."
+
     signal_procs()
 
-    return "Saved"
+    return message
 
 
 @app.route("/rescan_players", methods=["POST"])
@@ -187,9 +211,10 @@ def reset_networking():
         # Signal the processes to reload.   This should send the display process back to it's debloy netorking screen
         signal_procs()
 
-        command = ["systemctl", "start", "wifiselect"]
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        print(result)
+        if args.systemctl:
+            command = ["systemctl", "start", "wifiselect"]
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            print(result)
 
     except Exception as e:
         return str(e), 500
@@ -207,6 +232,11 @@ def check_updates():
 def update_now():
     print(request)
     return "Update not yet implemented", 501
+
+@app.route("/reset_services")
+def reset_services():
+    print("Reset services")
+    return 200
 
 
 @app.route("/favicon.ico")
@@ -362,6 +392,7 @@ def processCommandLine():
     parser.add_argument("--config", type=Path,   help="Config file for the display process")
     parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
     parser.add_argument("--imagedir", type=Path, default=Path("/opt/share/lmsdisplay"), help="Location of image files")
+    parser.add_argument("--systemctl", action=argparse.BooleanOptionalAction, default=True, help="Call (or not) systemctl methods.   For debugging.")
     parser.add_argument("--version", action="version", version =__version__)
 
     return parser.parse_args()
@@ -381,6 +412,9 @@ def main():
         if args.config and not args.config.exists():
             write_config(args.config, defaults.defaults)
 
+        import logging
+        logger = logging.getLogger('waitress')
+        logger.setLevel(logging.DEBUG)
         waitress.serve(app, host="0.0.0.0", port=args.port)
         #app.run(host="0.0.0.0", port=args.port)
 

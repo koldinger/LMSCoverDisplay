@@ -45,6 +45,7 @@ from icecream import ic
 class States(Enum):
     PAUSED = auto()
     PLAYING = auto()
+    UNKNOWN = auto()
 
 
 TIMEOUT_DEF = 20
@@ -60,7 +61,7 @@ class StateMachine(threading.Thread):
         self._player= player
         self._adjuster = adjuster
 
-        self._state = States.PAUSED
+        self._state = States.UNKNOWN
         self._saver: Optional[screensaver.ScreenSaver] = None
         self._last_image: Optional[Image.Image] = None
         self._last_song = -1
@@ -76,17 +77,19 @@ class StateMachine(threading.Thread):
         # Create events to start and end dimming, assuming they're specified
         self._dim_start = util.parsetime(config.dim_start_time)
         self._dim_end   = util.parsetime(config.dim_end_time)
-        ic(config.dim_start_time, self._dim_start, config.dim_end_time, self._dim_end)
-        self._dimmed = config.dim_at_night and util.betweentimes(datetime.now().time(), self._dim_start, self._dim_end)
-        if self._dimmed:
-            print("Setting Dimmed Mode")
-            self._display.dim(config.dimmed_brightness)
+
         if config.dim_at_night:
-            d_time = util.next_time(self._dim_start)
-            ud_time = util.next_time(self._dim_end)
-            ic(d_time, ud_time)
-            self._dim_event   = self._scheduler.enterabs(d_time.timestamp(), queue.Queue.put, (self.queue, PlayEvent(EventType.DIM)))
-            self._undim_event = self._scheduler.enterabs(ud_time.timestamp(),  queue.Queue.put, (self.queue, PlayEvent(EventType.UNDIM)))
+            self._dimmed = util.betweentimes(datetime.now().time(), self._dim_start, self._dim_end)
+            if self._dimmed:
+                print("Setting Dimmed Mode")
+                self._display.dim(config.dimmed_brightness)
+            dim_time = util.next_time(self._dim_start)
+            undim_time = util.next_time(self._dim_end)
+            ic(dim_time, undim_time)
+            self._dim_event   = self._scheduler.enterabs(dim_time.timestamp(), queue.Queue.put, (self.queue, PlayEvent(EventType.DIM)))
+            self._undim_event = self._scheduler.enterabs(undim_time.timestamp(),  queue.Queue.put, (self.queue, PlayEvent(EventType.UNDIM)))
+        else:
+            self._dimmed = False
 
         # TODO: This should be a constructor argument, honestly.
         if config.enable_screensaver:
@@ -95,9 +98,9 @@ class StateMachine(threading.Thread):
             ic(c)
             match config.screensavers["screensaver"]:
                 case "coverflow":
-                    self._saver = screensaver.CoverFlowScreensaver(self._display, self._player.server, self._config.display_time, c.frame_delay, self._adjuster)
+                    self._saver = screensaver.CoverFlowScreensaver(self._display, config.screensavers["brightness"], self._player.server, self._config.display_time, c.frame_delay, self._adjuster)
                 case "clock":
-                    self._saver = screensaver.DigitalClockScreenSaver(self._display, c.hour_format, c.font, self._adjuster)
+                    self._saver = screensaver.DigitalClockScreenSaver(self._display, config.screensavers["brightness"], c.hour_format, c.font, self._adjuster)
                 case _:
                     raise ValueError(config.screensavers["screensaver"])
 
@@ -119,7 +122,7 @@ class StateMachine(threading.Thread):
         ic(event)
 
         match self._state:
-            case States.PAUSED:
+            case States.PAUSED | States.UNKNOWN:
                 # Cancel any events that are schedule in Paused mode
                 self._scheduler.cancel(self._ss_event)
                 self._scheduler.cancel(self._pause_event)
@@ -164,7 +167,8 @@ class StateMachine(threading.Thread):
         match self._state:
             case States.PAUSED:
                 pass
-            case States.PLAYING:
+            case States.PLAYING | States.UNKNOWN:
+                # Calculate how long to hold the current image
                 if self._config.pause_delay:
                     self._display.refresh()
                     self._scheduler.enter(self._config.pause_delay, queue.Queue.put, (self.queue, PlayEvent(EventType.END_PAUSE_DELAY)))
@@ -172,9 +176,10 @@ class StateMachine(threading.Thread):
                     self._display.transition(self._last_image, None)
                     self._last_image = None
 
+                # Calculate how long to wait for the screen saver.
                 if self._config.enable_screensaver:
-                    if self._config.screensaver_delay:
-                        delay = self._config.screensaver_delay + self._config.pause_delay
+                    delay = self._config.screensaver_delay + self._config.pause_delay
+                    if delay:
                         self._scheduler.enter(delay, queue.Queue.put, (self.queue, PlayEvent(EventType.START_SAVER)))
                     else:
                         self.start_screensaver()

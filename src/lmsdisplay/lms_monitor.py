@@ -184,7 +184,7 @@ class PlayerMonitor(threading.Thread):
             try:
                 # Build the subscribe command, and send it.
                 # Adds a few extra tags in, for fun
-                subscribe_cmd = f"{self.player_id} status - 1 tags:ejl subscribe:10"
+                subscribe_cmd = f"{self.player_id} status - 1 tags:ejl subscribe:120"
                 self.send_line(command_string(subscribe_cmd))
                 subscribe_quoted = quote(subscribe_cmd.strip(), safe=" ")
 
