@@ -40,8 +40,6 @@ from icecream import ic
 from LMSTools import LMSServer
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-import imgcat
-
 from lmsdisplay import display, transitions, util
 
 ic.configureOutput(includeContext=True)
