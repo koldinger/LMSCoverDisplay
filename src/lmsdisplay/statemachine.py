@@ -231,7 +231,7 @@ class StateMachine(threading.Thread):
 
         if self._state == States.PAUSED and self._config.enable_screensaver:
             self.start_screensaver()
-        elif self._state._state == PLAYING:
+        elif self._state == States.PLAYING:
             self._display.show_artwork(self._last_image)
 
     def end_paused_delay(self):
