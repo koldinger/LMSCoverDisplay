@@ -29,16 +29,16 @@
 
 import socket
 
-from collections import namedtuple
+#from collections import namedtuple
+from typing import NamedTuple
 
 
 DISCOVERY_PORT = 3483
 DEFAULT_DISCOVERY_TIMEOUT = .5
 
-ATTR_HOST = "host"
-ATTR_PORT = "port"
-
-LmsInstance = namedtuple("LmsInstance", [ATTR_HOST, ATTR_PORT])
+class LmsInstance(NamedTuple):
+    host: str
+    port: int
 
 def discover_lms(timeout=DEFAULT_DISCOVERY_TIMEOUT):
     """ Scan network for Logitech Media Servers. """
