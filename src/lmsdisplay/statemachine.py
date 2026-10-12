@@ -111,6 +111,7 @@ class StateMachine(threading.Thread):
                                                                       config.screensavers["brightness"],
                                                                       c.hour_format,
                                                                       c.font,
+                                                                      c.color,
                                                                       self._timezone,
                                                                       self._adjuster)
                 case _:

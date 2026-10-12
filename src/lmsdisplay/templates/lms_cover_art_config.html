@@ -21,7 +21,8 @@
                         "brightness"            : float (0.0–1.0, default 1.0)
                         "covers"                : dict  { "display_time": int (1–600s, default 30) }
                         "clock"                 : dict  { "hour_format": int (12 | 24, default 12),
-                                                          "font": str ("regular"|"bold"|"italic"|"bold_italic"|"light"|"light_italic") }
+                                                          "font": str ("regular"|"bold"|"italic"|"bold_italic"|"light"|"light_italic"),
+                                                          "color": str (hex color, default "#ffffff") }
                     }
                     "timezone"                  : str   (IANA timezone name, default "")
                     "show_volume_bar"           : bool  (default false)
@@ -290,6 +291,9 @@
 
   .driver-sub { margin-top: 0.75rem; padding-left: 0; display: none; flex-direction: column; gap: 12px; }
   .driver-sub.visible { display: flex; }
+  .color-picker-row { display: flex; align-items: center; gap: 10px; }
+  .color-picker-row input[type=color] { width: 40px; height: 32px; padding: 2px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); cursor: pointer; }
+  .color-picker-val { font-size: 13px; color: var(--color-text-secondary); font-family: monospace; }
   .version-footer {
     margin-top: 1.5rem;
     font-size: 11px;
@@ -555,6 +559,13 @@
           <option value="light_italic"{% if presets.screensavers.clock.font | default('regular') == 'light_italic' %} selected{% endif %}>Light Italic</option>
         </select>
         <div class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="section-label">Color</div>
+      <div class="color-picker-row">
+        <input type="color" id="clock-color" value="{{ presets.screensavers.clock.color | default('#ffffff') }}">
+        <span class="color-picker-val" id="clock-color-val">{{ presets.screensavers.clock.color | default('#ffffff') }}</span>
       </div>
     </div>
   </div>
@@ -949,6 +960,12 @@ screensaverDelayEl.addEventListener("input", () => {
   document.getElementById("screensaver-delay-val").textContent = screensaverDelayEl.value + "s";
 });
 
+// ── Clock color picker ──────────────────────────────────────────────────────
+const clockColorEl = document.getElementById('clock-color');
+clockColorEl.addEventListener('input', () => {
+  document.getElementById('clock-color-val').textContent = clockColorEl.value;
+});
+
 // ── Screensaver brightness slider ───────────────────────────────────────────
 const screensaverBrightnessEl = document.getElementById("screensaver-brightness");
 screensaverBrightnessEl.addEventListener("input", () => {
@@ -981,6 +998,7 @@ function collectFormData() {
       clock: {
         hour_format: parseInt(document.getElementById('clock-hour-format').value, 10),
         font:        document.getElementById('clock-font').value,
+        color:       document.getElementById('clock-color').value,
       },
     },
     show_volume_bar:             document.getElementById('volume').checked,

@@ -133,11 +133,12 @@ class CoversScreensaver(ScreenSaver):
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display, brightness, time_fmt, font, timezone, adjustor):
+    def __init__(self, display, brightness, time_fmt, font, color, timezone, adjustor):
         super().__init__(display, brightness)
         self.adjustor = adjustor
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
         self.timezone = timezone
+        self.color = color
         # Change the format name from something like bold-italic to BoldItalic
         style = font.title().replace("_", "")
         fontname = f"DSEG7Modern-{style}.woff2"
@@ -161,7 +162,7 @@ class DigitalClockScreenSaver(ScreenSaver):
                 for i in [0, 1]:
                     drw = ImageDraw.Draw(images[i])
                     txt = now.strftime(self.formats[i])
-                    drw.text((100, 100), txt, fill=(255, 0, 0), font=self.font, anchor="mm")
+                    drw.text((100, 100), txt, fill=self.color, font=self.font, anchor="mm")
 
                     images[i] = self.adjustor.adjustImage(images[i])
                     if self.brightness < 1:

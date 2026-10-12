@@ -51,7 +51,11 @@ defaults = {
         "screensaver": "covers",
         "brightness" : 1,
         "covers": { "display_time": 30 },
-        "clock": { "hour_format": 12, "font": "regular" },
+        "clock": {
+            "hour_format": 12,
+            "font": "regular",
+            "color": "#ff0000",
+        },
     },
     "drivers": {
         "driver": "internal",

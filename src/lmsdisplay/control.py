@@ -110,7 +110,7 @@ def index():
     if args.config:
         try:
             # Load the current values, but do an "or" with the defaults to add any new values.
-            presets = defaults.defaults | toml.load(args.config)
+            presets = util.loadtoml(args.config, defaults.defaults)
         except FileNotFoundError:
             errmsg = f"{args.config} does not exist"
             print(errmsg)
@@ -418,9 +418,6 @@ def main():
         if args.config and not args.config.exists():
             write_config(args.config, defaults.defaults)
 
-        import logging
-        logger = logging.getLogger('waitress')
-        logger.setLevel(logging.DEBUG)
         waitress.serve(app, host="0.0.0.0", port=args.port)
         #app.run(host="0.0.0.0", port=args.port)
 
