@@ -105,21 +105,25 @@ class CoversScreensaver(ScreenSaver):
             ic(now, changetime, now >= changetime)
 
             if now >= changetime:
-                album = self.random_album()
-                track_id = album["artwork_track_id"]
-                ic(album)
-                art = self.get_art(track_id)
-                if not art:
-                    ic("No art")
-                    continue
+                # Suppress all exceptions.  If anything goes wrong, just go round the loop again.
+                try:
+                    album = self.random_album()
+                    track_id = album["artwork_track_id"]
+                    ic(album)
+                    art = self.get_art(track_id)
+                    if not art:
+                        ic("No art")
+                        continue
 
-                next_img = self.adjustor.adjustImage(art)
-                if self.brightness < 1:
-                    next_img = ImageEnhance.Brightness(next_img).enhance(self.brightness)
-                self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
-                changetime = datetime.now() + self.pause_delta
-                ic(datetime.now(), self.pause_delta, changetime, waittime)
-                self.last_img = next_img
+                    next_img = self.adjustor.adjustImage(art)
+                    if self.brightness < 1:
+                        next_img = ImageEnhance.Brightness(next_img).enhance(self.brightness)
+                    self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
+                    changetime = datetime.now() + self.pause_delta
+                    ic(datetime.now(), self.pause_delta, changetime, waittime)
+                    self.last_img = next_img
+                except Exception:
+                    self.display.refresh()
             else:
                 self.display.refresh()
 
@@ -154,6 +158,7 @@ class DigitalClockScreenSaver(ScreenSaver):
 
         while not self.stopped:
             now = datetime.now(self.timezone).time()
+            # If the minute has chnaged, update the screen.
             if now.minute != minute:
                 ic("Updating time", now)
                 minute = now.minute
