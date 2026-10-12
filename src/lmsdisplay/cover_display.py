@@ -54,6 +54,7 @@ rich.traceback.install()
 args: argparse.Namespace
 
 monitor: Optional[lms_monitor.PlayerMonitor] = None
+config: SimpleNamespace
 
 from icecream import ic
 
@@ -177,7 +178,7 @@ def check_player(display):
         rd.update()
         servers = discovery.discover_lms()
 
-def process_cmdline():
+def process_cmdline() -> tuple[argparse.Namespace, SimpleNamespace]:
     parser = argparse.ArgumentParser("Display album art from Lyrion Music Server")
                                            # formatter_class=argparse.RawTextHelpFormatter)
     parser.suggest_on_error = True
