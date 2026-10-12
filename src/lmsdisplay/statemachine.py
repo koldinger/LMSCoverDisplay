@@ -95,27 +95,26 @@ class StateMachine(threading.Thread):
 
         # TODO: This should be a constructor argument, honestly.
         if config.enable_screensaver:
-            ss = config.screensavers.get("screensaver")
-            c = SimpleNamespace(**config.screensavers[ss])
-            ic(c)
-            match config.screensavers["screensaver"]:
+            match config.screensavers.screensaver:
                 case "covers":
+                    c = config.screensavers.covers
                     self._saver = screensaver.CoversScreensaver(self._display,
-                                                                config.screensavers["brightness"],
+                                                                config.screensavers.brightness,
                                                                 self._player.server,
                                                                 c.display_time,
                                                                 config.frame_delay,
                                                                 self._adjuster)
                 case "clock":
+                    c = config.screensavers.clock
                     self._saver = screensaver.DigitalClockScreenSaver(self._display,
-                                                                      config.screensavers["brightness"],
+                                                                      config.screensavers.brightness,
                                                                       c.hour_format,
                                                                       c.font,
                                                                       c.color,
                                                                       self._timezone,
                                                                       self._adjuster)
                 case _:
-                    raise ValueError(config.screensavers["screensaver"])
+                    raise ValueError(config.screensavers.screensaver)
 
 
     def stop(self):

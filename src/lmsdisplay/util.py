@@ -87,10 +87,23 @@ def makedir(name: Path):
     elif not name.is_dir():
         raise NotADirectoryError
 
+def nested_merge(src, values) -> dict:
+    values = src | values
+    for k, v in values.items():
+        if type(v) is dict:
+            values[k] = nested_merge(src.get(k, {}), v)
+    return values
+
+def nested_namespace(values) -> SimpleNamespace:
+    for k, v in values.items():
+        if type(v) is dict:
+            values[k] = nested_namespace(v)
+    return SimpleNamespace(**values)
+
 def loadtoml(file, defaults):
     """ Load a toml file, with a list of default values. """
-    values = defaults | toml.load(file)
-    return SimpleNamespace(**values)
+    values = nested_merge(defaults, toml.load(file))
+    return nested_namespace(values)
 
 def port_number(value):
     """ Make sure an integer is a valid port number, ie between 0 65535. """

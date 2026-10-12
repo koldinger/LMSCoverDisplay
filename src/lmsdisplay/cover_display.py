@@ -201,11 +201,11 @@ def init_display():
     x = y = config.image_size
     size = (x, y)
     trans_list = [transitions.TransitionTypes(x) for x in config.transitions]
-    match config.drivers.get("driver"):
+    match config.drivers.driver:
         case "flaschen":
-            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, SimpleNamespace(**config.drivers["flaschen"]))
+            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.flaschen)
         case "internal":
-            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, SimpleNamespace(**config.drivers["internal"]))
+            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.internal)
         case _:
             raise ValueError(config.driver)
 
