@@ -168,9 +168,10 @@ class PlayerMonitor(threading.Thread):
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
                 # Get the CLI port
+                print(f"Getting CLI Port: {self.server.host}")
                 cli_port = self.get_cli_port()
-                ic(self.server.host, cli_port)
 
+                print(f"Connecting to {self.server.host}:{cli_port}")
                 self.tn = telnetlib.Telnet(self.server.host, cli_port)
 
                 if self.login:
