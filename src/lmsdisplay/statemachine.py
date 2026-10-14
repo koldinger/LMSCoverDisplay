@@ -27,7 +27,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import threading
 import queue
 from types import SimpleNamespace
 from enum import Enum, auto
@@ -48,9 +47,9 @@ class States(Enum):
     UNKNOWN = auto()
 
 
-TIMEOUT_DEF = 20
+TIMEOUT_DEF = 120
 
-class StateMachine(threading.Thread):
+class StateMachine:
     def __init__(self, config:SimpleNamespace, disp:display.Display, player: LMSPlayer, timezone: datetime.tzinfo, adjuster: util.ImageAdjuster, event_q: queue.Queue):
         self.queue = event_q
 
@@ -148,6 +147,7 @@ class StateMachine(threading.Thread):
                     self._display.transition(self._last_image, event.artwork)
                 self._last_image = event.artwork
                 self._last_song = event.song
+                self._last_volume = event.volume
             case States.PLAYING:
                 if event.song != self._last_song:
                     if event.artwork != self._last_image:
@@ -174,11 +174,11 @@ class StateMachine(threading.Thread):
 
         return States.PLAYING
 
-    def handle_pause(self):
+    def handle_pause(self, event):
         ic()
         match self._state:
             case States.PAUSED:
-                pass
+                self._last_volume = event.volume
             case States.PLAYING | States.UNKNOWN:
                 # Calculate how long to hold the current image
                 if self._config.pause_delay:
@@ -260,7 +260,7 @@ class StateMachine(threading.Thread):
                     case EventType.PLAY:
                         self._state = self.handle_play(event)
                     case EventType.PAUSE | EventType.STOP:
-                        self._state = self.handle_pause()
+                        self._state = self.handle_pause(event)
                     case EventType.START_SAVER:
                         self.start_screensaver()
                     case EventType.STOP_SAVER:
