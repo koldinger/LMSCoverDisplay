@@ -54,6 +54,7 @@ rich.traceback.install()
 args: argparse.Namespace
 
 monitor: Optional[lms_monitor.PlayerMonitor] = None
+state_machine: Optional[statemachine.StateMachine] = None
 config: SimpleNamespace
 
 from icecream import ic
@@ -69,7 +70,7 @@ event_q = Queue()
 
 TIMEOUT_DEF = 20    # 20 second timeout.   Screen should flush at 30
 
-def handle_signal(_signum, _frame):
+def handle_sighup(_signum, _frame):
     reload_config()
 
 def reload_config():
@@ -84,6 +85,12 @@ def reload_config():
     # Stop the statemachine.
     event_q.put(events.PlayEvent(events.EventType.END))
 
+def handle_quit(_signum, _frame):
+    print("Received SIGTERM")
+    if state_machine:
+        state_machine.stop()
+    if monitor:
+        monitor.close()
 
 def watch_config(configfile):
     c = Path(configfile).absolute()
@@ -210,14 +217,17 @@ def init_display():
             raise ValueError(config.driver)
 
 def main():
-    global args, config, monitor
+    global args, config, monitor, state_machine
     args, config = process_cmdline()
     print(f"Running.   Version: {__version__}")
     if not args.debug:
         ic.disable()
     console = Console()
 
-    signal.signal(signal.SIGHUP, handle_signal)
+    signal.signal(signal.SIGHUP, handle_sighup)
+    signal.signal(signal.SIGTERM, handle_quit)
+    signal.signal(signal.SIGQUIT, handle_quit)
+
     if args.watch_config:
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
 
@@ -237,13 +247,13 @@ def main():
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                sm = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q)
-                monitor = lms_monitor.PlayerMonitor(plr, sm.queue, adjuster)
+                state_machine = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q)
+                monitor = lms_monitor.PlayerMonitor(plr, state_machine.queue, adjuster)
                 monitor.start()
 
                 backoff = 1
 
-                sm.run()
+                state_machine.run()
                 monitor.close()
             except Exception:
                 console.print_exception()
