@@ -241,7 +241,13 @@ def update_now():
 
 @app.route("/reset_services")
 def reset_services():
-    print("Reset services")
+    services = ["lmsdisplay.service", "lmsconfig.service"]
+    print("Reset services: ", services)
+    if args.systemctl:
+        command = ["systemctl", "restart"] + services
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        # Honestly, this print should never happen.   We should be killed before here, but whatever :-)
+        print(result)
     return 200
 
 
