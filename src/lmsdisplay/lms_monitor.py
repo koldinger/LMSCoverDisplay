@@ -42,11 +42,13 @@ from rich import print
 
 import LMSTools
 
+import traceback
 from . import events, util, discovery
+#import events, util, discovery
 
 ic.configureOutput(includeContext=True)
 
-MAX_BACKOFF = 120
+MAX_BACKOFF = 60
 
 
 def command_string(string, query=False):
@@ -160,6 +162,8 @@ class PlayerMonitor(threading.Thread):
 
     def run(self):
         while not self.closed:
+            ic()
+
             # Try to connect with the server.  If not successful, try again,
             # but backoff exponentially for up to MAX_BACKOFF seconds
             try:
@@ -176,6 +180,7 @@ class PlayerMonitor(threading.Thread):
                 print(f"Connection complete with {self.server.host}")
             except Exception as e:
                 print(e)
+                traceback.print_exc()
                 print(f"Could not make connection.  Backing off for {self.backoff} seconds")
                 time.sleep(self.backoff)
                 self.backoff = min(MAX_BACKOFF, self.backoff * 2)
@@ -216,11 +221,16 @@ class PlayerMonitor(threading.Thread):
             except (EOFError, ConnectionResetError) as e:
                 # self.queue.put(MonitorEndedEvent)
                 print(f"Connection ended, retrying: {e}, {type(e)}")
+                #traceback.print_exc(e)
             except ConnectionError as e:
                 # self.queue.put(MonitorEndedEvent)
                 print(f"Other connection error: {e}")
+                #traceback.print_exc(e)
             finally:
-                self.close()
+                self.tn.close()
+                self.tn = None
+                ic()
+        ic("Ending")
 
 
     def close(self):
@@ -229,6 +239,7 @@ class PlayerMonitor(threading.Thread):
         if self.tn:
             self.tn.close()
             self.tn = None
+        ic()
 
 
 if __name__ == "__main__":
@@ -243,4 +254,5 @@ if __name__ == "__main__":
         print(thing)
 
     mon.close()
+    ic()
 
