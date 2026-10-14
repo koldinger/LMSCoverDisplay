@@ -180,7 +180,6 @@ class PlayerMonitor(threading.Thread):
                 print(f"Connection complete with {self.server.host}")
             except Exception as e:
                 print(e)
-                traceback.print_exc()
                 print(f"Could not make connection.  Backing off for {self.backoff} seconds")
                 time.sleep(self.backoff)
                 self.backoff = min(MAX_BACKOFF, self.backoff * 2)
@@ -189,7 +188,7 @@ class PlayerMonitor(threading.Thread):
             try:
                 # Build the subscribe command, and send it.
                 # Adds a few extra tags in, for fun
-                subscribe_cmd = f"{self.player_id} status - 1 tags:ejl subscribe:120"
+                subscribe_cmd = f"{self.player_id} status - 1 tags:ejl subscribe:15"
                 self.send_line(command_string(subscribe_cmd))
                 subscribe_quoted = quote(subscribe_cmd.strip(), safe=" ")
 
