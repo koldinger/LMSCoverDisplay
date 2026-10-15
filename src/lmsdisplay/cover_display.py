@@ -121,7 +121,7 @@ class RotatingDisplay:
             art, delay = next(self.images)
 
             if self.last_image and art != self.last_image:
-                self.display.transition(self.last_image, art, transitions.TransitionTypes.Fade)
+                self.display.transition(self.last_image, art, transitions.TransitionTypes.Fade, 10)
             else:
                 self.display.show_artwork(art)
 
