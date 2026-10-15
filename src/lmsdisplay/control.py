@@ -239,8 +239,8 @@ def update_now():
     print(request)
     return "Update not yet implemented", 501
 
-@app.route("/reset_services")
-def reset_services():
+@app.route("/restart_services")
+def restart_services():
     services = ["lmsdisplay.service", "lmsconfig.service"]
     print("Reset services: ", services)
     if args.systemctl:
