@@ -69,7 +69,7 @@ class CoversScreensaver(ScreenSaver):
         self.display_time = display_time
         self.server = server
         self.adjustor = adjustor
-        self.last_img = self.adjustor.adjustImage(BLANK)
+        self.blank = self.adjustor.adjustImage(BLANK)
 
     def num_albums(self):
         resp = self.server.request(params="info total albums ?")
@@ -98,7 +98,7 @@ class CoversScreensaver(ScreenSaver):
         changetime = datetime.now()
         waittime = min(10.0, self.display_time)
 
-        time.sleep(0.1)
+        last_img = self.blank
 
         while not self.stopped:
             now = datetime.now()
@@ -118,10 +118,10 @@ class CoversScreensaver(ScreenSaver):
                     next_img = self.adjustor.adjustImage(art)
                     if self.brightness < 1:
                         next_img = ImageEnhance.Brightness(next_img).enhance(self.brightness)
-                    self.display.transition(self.last_img, next_img, transitions.TransitionTypes.PageTurn)
+                    self.display.transition(last_img, next_img, transitions.TransitionTypes.PageTurn)
                     changetime = datetime.now() + self.pause_delta
                     ic(datetime.now(), self.pause_delta, changetime, waittime)
-                    self.last_img = next_img
+                    last_img = next_img
                 except Exception:
                     self.display.refresh()
             else:
