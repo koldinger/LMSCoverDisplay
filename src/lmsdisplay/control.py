@@ -239,7 +239,7 @@ def update_now():
     print(request)
     return "Update not yet implemented", 501
 
-@app.route("/restart_services")
+@app.route("/restart_services", methods=["POST"])
 def restart_services():
     services = ["lmsdisplay.service", "lmsconfig.service"]
     print("Reset services: ", services)
