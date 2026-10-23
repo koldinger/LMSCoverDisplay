@@ -241,11 +241,11 @@ def init_saver(config, player, timezone, display, adjuster):
                 c = config.screensavers.aclock
                 saver = screensaver.AnalogClockScreenSaver(display,
                                                            config.screensavers.brightness,
-                                                           True,
+                                                           c.covers,
                                                            player.server,
                                                            timezone,
                                                            adjuster,
-                                                           c.__dict__)
+                                                           {})
             case _:
                 raise ValueError(config.screensavers.screensaver)
     return saver
