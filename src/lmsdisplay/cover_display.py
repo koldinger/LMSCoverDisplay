@@ -34,12 +34,11 @@ import itertools
 import signal
 import threading
 import time
-from datetime import datetime, timedelta
+import zoneinfo
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 from typing import Optional
-import zoneinfo
 
 import nmcli
 import rich.traceback
@@ -48,7 +47,8 @@ from pid import PidFile
 from PIL import Image
 from rich.console import Console
 
-from . import (defaults, discovery, display, events, lms_monitor, qrcodes, statemachine, transitions, util)
+from . import (defaults, discovery, screensaver, display, events, lms_monitor, qrcodes,
+               statemachine, transitions, util)
 
 rich.traceback.install()
 args: argparse.Namespace
@@ -111,13 +111,13 @@ class RotatingDisplay:
     def __init__(self, display, images):
         ic(images, len(images))
         self.images = itertools.cycle(images)
-        self.next = datetime.now()
+        self.next_change = time.monotonic()
         self.last_image = None
         self.display = display
 
     def update(self):
-        now = datetime.now()
-        if now > self.next:
+        now = time.monotonic()
+        if now > self.next_change:
             art, delay = next(self.images)
 
             if self.last_image and art != self.last_image:
@@ -126,7 +126,7 @@ class RotatingDisplay:
                 self.display.show_artwork(art)
 
             self.last_image = art
-            self.next = datetime.now() + timedelta(seconds=delay)
+            self.next_change = time.monotonic() + delay
         else:
             # self.display.show_artwork(self.last_image)
             self.display.refresh()
@@ -162,7 +162,7 @@ def check_player(display):
     """
     Check to see if we're in need of configuration.
 
-    Configuration need is assumed if either the player has not been specied, or 
+    Configuration need is assumed if either the player has not been specified, or
     the specified player cannot be found.
     """
     if not args.check_player:
@@ -216,6 +216,40 @@ def init_display():
         case _:
             raise ValueError(config.driver)
 
+def init_saver(config, player, timezone, display, adjuster):
+    saver: Optional[screensaver.ScreenSaver] = None
+
+    if config.enable_screensaver:
+        match config.screensavers.screensaver:
+            case "covers":
+                c = config.screensavers.covers
+                saver = screensaver.CoversScreenSaver(display,
+                                                      config.screensavers.brightness,
+                                                      player.server,
+                                                      c.display_time,
+                                                      config.frame_delay,
+                                                      adjuster)
+            case "clock":
+                c = config.screensavers.clock
+                saver = screensaver.DigitalClockScreenSaver(display, config.screensavers.brightness,
+                                                            c.hour_format,
+                                                            c.font,
+                                                            c.color,
+                                                            timezone,
+                                                            adjuster)
+            case "aclock":
+                c = config.screensavers.aclock
+                saver = screensaver.AnalogClockScreenSaver(display,
+                                                           config.screensavers.brightness,
+                                                           True,
+                                                           player.server,
+                                                           timezone,
+                                                           adjuster,
+                                                           c.__dict__)
+            case _:
+                raise ValueError(config.screensavers.screensaver)
+    return saver
+
 def main():
     global args, config, monitor, state_machine
     args, config = process_cmdline()
@@ -247,7 +281,10 @@ def main():
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
-                state_machine = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q)
+                saver = init_saver(config, plr, tz, disp, adjuster)
+                ic(saver)
+
+                state_machine = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q, saver)
                 monitor = lms_monitor.PlayerMonitor(plr, state_machine.queue, adjuster)
                 monitor.start()
 

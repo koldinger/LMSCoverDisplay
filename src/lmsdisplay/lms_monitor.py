@@ -180,8 +180,11 @@ class PlayerMonitor(threading.Thread):
                 self.backoff = 1            # Reset the backoff time
                 print(f"Connection complete with {self.server.host}")
             except Exception as e:
-                print(e)
+                #print(e)
                 print(f"Could not make connection.  Backing off for {self.backoff} seconds")
+                img = util.get_internal_art("lyrion-question.jpg")
+                event = events.PlayEvent(events.EventType.PLAY, -1, -1, img)
+                self.queue.put(event)
                 time.sleep(self.backoff)
                 self.backoff = min(MAX_BACKOFF, self.backoff * 2)
                 continue

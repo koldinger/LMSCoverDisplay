@@ -50,7 +50,14 @@ class States(Enum):
 TIMEOUT_DEF = 120
 
 class StateMachine:
-    def __init__(self, config:SimpleNamespace, disp:display.Display, player: LMSPlayer, timezone: datetime.tzinfo, adjuster: util.ImageAdjuster, event_q: queue.Queue):
+    def __init__(self,
+                 config:SimpleNamespace,
+                 disp:display.Display,
+                 player: LMSPlayer,
+                 timezone: datetime.tzinfo,
+                 adjuster: util.ImageAdjuster,
+                 event_q: queue.Queue,
+                 saver: Optional[screensaver.ScreenSaver]):
         self.queue = event_q
 
         self._display = disp
@@ -62,8 +69,9 @@ class StateMachine:
 
         self._timezone = timezone
 
+        self._saver = saver
+
         self._state = States.UNKNOWN
-        self._saver: Optional[screensaver.ScreenSaver] = None
         self._last_image: Optional[Image.Image] = None
         self._last_song = -1
         self._last_volume = -1
@@ -91,30 +99,6 @@ class StateMachine:
             self._undim_event = self._scheduler.enterabs(undim_time.timestamp(),  queue.Queue.put, (self.queue, PlayEvent(EventType.UNDIM)))
         else:
             self._dimmed = False
-
-        # TODO: This should be a constructor argument, honestly.
-        if config.enable_screensaver:
-            match config.screensavers.screensaver:
-                case "covers":
-                    c = config.screensavers.covers
-                    self._saver = screensaver.CoversScreensaver(self._display,
-                                                                config.screensavers.brightness,
-                                                                self._player.server,
-                                                                c.display_time,
-                                                                config.frame_delay,
-                                                                self._adjuster)
-                case "clock":
-                    c = config.screensavers.clock
-                    self._saver = screensaver.DigitalClockScreenSaver(self._display,
-                                                                      config.screensavers.brightness,
-                                                                      c.hour_format,
-                                                                      c.font,
-                                                                      c.color,
-                                                                      self._timezone,
-                                                                      self._adjuster)
-                case _:
-                    raise ValueError(config.screensavers.screensaver)
-
 
     def stop(self):
         self._stop = True
@@ -198,7 +182,6 @@ class StateMachine:
         return States.PAUSED
 
     def start_screensaver(self):
-        ic()
         if self._state == States.PAUSED and not (self._config.disable_screensaver_dimmed and self._dimmed):
             self._display.start_screensaver(self._saver)
 

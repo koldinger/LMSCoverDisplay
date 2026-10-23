@@ -30,7 +30,7 @@
 import random
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 from urllib.parse import urljoin
 import importlib.resources
@@ -40,36 +40,34 @@ from icecream import ic
 from LMSTools import LMSServer
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-from lmsdisplay import display, transitions, util
+from lmsdisplay import display, transitions, util, aclock
 
 ic.configureOutput(includeContext=True)
+#from imgcat import imgcat
 
 BLANK = Image.new("RGB", (64, 64), color=(0, 0, 0))
 
 class ScreenSaver:
     def __init__(self, display, brightness):
-        self.display = display
         self.stopped = False
         self.stop_event = threading.Event()
         self.brightness = brightness
+        self.display = display
 
     def stop(self):
-        ic()
         self.stopped = True
         self.stop_event.set()
 
     def run(self):
         pass
 
-class CoversScreensaver(ScreenSaver):
-    def __init__(self, display, brightness, server, display_time, frame_delay, adjustor):
-        super().__init__(display, brightness)
-        self.frame_delay = frame_delay
-        self.pause_delta = timedelta(seconds=display_time)
-        self.display_time = display_time
+    def set_display(self, display: display.Display|None):
+        self.display = display
+
+class ArtMixin:
+    def __init__(self, *args, server=None, **kwargs):
         self.server = server
-        self.adjustor = adjustor
-        self.blank = self.adjustor.adjustImage(BLANK)
+        super().__init__(*args, **kwargs)
 
     def num_albums(self):
         resp = self.server.request(params="info total albums ?")
@@ -87,21 +85,31 @@ class CoversScreensaver(ScreenSaver):
 
     def get_art(self, track_id) -> Image.Image:
         url = urljoin(self.server.url, f"music/{track_id}/cover.jpg")
-        ic(url)
         resp = requests.get(url, timeout=(5, 10))
         img = Image.open(BytesIO(resp.content)) if resp.status_code == requests.codes["ok"] else None
         return img
 
+class CoversScreenSaver(ArtMixin, ScreenSaver):
+    def __init__(self, display, brightness, server, display_time, frame_delay, adjuster):
+        super().__init__(display, brightness)
+        self.frame_delay = frame_delay
+        self.pause_delta = display_time
+        self.display_time = display_time
+        self.server = server
+        self.adjuster = adjuster
+        self.blank = self.adjuster.adjustImage(BLANK)
+
+
     def run(self):
         self.stopped = False
         ic("Covers Starting")
-        changetime = datetime.now()
+        changetime = time.monotonic()
         waittime = min(10.0, self.display_time)
 
         last_img = self.blank
 
         while not self.stopped:
-            now = datetime.now()
+            now = time.monotonic()
             ic(now, changetime, now >= changetime)
 
             if now >= changetime:
@@ -115,12 +123,12 @@ class CoversScreensaver(ScreenSaver):
                         ic("No art")
                         continue
 
-                    next_img = self.adjustor.adjustImage(art)
+                    next_img = self.adjuster.adjustImage(art)
                     if self.brightness < 1:
                         next_img = ImageEnhance.Brightness(next_img).enhance(self.brightness)
                     self.display.transition(last_img, next_img, transitions.TransitionTypes.PageTurn)
-                    changetime = datetime.now() + self.pause_delta
-                    ic(datetime.now(), self.pause_delta, changetime, waittime)
+                    changetime = time.monotonic() + self.pause_delta
+                    ic(time.monotonic(), self.pause_delta, changetime, waittime)
                     last_img = next_img
                 except Exception:
                     self.display.refresh()
@@ -132,14 +140,14 @@ class CoversScreensaver(ScreenSaver):
             self.stop_event.clear()
 
         ic()
-        self.display.transition(self.last_img, self.adjustor.adjustImage(BLANK), transitions.TransitionTypes.PageTurn)
+        self.display.transition(self.last_img, self.adjuster.adjustImage(BLANK), transitions.TransitionTypes.PageTurn)
         ic("Screensaver Done")
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display, brightness, time_fmt, font, color, timezone, adjustor):
+    def __init__(self, display, brightness, time_fmt, font, color, timezone, adjuster):
         super().__init__(display, brightness)
-        self.adjustor = adjustor
+        self.adjuster = adjuster
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
         self.timezone = timezone
         self.color = color
@@ -153,7 +161,7 @@ class DigitalClockScreenSaver(ScreenSaver):
         self.stopped = False
         ic("DigitalClock Starting")
         minute = -1
-        last_img = self.adjustor.adjustImage(BLANK)
+        last_img = self.adjuster.adjustImage(BLANK)
         images = []
 
         while not self.stopped:
@@ -169,12 +177,13 @@ class DigitalClockScreenSaver(ScreenSaver):
                     txt = now.strftime(self.formats[i])
                     drw.text((100, 100), txt, fill=self.color, font=self.font, anchor="mm")
 
-                    images[i] = self.adjustor.adjustImage(images[i])
+                    images[i] = self.adjuster.adjustImage(images[i])
                     if self.brightness < 1:
                         images[i] = ImageEnhance.Brightness(images[i]).enhance(self.brightness)
 
             n = self.display.transition(last_img, images[0], transitions.TransitionTypes.Fade, frames=5)
             s = max((1.0 - (n * self.display.frame_delay)), 0)
+            # sleep, using time.sleep becoause we don't wat to be interrupted here
             time.sleep(s)
             n = self.display.transition(images[0], images[1], transitions.TransitionTypes.Fade, frames=5)
             last_img = images[1]
@@ -182,6 +191,45 @@ class DigitalClockScreenSaver(ScreenSaver):
             self.stop_event.clear()
 
         self.display.transition(last_img, BLANK, transitions.TransitionTypes.Fade)
+        ic("Screensaver Done")
+
+class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
+    def __init__(self, display, brightness: int, covers: bool, server: LMSServer, timezone, adjuster, aclock_args):
+        super().__init__(display, brightness, server=server)
+        print(aclock_args)
+        self.clock = aclock.AnalogClock((512, 512), seconds=False, **aclock_args)
+        self.timezone = timezone
+        self.adjuster = adjuster
+        self.server = server
+        self.covers = covers
+        self.blank = self.adjuster.adjustImage(BLANK)
+
+
+    def run(self):
+        self.stopped = False
+        next_img = self.blank
+        last_img = self.blank
+
+        while not self.stopped:
+            now = datetime.now(tz=self.timezone).time()
+            # Use the adjuster here?
+            clk_img = self.clock.draw(now.hour, now.minute, now.second).resize(self.display.imgsize)
+            self.display.set_overlay(clk_img)
+            if self.covers:
+                last_img = next_img
+                album = self.random_album()
+                track_id = album["artwork_track_id"]
+                art = self.get_art(track_id)
+                next_img = self.adjuster.adjustImage(art) if art else self.blank
+            self.display.transition(last_img, next_img, transitions.TransitionTypes.Fade)
+            #self.display.show_artwork(art)
+
+            s = 60 - now.second
+            self.stop_event.wait(timeout=s)
+            self.stop_event.clear()
+
+        self.display.set_overlay(None)
+        self.display.transition(next_img, None, transitions.TransitionTypes.Fade)
         ic("Screensaver Done")
 
 if __name__ == "__main__":
@@ -200,8 +248,10 @@ if __name__ == "__main__":
         "port": 1337,
     }
     disp = display.FlashenDisplay([], 25, 0.05, (64, 64), 0, SimpleNamespace(**config))
-    adjustor = util.ImageAdjuster(1.0, 1.0, 64)
-    s = Covers(disp, server, 5, 0.05, adjustor)
+    adjuster = util.ImageAdjuster(1.0, 1.0, 64)
+    s = CoversScreenSaver(disp, server, 5, 0.05, adjuster)
     run_saver(s)
-    s = DigitalClockScreenSaver(disp, 12, "bold-italic", adjustor)
+    s = DigitalClockScreenSaver(disp, 12, "bold-italic", adjuster)
+    run_saver(s)
+    s = AnalogClockScreenSaver(disp, 12, "bold-italic", adjuster)
     run_saver(s)

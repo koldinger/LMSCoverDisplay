@@ -56,6 +56,7 @@ defaults = {
             "font": "regular",
             "color": "#ff0000",
         },
+        "aclock": { },
     },
     "drivers": {
         "driver": "internal",

@@ -35,9 +35,9 @@ from types import SimpleNamespace
 
 from PIL import Image, ImageEnhance
 
-from . import screensaver, transitions
+from . import transitions
 
-#from icecream import ic
+from icecream import ic
 
 try:
     import flaschen
@@ -87,17 +87,14 @@ class Display:
         pass
 
     def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
-        if not trans:
-            trans = random.choice(self.translist)
+        # use the specified transition, or choose one
+        trans = trans or random.choice(self.translist)
 
-        if not old_artwork:
-            old_artwork = self.blank
-        if not new_artwork:
-            new_artwork = self.blank
-        if frames is None:
-            frames = self.frames
-        if frame_delay is None:
-            frame_delay = self.frame_delay
+        # Get values, overriding the internal values if specified
+        old_artwork = old_artwork or self.blank
+        new_artwork = new_artwork or self.blank
+        frames = frames or self.frames
+        frame_delay = frame_delay or self.frame_delay
 
         func = trans.function
         nframes = 0
@@ -113,6 +110,7 @@ class Display:
         pass
 
     def start_screensaver(self, saver):
+        ic(saver)
         self.saver = saver
         self.saver_thread = Thread(target=self.saver.run, daemon=True)
         self.saver_thread.daemon = True
