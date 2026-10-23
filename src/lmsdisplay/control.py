@@ -402,6 +402,7 @@ def processCommandLine():
     parser.add_argument("--port", default=5000, type=util.port_number, help="Listen on this port.")
     parser.add_argument("--pidfiles",    default=[], nargs="*", type=Path,         help="Signal the display process to reread configurations")
     parser.add_argument("--config", type=Path,   help="Config file for the display process")
+    parser.add_argument("--write", action="store_true", help="Write a new config file and exit")
     parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
     parser.add_argument("--imagedir", type=Path, default=Path("/opt/share/lmsdisplay"), help="Location of image files")
     parser.add_argument("--systemctl", action=argparse.BooleanOptionalAction, default=True, help="Call (or not) systemctl methods.   For debugging.")
@@ -421,8 +422,10 @@ def main():
             Prerenderer().start()
 
         # Generate a config file if it doesn't exist already
-        if args.config and not args.config.exists():
+        if (args.config and (not args.config.exists() or args.write)):
             write_config(args.config, defaults.defaults)
+            if args.write:
+                return
 
         waitress.serve(app, host="0.0.0.0", port=args.port)
         #app.run(host="0.0.0.0", port=args.port)
