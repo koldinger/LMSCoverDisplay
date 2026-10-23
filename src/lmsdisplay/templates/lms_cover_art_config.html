@@ -515,6 +515,7 @@
       <select id="screensaver-type">
         <option value="covers"{% if presets.screensavers.screensaver | default('covers') == 'covers' %} selected{% endif %}>Covers</option>
         <option value="clock"{% if presets.screensavers.screensaver | default('covers') == 'clock' %} selected{% endif %}>Digital Clock</option>
+        <option value="analog"{% if presets.screensavers.screensaver | default('covers') == 'analog' %} selected{% endif %}>Analog Clock</option>
       </select>
       <div class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
     </div>
@@ -567,6 +568,37 @@
         <input type="color" id="clock-color" value="{{ presets.screensavers.clock.color | default('#ffffff') }}">
         <span class="color-picker-val" id="clock-color-val">{{ presets.screensavers.clock.color | default('#ffffff') }}</span>
       </div>
+    </div>
+  </div>
+
+  {# ── Analog Clock sub-options ──────────────────────────────────────────── #}
+  <div class="driver-sub" id="screensaver-analog-sub">
+    <div class="field-block">
+      <div class="section-label">Edge Color</div>
+      <div class="color-picker-row">
+        <input type="color" id="analog-edge-color" value="{{ presets.screensavers.analog.edge_color | default('#ffffff') }}">
+        <span class="color-picker-val" id="analog-edge-color-val">{{ presets.screensavers.analog.edge_color | default('#ffffff') }}</span>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="section-label">Hand Color</div>
+      <div class="color-picker-row">
+        <input type="color" id="analog-hand-color" value="{{ presets.screensavers.analog.hand_color | default('#ffffff') }}">
+        <span class="color-picker-val" id="analog-hand-color-val">{{ presets.screensavers.analog.hand_color | default('#ffffff') }}</span>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="section-label">Tick Color</div>
+      <div class="color-picker-row">
+        <input type="color" id="analog-tick-color" value="{{ presets.screensavers.analog.tick_color | default('#ffffff') }}">
+        <span class="color-picker-val" id="analog-tick-color-val">{{ presets.screensavers.analog.tick_color | default('#ffffff') }}</span>
+      </div>
+    </div>
+    <div class="field-block">
+      <label class="checkbox-row">
+        <input type="checkbox" id="analog-display-covers"{% if presets.screensavers.analog.display_covers | default(false) %} checked{% endif %}>
+        <span>Display Covers behind clock</span>
+      </label>
     </div>
   </div>
   </div>
@@ -945,11 +977,14 @@ displayPortEl.addEventListener('blur', () => {
 const screensaverTypeEl      = document.getElementById("screensaver-type");
 const screensaverCoverflowSub = document.getElementById("screensaver-covers-sub");
 const screensaverClockSub    = document.getElementById("screensaver-clock-sub");
+const screensaverAnalogSub   = document.getElementById("screensaver-analog-sub");
 function updateScreensaverSub() {
   const isCoverflow = screensaverTypeEl.value === "covers";
   const isClock     = screensaverTypeEl.value === "clock";
+  const isAnalog    = screensaverTypeEl.value === "analog";
   screensaverCoverflowSub.classList.toggle("visible", isCoverflow);
   screensaverClockSub.classList.toggle("visible", isClock);
+  screensaverAnalogSub.classList.toggle("visible", isAnalog);
 }
 screensaverTypeEl.addEventListener("change", updateScreensaverSub);
 updateScreensaverSub();
@@ -964,6 +999,20 @@ screensaverDelayEl.addEventListener("input", () => {
 const clockColorEl = document.getElementById('clock-color');
 clockColorEl.addEventListener('input', () => {
   document.getElementById('clock-color-val').textContent = clockColorEl.value;
+});
+
+// ── Analog clock color pickers ──────────────────────────────────────────────
+const analogEdgeColorEl = document.getElementById('analog-edge-color');
+analogEdgeColorEl.addEventListener('input', () => {
+  document.getElementById('analog-edge-color-val').textContent = analogEdgeColorEl.value;
+});
+const analogHandColorEl = document.getElementById('analog-hand-color');
+analogHandColorEl.addEventListener('input', () => {
+  document.getElementById('analog-hand-color-val').textContent = analogHandColorEl.value;
+});
+const analogTickColorEl = document.getElementById('analog-tick-color');
+analogTickColorEl.addEventListener('input', () => {
+  document.getElementById('analog-tick-color-val').textContent = analogTickColorEl.value;
 });
 
 // ── Screensaver brightness slider ───────────────────────────────────────────
@@ -999,6 +1048,12 @@ function collectFormData() {
         hour_format: parseInt(document.getElementById('clock-hour-format').value, 10),
         font:        document.getElementById('clock-font').value,
         color:       document.getElementById('clock-color').value,
+      },
+      analog: {
+        edge_color:     document.getElementById('analog-edge-color').value,
+        hand_color:     document.getElementById('analog-hand-color').value,
+        tick_color:     document.getElementById('analog-tick-color').value,
+        display_covers: document.getElementById('analog-display-covers').checked,
       },
     },
     show_volume_bar:             document.getElementById('volume').checked,

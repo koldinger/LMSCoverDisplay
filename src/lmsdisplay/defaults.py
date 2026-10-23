@@ -56,8 +56,11 @@ defaults = {
             "font": "regular",
             "color": "#ff0000",
         },
-        "aclock": {
-            "covers": False,
+        "analog": {
+            "display_covers": False,
+            "edge_color" : "#252bd4",
+            "hand_color" : "#c8f42a",
+            "tick_color" : "#f4eb01",
         },
     },
     "drivers": {

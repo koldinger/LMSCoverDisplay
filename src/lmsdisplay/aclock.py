@@ -162,8 +162,10 @@ class AnalogClock:
 
         # Covert a color specification to RGBA format, with a specified alpha channel.
         def _toRGBA(color, alpha):
-            if type(color) is tuple and len(color) == 4:
-                return color
+            if type(color) is tuple:
+                if len(color) == 3:
+                    return color
+                return (*color, alpha)
             rgb = ImageColor.getrgb(color)
             if len(rgb) != 4:
                 rgb = (*rgb, alpha)

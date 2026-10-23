@@ -44,7 +44,7 @@ import nmcli
 import rich.traceback
 import watchfiles
 from pid import PidFile
-from PIL import Image
+from PIL import Image, ImageColor
 from rich.console import Console
 
 from . import (defaults, discovery, screensaver, display, events, lms_monitor, qrcodes,
@@ -237,15 +237,20 @@ def init_saver(config, player, timezone, display, adjuster):
                                                             c.color,
                                                             timezone,
                                                             adjuster)
-            case "aclock":
-                c = config.screensavers.aclock
+            case "analog":
+                c = config.screensavers.analog
+                clock_config = {
+                    "edge_color": ImageColor.getrgb(c.edge_color),
+                    "hand_color": ImageColor.getrgb(c.hand_color),
+                    "tick_color": ImageColor.getrgb(c.tick_color),
+                }
                 saver = screensaver.AnalogClockScreenSaver(display,
                                                            config.screensavers.brightness,
-                                                           c.covers,
+                                                           c.display_covers,
                                                            player.server,
                                                            timezone,
                                                            adjuster,
-                                                           {})
+                                                           clock_config)
             case _:
                 raise ValueError(config.screensavers.screensaver)
     return saver
