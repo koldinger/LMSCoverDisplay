@@ -197,7 +197,7 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
     def __init__(self, display, brightness: int, covers: bool, server: LMSServer, timezone, adjuster, aclock_args):
         super().__init__(display, brightness, server=server)
         print(aclock_args)
-        self.clock = aclock.AnalogClock((512, 512), seconds=False, **aclock_args)
+        self.clock = aclock.AnalogClock(display.size(), seconds=False, **aclock_args)
         self.timezone = timezone
         self.adjuster = adjuster
         self.server = server
@@ -206,6 +206,7 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
 
 
     def run(self):
+        ic("Staring AnalogClockScreenSaver")
         self.stopped = False
         next_img = self.blank
         last_img = self.blank
