@@ -34,14 +34,16 @@ from contextlib import suppress
 from enum import auto
 from functools import partial
 from hashlib import md5
-from math import ceil
+from math import ceil, sqrt
 from pathlib import Path
 
 import numpy as np
 import rich.traceback
 from numpy.linalg import LinAlgError
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageDraw
 from strenum import StrEnum
+
+from imgcat import imgcat
 
 rich.traceback.install()
 
@@ -624,6 +626,36 @@ def lines(oimg, nimg, steps, rotation=0):
     yield from _rotate(rotation, _doBoxes, oimg, nimg, strips)
     yield nimg
 
+def _doPinwheel(oimg, nimg, steps, sections):
+    wedge = int(360 / sections)         # Angle of each wedge
+    increment = (wedge / steps)         # angle added each time
+
+    x, y = oimg.size
+    x2 = x / 2
+    y2 = y / 2
+    radius = ceil(sqrt(x2 ** 2  + y2 ** 2))             # Determine the radius, ie, distance from center to corner
+    box = ((x2 - radius, y2 - radius), (x2 + radius, y2 + radius))  # Create a bounding box.
+
+    mask = Image.new("LA", oimg.size)
+    dmask = ImageDraw.Draw(mask)
+
+    result = oimg.copy()
+
+    for i in range(0, steps):
+        angle = (i * increment)
+        for j in range(0, sections):
+            base = j * wedge
+            dmask.pieslice(box, base, base+angle, fill=(255, 255))
+
+            result.paste(nimg, (0, 0), mask=mask)
+        yield result
+
+
+def pinwheel(oimg, nimg, steps, rotation=0, wedges=1):
+    yield oimg
+    steps = max(int(steps/wedges), 8)
+    yield from _rotate(rotation, _doPinwheel, oimg, nimg, steps, wedges)
+    yield nimg
 
 def instant(oimg, nimg, _):
     """ Instantly transition to the new image. """
@@ -718,6 +750,10 @@ class TransitionTypes(StrEnum):
     Unrip_Vert = auto(), "Push image together vertically", partial(unrip, rotation=90)
     Lines_Horiz = auto(), "Draw lines horizontally", partial(lines, rotation=90)
     Lines_Vert = auto(), "Draw lines vertically", partial(lines, rotation=0)
+    Pinwheel = auto(), "Draw a pinwheel", partial(pinwheel, wedges=1, rotation=270)
+    Pinwheel2 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=2)
+    Pinwheel4 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=4)
+    Pinwheel8 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=8)
 
 class Directions(StrEnum):
     Up = auto()
@@ -776,6 +812,7 @@ class TransitionGroups(StrEnum):
     Unrip = auto(), "Push the image together", UpDown
     Lines = auto(), "Draw lines one at a time", UpDown
     PageTurn = auto(), "Turn a page", None
+    Pinwheel = auto(), "Draw a Pinwheel to change", [None, "Pinwheel2", "Pinwheel4", "Pinwheel8"]
 
 
 def make_transitions(group):
