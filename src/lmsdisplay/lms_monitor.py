@@ -183,6 +183,7 @@ class PlayerMonitor(threading.Thread):
                 #print(e)
                 print(f"Could not make connection.  Backing off for {self.backoff} seconds")
                 img = util.get_internal_art("lyrion-question.jpg")
+                img = self.adjuster.adjustImage(img)
                 event = events.PlayEvent(events.EventType.PLAY, -1, -1, img)
                 self.queue.put(event)
                 time.sleep(self.backoff)
