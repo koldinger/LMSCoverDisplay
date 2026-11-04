@@ -366,7 +366,7 @@ if __name__ == "__main__":
                         edge_width=1,
                         tick_color="gold",
                         tick_width=1,
-                        tick_length=1,
+                        tick_length=.05,
                         hand_color="silver",
                         hand_width=1,
                         hr_hand_color="green",
