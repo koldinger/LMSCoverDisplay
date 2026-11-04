@@ -272,10 +272,11 @@ def main():
 
     with PidFile("lmsdisplay"):
         backoff = 1
-        disp = init_display()
         while True:
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
             tz = zoneinfo.ZoneInfo(config.timezone)
+
+            disp = init_display()
 
             check_connection(disp)
             check_player(disp)
@@ -286,8 +287,10 @@ def main():
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
 
+
                 saver = init_saver(config, plr, tz, disp, adjuster)
                 ic(saver)
+
 
                 state_machine = statemachine.StateMachine(config, disp, plr, tz, adjuster, event_q, saver)
                 monitor = lms_monitor.PlayerMonitor(plr, state_machine.queue, adjuster)

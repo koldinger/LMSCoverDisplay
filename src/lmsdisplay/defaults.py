@@ -72,7 +72,7 @@ defaults = {
         "internal": {
             "gpio_slowdown": 2,
             "max_framerate": 120,
-            "brightness": 75,
+            "led_brightness": 75,
             "hw_mapping": "adafruit-hat-pwm",
         },
     },
