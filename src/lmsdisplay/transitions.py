@@ -43,8 +43,6 @@ from numpy.linalg import LinAlgError
 from PIL import Image, ImageEnhance, ImageDraw
 from strenum import StrEnum
 
-from imgcat import imgcat
-
 rich.traceback.install()
 
 """
@@ -528,9 +526,9 @@ def _slice(img, num):
         slices.append(slice)
     return slices
 
-def _doBars(oimg, nimg, steps):
-    oslices = _slice(oimg, 4)
-    nslices = _slice(nimg, 4)
+def _doBars(oimg, nimg, steps, slices=4):
+    oslices = _slice(oimg, slices)
+    nslices = _slice(nimg, slices)
 
     angle = 0
     bars = []
@@ -617,6 +615,11 @@ def diagonal(oimg, nimg, steps, rotation=0):
 def bars(oimg, nimg, steps, rotation=0):
     yield oimg
     yield from _rotate(rotation, _doBars, oimg, nimg, steps)
+    yield nimg
+
+def blast(oimg, nimg, steps, rotation=0):
+    yield oimg
+    yield from _rotate(rotation, _doBars, oimg, nimg, 4, oimg.size[0])
     yield nimg
 
 def lines(oimg, nimg, steps, rotation=0):
@@ -750,10 +753,13 @@ class TransitionTypes(StrEnum):
     Unrip_Vert = auto(), "Push image together vertically", partial(unrip, rotation=90)
     Lines_Horiz = auto(), "Draw lines horizontally", partial(lines, rotation=90)
     Lines_Vert = auto(), "Draw lines vertically", partial(lines, rotation=0)
-    Pinwheel = auto(), "Draw a pinwheel", partial(pinwheel, wedges=1, rotation=270)
-    Pinwheel2 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=2)
-    Pinwheel4 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=4)
-    Pinwheel8 = auto(), "Draw a pinwheel", partial(pinwheel, wedges=8)
+    Pinwheel_1 = auto(), "Draw a pinwheel with a single hand", partial(pinwheel, wedges=1, rotation=270)
+    Pinwheel_2 = auto(), "Draw a pinwheel with 2 hands", partial(pinwheel, wedges=2)
+    Pinwheel_4 = auto(), "Draw a pinwheel with 4 hands", partial(pinwheel, wedges=4)
+    Pinwheel_8 = auto(), "Draw a pinwheel with 8 hands", partial(pinwheel, wedges=8)
+
+    # Blast_Horiz = auto(), "Blast lines across", partial(blast, rotation=0)
+    # Blast_Vert  = auto(), "Blast lines across", partial(blast, rotation=90)
 
 class Directions(StrEnum):
     Up = auto()
@@ -812,7 +818,8 @@ class TransitionGroups(StrEnum):
     Unrip = auto(), "Push the image together", UpDown
     Lines = auto(), "Draw lines one at a time", UpDown
     PageTurn = auto(), "Turn a page", None
-    Pinwheel = auto(), "Draw a Pinwheel to change", [None, "Pinwheel2", "Pinwheel4", "Pinwheel8"]
+    Pinwheel = auto(), "Draw a Pinwheel to change", ["1", "2", "4", "8"]
+    # Blast = auto(), "Blast rows across", UpDown
 
 
 def make_transitions(group):
