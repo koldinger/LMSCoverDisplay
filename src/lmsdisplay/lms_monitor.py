@@ -231,8 +231,9 @@ class PlayerMonitor(threading.Thread):
                 print(f"Other connection error: {e}")
                 #traceback.print_exc(e)
             finally:
-                self.tn.close()
-                self.tn = None
+                if self.tn:
+                    self.tn.close()
+                    self.tn = None
                 ic()
         ic("Ending")
 
