@@ -48,7 +48,7 @@ ic.configureOutput(includeContext=True)
 BLANK = Image.new("RGB", (64, 64), color=(0, 0, 0))
 
 class ScreenSaver:
-    def __init__(self, display, brightness):
+    def __init__(self, display: display.Display, brightness: float):
         self.stopped = False
         self.stop_event = threading.Event()
         self.brightness = brightness
@@ -65,7 +65,9 @@ class ScreenSaver:
         self.display = display
 
 class ArtMixin:
-    def __init__(self, *args, server=None, **kwargs):
+    """ Mixin to retrieve album covers (art) from the server, usually for random albums. """
+
+    def __init__(self, *args, server: LMSServer, **kwargs):
         self.server = server
         super().__init__(*args, **kwargs)
 
@@ -90,7 +92,7 @@ class ArtMixin:
         return img
 
 class CoversScreenSaver(ArtMixin, ScreenSaver):
-    def __init__(self, display, brightness, server, display_time, frame_delay, adjuster):
+    def __init__(self, display: display.Display, brightness: float, server: LMSServer, display_time: int, frame_delay: float, adjuster: util.ImageAdjuster):
         super().__init__(display, brightness)
         self.frame_delay = frame_delay
         self.pause_delta = display_time
@@ -140,12 +142,12 @@ class CoversScreenSaver(ArtMixin, ScreenSaver):
             self.stop_event.clear()
 
         ic()
-        self.display.transition(self.last_img, self.adjuster.adjustImage(BLANK), transitions.TransitionTypes.PageTurn)
+        self.display.transition(last_img, self.adjuster.adjustImage(BLANK), transitions.TransitionTypes.PageTurn)
         ic("Screensaver Done")
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display, brightness, time_fmt, font, color, timezone, adjuster):
+    def __init__(self, display: display.Display, brightness: float, time_fmt: str, font: str, color: str|tuple , timezone: str, adjuster: util.ImageAdjuster):
         super().__init__(display, brightness)
         self.adjuster = adjuster
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
@@ -194,9 +196,8 @@ class DigitalClockScreenSaver(ScreenSaver):
         ic("Screensaver Done")
 
 class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
-    def __init__(self, display, brightness: int, covers: bool, server: LMSServer, timezone, adjuster, aclock_args):
+    def __init__(self, display: display.Display, brightness: int, covers: bool, server: LMSServer, timezone, adjuster, aclock_args):
         super().__init__(display, brightness, server=server)
-        print(aclock_args)
         self.clock = aclock.AnalogClock(display.size(), seconds=False, **aclock_args)
         self.timezone = timezone
         self.adjuster = adjuster
