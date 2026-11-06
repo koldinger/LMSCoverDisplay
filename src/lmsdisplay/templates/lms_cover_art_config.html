@@ -35,7 +35,7 @@
                     "orientation"               : int   (0, 90, 180, or 270, default 0)
                     "image_size"                : int   (positive integer, default 64)
                     "drivers"                   : dict  {
-                        "driver"                : str   ("flaschen" | "internal", default "flaschen")
+                        "driver"                : str   ("flaschen" | "internal" | "emulated", default "flaschen")
                         "flaschen"              : dict  { "display_host": str, "display_port": int }
                         "internal"              : dict  { "max_framerate": int, "gpio_slowdown": int,
                                                           "led_brightness": int, "hw_mapping": str }
@@ -515,7 +515,7 @@
       <select id="screensaver-type">
         <option value="covers"{% if presets.screensavers.screensaver | default('covers') == 'covers' %} selected{% endif %}>Covers</option>
         <option value="clock"{% if presets.screensavers.screensaver | default('covers') == 'clock' %} selected{% endif %}>Digital Clock</option>
-        <!-- <option value="analog"{% if presets.screensavers.screensaver | default('covers') == 'analog' %} selected{% endif %}>Analog Clock</option> -->
+        <option value="analog"{% if presets.screensavers.screensaver | default('covers') == 'analog' %} selected{% endif %}>Analog Clock</option>
       </select>
       <div class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
     </div>
@@ -574,24 +574,28 @@
   {# ── Analog Clock sub-options ──────────────────────────────────────────── #}
   <div class="driver-sub" id="screensaver-analog-sub">
     <div class="field-block">
-      <div class="section-label">Edge Color</div>
-      <div class="color-picker-row">
-        <input type="color" id="analog-edge-color" value="{{ presets.screensavers.analog.edge_color | default('#ffffff') }}">
-        <span class="color-picker-val" id="analog-edge-color-val">{{ presets.screensavers.analog.edge_color | default('#ffffff') }}</span>
-      </div>
-    </div>
-    <div class="field-block">
-      <div class="section-label">Hand Color</div>
-      <div class="color-picker-row">
-        <input type="color" id="analog-hand-color" value="{{ presets.screensavers.analog.hand_color | default('#ffffff') }}">
-        <span class="color-picker-val" id="analog-hand-color-val">{{ presets.screensavers.analog.hand_color | default('#ffffff') }}</span>
-      </div>
-    </div>
-    <div class="field-block">
-      <div class="section-label">Tick Color</div>
-      <div class="color-picker-row">
-        <input type="color" id="analog-tick-color" value="{{ presets.screensavers.analog.tick_color | default('#ffffff') }}">
-        <span class="color-picker-val" id="analog-tick-color-val">{{ presets.screensavers.analog.tick_color | default('#ffffff') }}</span>
+      <div style="display:flex; gap:2rem; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <div class="section-label">Edge Color</div>
+          <div class="color-picker-row">
+            <input type="color" id="analog-edge-color" value="{{ presets.screensavers.analog.edge_color | default('#ffffff') }}">
+            <span class="color-picker-val" id="analog-edge-color-val">{{ presets.screensavers.analog.edge_color | default('#ffffff') }}</span>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Hand Color</div>
+          <div class="color-picker-row">
+            <input type="color" id="analog-hand-color" value="{{ presets.screensavers.analog.hand_color | default('#ffffff') }}">
+            <span class="color-picker-val" id="analog-hand-color-val">{{ presets.screensavers.analog.hand_color | default('#ffffff') }}</span>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Tick Color</div>
+          <div class="color-picker-row">
+            <input type="color" id="analog-tick-color" value="{{ presets.screensavers.analog.tick_color | default('#ffffff') }}">
+            <span class="color-picker-val" id="analog-tick-color-val">{{ presets.screensavers.analog.tick_color | default('#ffffff') }}</span>
+          </div>
+        </div>
       </div>
     </div>
     <div class="field-block">
@@ -637,6 +641,7 @@
           <select class="field-input" id="driver" style="padding-left:36px">
             <option value="flaschen"{% if (presets.drivers.driver | default("flaschen")) == "flaschen" %} selected{% endif %}>Flaschen</option>
             <option value="internal"{% if (presets.drivers.driver | default("flaschen")) == "internal" %} selected{% endif %}>Internal</option>
+            {% if debug | default(false) %}<option value="emulated"{% if (presets.drivers.driver | default("flaschen")) == "emulated" %} selected{% endif %}>Emulated</option>{% endif %}
           </select>
           <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
         </div>
@@ -1309,7 +1314,7 @@ const driverSub    = document.getElementById("driver-sub");
 const flaschenSub  = document.getElementById("flaschen-sub");
 const flaschenNote = document.getElementById("flaschen-note");
 function updateDriverSub() {
-  const isInternal = driverSelect.value === "internal";
+  const isInternal = driverSelect.value === "internal" || driverSelect.value === "emulated";
   const isFlaschen = driverSelect.value === "flaschen";
   driverSub.classList.toggle("visible", isInternal);
   flaschenSub.classList.toggle("visible", isFlaschen);
