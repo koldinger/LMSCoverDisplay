@@ -143,7 +143,7 @@ def save_config():
         presets = SimpleNamespace(**defaults.defaults)
 
     old_disp = presets["drivers"]["driver"]
-    old_disp = "internal" if old_disp == "emulated" else new_disp
+    old_disp = "internal" if old_disp == "emulated" else old_disp
     old_disp_conf = presets["drivers"][old_disp]
 
     config = request.json
