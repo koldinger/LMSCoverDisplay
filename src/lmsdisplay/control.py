@@ -126,7 +126,8 @@ def index():
                            players=players,
                            transitions=trans,
                            timezones=timezones,
-                           version=__version__)
+                           version=__version__,
+                           debug=args.debug)
 
 
 @app.route("/save_config", methods=["POST"])
@@ -147,6 +148,7 @@ def save_config():
     config = request.json
     # Remove values we don't save.
     new_disp = config["drivers"]["driver"]
+    new_disp = "internal" if new_disp == "emulated" else new_disp
     new_disp_conf = config["drivers"][new_disp]
 
     # Remove the hostname, we don't want to save it.
@@ -321,6 +323,11 @@ def make_transition(images, transition):
 
     return results
 
+def art_exists(ttype, transition) -> bool:
+    t_name = Path(transition).stem.replace("-", "_")
+    filepath = Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
+    return filepath.exists()
+
 def get_art_path(ttype, transition) -> Path:
     t_name = Path(transition).stem.replace("-", "_")
     filepath = Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
@@ -385,17 +392,19 @@ def write_config(filename, config):
 class Prerenderer(threading.Thread):
     def run(self):
         for g in transitions.TransitionGroups:
-            print(f"Generating group {g} ", end="", flush=True)
-            s_time = time.thread_time()
-            p = get_art_path("groups", str(g) + ".webp")
-            e_time = time.thread_time()
-            print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
+            if not art_exists("groups", str(g)):
+                print(f"Generating group {g} ", end="", flush=True)
+                s_time = time.thread_time()
+                p = get_art_path("groups", str(g))
+                e_time = time.thread_time()
+                print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
         for t in transitions.TransitionTypes:
-            s_time = time.thread_time()
-            print(f"Generating transition {t} ", end="", flush=True)
-            get_art_path("transitions", str(t) + ".webp")
-            e_time = time.thread_time()
-            print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
+            if not art_exists("transitions", str(t)):
+                s_time = time.thread_time()
+                print(f"Generating transition {t} ", end="", flush=True)
+                p = get_art_path("transitions", str(t))
+                e_time = time.thread_time()
+                print(f"{p} generated.  {(e_time - s_time):0.3f} CPU seconds")
 
 def processCommandLine():
     parser = argparse.ArgumentParser("LMS Display Configuration Web Interface")
@@ -406,6 +415,7 @@ def processCommandLine():
     parser.add_argument("--prerender", action=argparse.BooleanOptionalAction, default=False, help="Prerender art")
     parser.add_argument("--imagedir", type=Path, default=Path("/opt/share/lmsdisplay"), help="Location of image files")
     parser.add_argument("--systemctl", action=argparse.BooleanOptionalAction, default=True, help="Call (or not) systemctl methods.   For debugging.")
+    parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=False, help="Enable debugging function")
     parser.add_argument("--version", action="version", version =__version__)
 
     return parser.parse_args()
