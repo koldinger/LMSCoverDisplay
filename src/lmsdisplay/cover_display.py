@@ -204,10 +204,13 @@ def process_cmdline() -> tuple[argparse.Namespace, SimpleNamespace]:
     return args, conf
 
 
+def make_translist(names):
+    return [transitions.TransitionTypes(x) for x in names]
+
 def init_display():
     x = y = config.image_size
     size = (x, y)
-    trans_list = [transitions.TransitionTypes(x) for x in config.transitions]
+    trans_list = make_translist(config.transitions)
     match config.drivers.driver:
         case "flaschen":
             return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.flaschen)
@@ -275,22 +278,26 @@ def main():
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()
 
     with PidFile("lmsdisplay"):
+        disp = init_display()
+
         backoff = 1
+
         while True:
             adjuster = util.ImageAdjuster(config.contrast_enhancement, config.color_saturation, config.image_size)
             tz = zoneinfo.ZoneInfo(config.timezone)
 
-            disp = init_display()
-
             check_connection(disp)
             check_player(disp)
+
+            # Reset the transitions list
+            # Redundant, but if we change the list on a corfiguration reload
+            disp.set_transitions(make_translist(config.transitions))
 
             try:
                 ic("Looking for servers")
                 servers = discovery.discover_lms()
                 plr = util.get_player(servers, config.player)
                 print(f"Monitoring: {plr}")
-
 
                 saver = init_saver(config, plr, tz, disp, adjuster)
                 ic(saver)

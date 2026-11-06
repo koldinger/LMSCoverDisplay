@@ -58,7 +58,7 @@ class Display:
         self.imgsize = size
         self.orientation = orientation
         self.saver: screensaver.ScreenSaver | None = None
-        self.translist = translist or list(transitions.TransitionTypes)
+        self.transitions = translist or list(transitions.TransitionTypes)
         self.frames = frames
         self.frame_delay = frame_delay
         self.blank: Image.Image
@@ -70,7 +70,7 @@ class Display:
 
     def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
         # use the specified transition, or choose one
-        trans = trans or random.choice(self.translist)
+        trans = trans or random.choice(self.transitions)
 
         # Get values, overriding the internal values if specified
         old_artwork = old_artwork or self.blank
@@ -87,6 +87,9 @@ class Display:
 
         return nframes
 
+    def set_transitions(self, trans:list[transitions.TransitionTypes]):
+        self.transitions = trans
+        ic(self.transitions, trans)
 
     def refresh(self):
         pass
@@ -141,14 +144,14 @@ class Display:
         return art
 
 
-def FlashenDisplay(trans_list, frames, frame_delay,  size, orientation, driver_config):
+def FlashenDisplay(trans_list, frames, frame_delay,  size, orientation, driver_config) -> Display:
     from . import display_flaschen
     return display_flaschen.FlashenDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
 
-def InternalDisplay(trans_list, frames, frame_delay, size, orientation, driver_config):
+def InternalDisplay(trans_list, frames, frame_delay, size, orientation, driver_config) -> Display:
     from . import display_internal
     return display_internal.InternalDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
 
-def EmulatedDisplay(trans_list, frames, frame_delay, size, orientation, driver_config):
+def EmulatedDisplay(trans_list, frames, frame_delay, size, orientation, driver_config) -> Display:
     from . import display_emulated
     return display_emulated.EmulatedDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
