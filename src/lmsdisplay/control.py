@@ -143,6 +143,7 @@ def save_config():
         presets = SimpleNamespace(**defaults.defaults)
 
     old_disp = presets["drivers"]["driver"]
+    old_disp = "internal" if old_disp == "emulated" else new_disp
     old_disp_conf = presets["drivers"][old_disp]
 
     config = request.json
@@ -274,9 +275,7 @@ def proto_images():
 
 FRAME_DURATION = 50         # 20 fps
 def make_group(images, grp):
-    ic(grp)
     trans = transitions.make_transitions(grp)
-    ic(trans)
     # Make sure there's more than one transsition
     if len(trans) == 1:
         trans = trans * 2
@@ -323,19 +322,20 @@ def make_transition(images, transition):
 
     return results
 
-def art_exists(ttype, transition) -> bool:
+def art_path(ttype, transition):
     t_name = Path(transition).stem.replace("-", "_")
-    filepath = Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
-    return filepath.exists()
+    return Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
+
+def art_exists(ttype, transition) -> bool:
+    return art_path(ttype, transition).exists()
 
 def get_art_path(ttype, transition) -> Path:
-    t_name = Path(transition).stem.replace("-", "_")
-    filepath = Path(args.imagedir.absolute(), ttype, t_name).with_suffix(".webp")
-    ic(ttype, transition, t_name, filepath)
+    filepath = art_path(ttype, transition)
 
     if filepath.exists():
-        ic()
         return filepath
+
+    t_name = Path(transition).stem.replace("-", "_")
 
     match ttype:
         case "groups":
