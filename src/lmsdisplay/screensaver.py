@@ -237,7 +237,7 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
 if __name__ == "__main__":
     from types import SimpleNamespace
     def run_saver(saver):
-        t = threading.Thread(target=saver.run)
+        t = threading.Thread(target=saver.run, daemon=True)
         t.start()
         time.sleep(65)
         saver.stop()
