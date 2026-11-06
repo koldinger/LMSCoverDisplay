@@ -656,7 +656,7 @@ def _doPinwheel(oimg, nimg, steps, sections):
 
 def pinwheel(oimg, nimg, steps, rotation=0, wedges=1):
     yield oimg
-    steps = max(int(steps/wedges), 8)
+    steps = max(int(steps/wedges), 12)
     yield from _rotate(rotation, _doPinwheel, oimg, nimg, steps, wedges)
     yield nimg
 
