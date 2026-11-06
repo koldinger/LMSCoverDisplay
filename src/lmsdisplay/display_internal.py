@@ -30,7 +30,7 @@
 from types import SimpleNamespace
 from typing import Optional
 
-from icecream import ic
+#from icecream import ic
 from PIL import Image
 
 from . import display, transitions
@@ -44,8 +44,6 @@ class InternalDisplay(display.Display):
     # def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, host: str, port: int, xsize: int, ysize: int, orientation: int):
     def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
         super().__init__(translist, frames, frame_delay, size, orientation)
-        if not HAS_RGBMATRIX:
-            raise ImportError("RGB Matix Driver not installed.")
         options = rgbmatrix.RGBMatrixOptions()
         options.cols = size[0]
         options.rows = size[1]
