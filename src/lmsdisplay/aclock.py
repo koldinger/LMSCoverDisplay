@@ -183,7 +183,7 @@ class AnalogClock:
 
         self.size = size
         self.center = center or (int(self.size[0] / 2), int(self.size[1] / 2))
-        self.radius = radius or min(size[0], size[1]) / 2
+        self.radius = radius or int(min(size[0], size[1]) / 2)
 
         self.timezone = timezone
 
@@ -363,15 +363,15 @@ if __name__ == "__main__":
     clock = AnalogClock((512, 512),
                         seconds=True,
                         edge_color="blue",
-                        edge_width=1,
+                        edge_width=2,
                         tick_color="gold",
                         tick_width=1,
                         tick_length=.05,
                         hand_color="silver",
-                        hand_width=1,
+                        hand_width=3,
                         hr_hand_color="green",
                         sec_hand_color="yellow",
-                        hr_hand_width=.05,
+                        hr_hand_width=.02,
                         alpha=255,
                         bg_alpha=255,
                         background_color="black",
