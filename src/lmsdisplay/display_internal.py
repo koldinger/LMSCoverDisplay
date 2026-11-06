@@ -32,6 +32,7 @@ from typing import Optional
 
 #from icecream import ic
 from PIL import Image
+import rgbmatrix
 
 from . import display, transitions
 
