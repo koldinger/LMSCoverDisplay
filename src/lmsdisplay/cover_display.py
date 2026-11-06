@@ -213,6 +213,8 @@ def init_display():
             return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.flaschen)
         case "internal":
             return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.internal)
+        case "emulated":
+            return display.EmulatedDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.internal)
         case _:
             raise ValueError(config.driver)
 
@@ -243,6 +245,8 @@ def init_saver(config, player, timezone, display, adjuster):
                     "edge_color": ImageColor.getrgb(c.edge_color),
                     "hand_color": ImageColor.getrgb(c.hand_color),
                     "tick_color": ImageColor.getrgb(c.tick_color),
+                    "edge_width": 2,
+                    "hand_width": 2,
                 }
                 saver = screensaver.AnalogClockScreenSaver(display,
                                                            config.screensavers.brightness,
