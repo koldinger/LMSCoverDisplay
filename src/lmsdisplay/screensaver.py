@@ -93,7 +93,7 @@ class ArtMixin:
 
 class CoversScreenSaver(ArtMixin, ScreenSaver):
     def __init__(self, display: display.Display, brightness: float, server: LMSServer, display_time: int, frame_delay: float, adjuster: util.ImageAdjuster):
-        super().__init__(display, brightness)
+        super().__init__(display, brightness, server=server)
         self.frame_delay = frame_delay
         self.pause_delta = display_time
         self.display_time = display_time
