@@ -88,7 +88,7 @@ class Display:
         return nframes
 
     def set_transitions(self, trans:list[transitions.TransitionTypes]):
-        self.transitions = trans
+        self.transitions = trans or list(transitions.TransitionTypes)
         ic(self.transitions, trans)
 
     def refresh(self):
