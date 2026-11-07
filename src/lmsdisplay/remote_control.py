@@ -108,15 +108,17 @@ event_q = Queue()
 RESET_PERIOD = 4.0          # Number of seconds in a song during which we'll go back to the previous song, else we just go back to the start of this one.
 
 INTERRUPT_PIN = board.D17
-MCP23017_ADDR = 0x27
+#MCP23017_ADDR = 0x27
 
 def initI2C():
     i2c = busio.I2C(board.SCL, board.SDA)
-    mcp = MCP23017(i2c, address=MCP23017_ADDR)  # MCP23017 w/ A0 set
+    mcp = MCP23017(i2c, address=int(config.remote.i2c_address, 0))  # MCP23017 w/ A0 set
 
     # Only initiasize the pins we use, namely A0-A4
     for p in range(0, 5):
-        pin = mcp.get_pin(p)
+        # Get the pin number from the configuration
+        pin_num = config.remote.pins[p]
+        pin = mcp.get_pin(pin_num)
 
         pin.direction = Direction.INPUT
         pin.pull = Pull.UP
