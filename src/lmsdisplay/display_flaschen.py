@@ -41,8 +41,6 @@ from . import display, transitions
 class FlashenDisplay(display.Display):
     def __init__(self, translist: list[transitions.TransitionTypes], frames: int, frame_delay: float, size: tuple[int, int], orientation: int, driver_config: SimpleNamespace):
         super().__init__(translist, frames, frame_delay, size, orientation)
-        if not HAS_FLASHCEN:
-            raise ImportError("Flaschen-Taschen driver not installed.")
         self.disp = flaschen.Flaschen(driver_config.host, driver_config.port, size[0], size[1])
 
         self.blank = Image.new("RGB", self.imgsize)
