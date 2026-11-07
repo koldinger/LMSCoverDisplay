@@ -140,14 +140,14 @@ def save_config():
     try:
         presets = defaults.defaults | toml.load(args.config)
     except FileNotFoundError:
-        presets = SimpleNamespace(**defaults.defaults)
+        presets = defaults.defaults
 
     old_disp = presets["drivers"]["driver"]
     old_disp = "internal" if old_disp == "emulated" else old_disp
     old_disp_conf = presets["drivers"][old_disp]
 
     config = request.json
-    # Remove values we don't save.
+
     new_disp = config["drivers"]["driver"]
     new_disp = "internal" if new_disp == "emulated" else new_disp
     new_disp_conf = config["drivers"][new_disp]
@@ -174,6 +174,15 @@ def save_config():
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         print(result)
         message = "Saved.  Display server restarted."
+
+    # If the state of remote control has changed, enable or disable the service as requested
+    if presets["remote"]["enable"] != config["remote"]["enable"] and args.systemctl:
+        print("Remote control configuration changed.   Check.")
+        commands = ("start", "enable") if config["remote"]["enable"] else ("stop", "disable")
+        for c in commands:
+            command = ["systemctl", c, "lmsremote"]
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            print(result)
 
     signal_procs()
 

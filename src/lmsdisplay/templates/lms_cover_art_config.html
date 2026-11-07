@@ -40,6 +40,11 @@
                         "internal"              : dict  { "max_framerate": int, "gpio_slowdown": int,
                                                           "led_brightness": int, "hw_mapping": str }
                     }
+                    "remote"                    : dict  {
+                        "enable"                : bool  (default false)
+                        "i2c_address"           : str   (hex string, e.g. "0x20", default "0x20")
+                        "pins"                  : list  [rewind, play, fastforward, volume_down, volume_up]  (ints 0–15)
+                    }
                   }
 #}
 <!DOCTYPE html>
@@ -208,6 +213,11 @@
   .advanced-section.open { max-height: 2000px; opacity: 1; }
   .advanced-inner { padding-top: 1.5rem; }
   .advanced-heading { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
+
+  .pin-grid { display: flex; flex-direction: row; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+  .pin-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pin-label { font-size: 13px; color: var(--color-text-secondary); white-space: nowrap; }
+  .pin-input { width: 72px; }
 
   .save-row { display: flex; justify-content: space-between; margin-top: 1.5rem; gap: 10px; align-items: center; }
   .save-status { font-size: 13px; color: var(--color-text-secondary); opacity: 0; transition: opacity 0.3s; }
@@ -725,6 +735,45 @@
           <span class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></span>
         </div>
       </div>
+
+      <hr style="border:none;border-top:0.5px solid var(--color-border-tertiary);margin:1rem 0">
+
+      {# ── Remote Control ────────────────────────────────────────────────────── #}
+      <div class="advanced-heading">
+        <i class="ti ti-remote-control" aria-hidden="true"></i>
+        Remote Control
+      </div>
+
+      <div class="check-row" style="border-bottom:none;padding:0 0 1rem">
+        <input type="checkbox" id="remote-enable"{% if presets.remote.enable | default(false) %} checked{% endif %}>
+        <label for="remote-enable">Enable Remote Control</label>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">MCP23017 I²C address (hex)</div>
+        <input class="field-input" type="text" id="remote-i2c-address" maxlength="4"
+               placeholder="0x20" value="{{ presets.remote.i2c_address | default('0x20') }}">
+        <div class="field-hint" id="remote-i2c-address-hint">Hex value from 0x00 to 0x77.</div>
+      </div>
+
+      <div class="field-block">
+        <div class="section-label">Pin Configuration</div>
+        <div class="pin-grid">
+          {% set pin_fields = [
+            ("Rewind",      "remote-pin-rewind",      presets.remote.pins[0] | default(0)),
+            ("Play",        "remote-pin-play",        presets.remote.pins[1] | default(1)),
+            ("FastForward", "remote-pin-fastforward", presets.remote.pins[2] | default(2)),
+            ("Volume Down", "remote-pin-volume-down", presets.remote.pins[3] | default(3)),
+            ("Volume Up",   "remote-pin-volume-up",   presets.remote.pins[4] | default(4)),
+          ] %}
+          {% for label, id, val in pin_fields %}
+          <div class="pin-row">
+            <label class="pin-label" for="{{ id }}">{{ label }}</label>
+            <input class="field-input pin-input" type="number" id="{{ id }}" min="0" max="15" step="1" value="{{ val }}">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1083,6 +1132,17 @@ function collectFormData() {
         hw_mapping:     document.getElementById('hw-mapping').value,
       },
     },
+    remote: {
+      enable:      document.getElementById('remote-enable').checked,
+      i2c_address: document.getElementById('remote-i2c-address').value,
+      pins: [
+        parseInt(document.getElementById('remote-pin-rewind').value, 10),
+        parseInt(document.getElementById('remote-pin-play').value, 10),
+        parseInt(document.getElementById('remote-pin-fastforward').value, 10),
+        parseInt(document.getElementById('remote-pin-volume-down').value, 10),
+        parseInt(document.getElementById('remote-pin-volume-up').value, 10),
+      ],
+    },
   };
 }
 
@@ -1100,6 +1160,39 @@ imageSizeEl.addEventListener('blur', () => {
   const v = parseInt(imageSizeEl.value, 10);
   if (isNaN(v) || v < 1) imageSizeEl.value = 64;
   setFieldState(imageSizeEl, imageSizeHint, true, '', 'A positive integer.');
+});
+
+// ── Remote Control validation ───────────────────────────────────────────────
+const remoteI2cEl   = document.getElementById('remote-i2c-address');
+const remoteI2cHint = document.getElementById('remote-i2c-address-hint');
+function validateI2cAddress() {
+  const raw = remoteI2cEl.value.trim();
+  const v   = parseInt(raw, 16);
+  const valid = raw !== '' && !isNaN(v) && v >= 0x00 && v <= 0x77;
+  setFieldState(remoteI2cEl, remoteI2cHint, valid,
+    raw === '' ? 'Address is required.' : 'Must be a hex value from 0x00 to 0x77.',
+    'Hex value from 0x00 to 0x77.');
+  return valid;
+}
+remoteI2cEl.addEventListener('input', validateI2cAddress);
+remoteI2cEl.addEventListener('blur',  validateI2cAddress);
+
+const remotePinIds = [
+  'remote-pin-rewind', 'remote-pin-play', 'remote-pin-fastforward',
+  'remote-pin-volume-up', 'remote-pin-volume-down'
+];
+remotePinIds.forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/[^0-9]/g, '');
+    const v = parseInt(el.value, 10);
+    if (!isNaN(v) && v > 15) el.value = 15;
+  });
+  el.addEventListener('blur', () => {
+    const v = parseInt(el.value, 10);
+    if (isNaN(v) || v < 0) el.value = 0;
+    else if (v > 15) el.value = 15;
+  });
 });
 
 function isFormValid() {

@@ -76,4 +76,10 @@ defaults = {
             "hw_mapping": "adafruit-hat-pwm",
         },
     },
+    "remote": {
+        "enable": True,
+        "i2c_address": "0x027",
+        # Pin mappings, rewind, play, forward, volume down, volume up.
+        "pins": [0, 1, 2, 3, 4 ]
+    },
 }
