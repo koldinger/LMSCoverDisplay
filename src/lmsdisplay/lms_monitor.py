@@ -219,7 +219,7 @@ class PlayerMonitor(threading.Thread):
 
                         p = events.PlayEvent(events.EventType(data["mode"]), trackid, int(data["mixer volume"]), art)
                         self.queue.put(p)
-                    except ValueError as e:
+                    except (ValueError, KeyError) as e:
                         print(f"Problem with {line}: {e}")
 
             except (EOFError, ConnectionResetError) as e:
