@@ -197,7 +197,7 @@ def _doSpin(oimg, nimg, steps, out, clockwise=True):
         yield result
 
 
-def _doExpand(oimg, nimg, steps, out, full):
+def _doExpand(oimg, nimg, steps, out, full,  both):
     """ Expand an image from one area out (or in). """
     width = nimg.width
     rng = range(1, steps+1) if out else range(steps, 0, -1)
@@ -206,6 +206,9 @@ def _doExpand(oimg, nimg, steps, out, full):
         img = oimg.copy()
         over = nimg.resize((size, width if full else size))
         img.paste(over, (0, 0))
+        if both and full:
+            over = oimg.resize((max(width - size, 1), width))
+            img.paste(over, (size, 0))
         yield img
 
 
@@ -300,19 +303,23 @@ def slide(oimg, nimg, steps, rotation=0):
     return _rotate(rotation, _doSlide, oimg, nimg, steps)
 
 def expand(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, False)
+    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, False, False)
     yield nimg
 
 def shrink(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, False)
+    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, False, False)
     yield nimg
 
 def stretch(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, True)
+    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, True, False)
     yield nimg
 
 def squeeze(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, True)
+    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, True, False)
+    yield nimg
+
+def inflate(oimg, nimg, steps, rotation=0):
+    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, True, True)
     yield nimg
 
 def curtainIn(oimg, nimg, steps, rotation=0):
@@ -715,6 +722,10 @@ class TransitionTypes(StrEnum):
     Squeeze_Right = auto(), "Stretch the image out to the right", partial(squeeze, rotation=180)
     Squeeze_Up = auto(), "Stretch the image out to the top", partial(squeeze, rotation=90)
     Squeeze_Down = auto(), "Stretch the image out to the bottom", partial(squeeze, rotation=270)
+    Inflate_Left = auto(), "Inflate the new image, deflating the old image ", partial(inflate, rotation=0)
+    Inflate_Right = auto(), "Inflate the new image, deflating the old image ", partial(inflate, rotation=180)
+    Inflate_Up = auto(), "Inflate the new image, deflating the old image ", partial(inflate, rotation=90)
+    Inflate_Down = auto(), "Inflate the new image, deflating the old image ", partial(inflate, rotation=270)
     CurtainIn_Horiz = auto(), "Pull the new image in from the left and right", partial(curtainIn, rotation=0)
     CurtainIn_Vert = auto(), "Pull the new image in from the op and bottom", partial(curtainIn, rotation=90)
     CurtainOut_Horiz = auto(), "Push the old image out to both sides", partial(curtainOut, rotation=0)
@@ -811,6 +822,7 @@ class TransitionGroups(StrEnum):
     Shrink = auto(), "Shrink the old image out diagonally, uncovering the new", Diagonal
     Stretch = auto(), "Stretch the image out from one side", Cardinal
     Squeeze = auto(), "Squeeze the image in to one side", Cardinal
+    Inflate = auto(), "Inflate the new image, squeezing the old one", Cardinal
     CurtainIn = auto(), "Close a curtain with the new image", UpDown
     CurtainOut = auto(), "Open a curtain exposing the new image", UpDown
     Fade = auto(), "Fade from one image to the other", [None, Directions.OutIn]
