@@ -197,16 +197,17 @@ def _doSpin(oimg, nimg, steps, out, clockwise=True):
         yield result
 
 
-def _doExpand(oimg, nimg, steps, out):
-    """Expand an image from the center out"""
+def _doExpand(oimg, nimg, steps, out, full):
+    """ Expand an image from one area out (or in). """
     width = nimg.width
     rng = range(1, steps+1) if out else range(steps, 0, -1)
     for i in rng:
         size = int(i * width / steps)
         img = oimg.copy()
-        over = nimg.resize((size, size))
+        over = nimg.resize((size, width if full else size))
         img.paste(over, (0, 0))
         yield img
+
 
 def _find_coeffs(pa, pb):
     matrix = []
@@ -299,11 +300,19 @@ def slide(oimg, nimg, steps, rotation=0):
     return _rotate(rotation, _doSlide, oimg, nimg, steps)
 
 def expand(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True)
+    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, False)
     yield nimg
 
 def shrink(oimg, nimg, steps, rotation=0):
-    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False)
+    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, False)
+    yield nimg
+
+def stretch(oimg, nimg, steps, rotation=0):
+    yield from _rotate(rotation, _doExpand, oimg, nimg, steps, True, True)
+    yield nimg
+
+def squeeze(oimg, nimg, steps, rotation=0):
+    yield from _rotate(rotation, _doExpand, nimg, oimg, steps, False, True)
     yield nimg
 
 def curtainIn(oimg, nimg, steps, rotation=0):
@@ -617,11 +626,6 @@ def bars(oimg, nimg, steps, rotation=0):
     yield from _rotate(rotation, _doBars, oimg, nimg, steps)
     yield nimg
 
-def blast(oimg, nimg, steps, rotation=0):
-    yield oimg
-    yield from _rotate(rotation, _doBars, oimg, nimg, 4, oimg.size[0])
-    yield nimg
-
 def lines(oimg, nimg, steps, rotation=0):
     strips = _makeLines(steps, oimg.size)
     random.shuffle(strips)
@@ -703,6 +707,14 @@ class TransitionTypes(StrEnum):
     Shrink_RightUp = auto(), "Shrink the image up from the bottom left corner", partial(shrink, rotation=90)
     Shrink_LeftDown = auto(), "Shrink the image down from the top right corner", partial(shrink, rotation=270)
     Shrink_LeftUp = auto(), "Shrink the image up from the bottom right corner", partial(shrink, rotation=0)
+    Stretch_Left = auto(), "Stretch the image out to the left", partial(stretch, rotation=180)
+    Stretch_Right = auto(), "Stretch the image out to the right", partial(stretch, rotation=0)
+    Stretch_Up = auto(), "Stretch the image out to the top", partial(stretch, rotation=270)
+    Stretch_Down = auto(), "Stretch the image out to the bottom", partial(stretch, rotation=90)
+    Squeeze_Left = auto(), "Stretch the image out to the left", partial(squeeze, rotation=0)
+    Squeeze_Right = auto(), "Stretch the image out to the right", partial(squeeze, rotation=180)
+    Squeeze_Up = auto(), "Stretch the image out to the top", partial(squeeze, rotation=90)
+    Squeeze_Down = auto(), "Stretch the image out to the bottom", partial(squeeze, rotation=270)
     CurtainIn_Horiz = auto(), "Pull the new image in from the left and right", partial(curtainIn, rotation=0)
     CurtainIn_Vert = auto(), "Pull the new image in from the op and bottom", partial(curtainIn, rotation=90)
     CurtainOut_Horiz = auto(), "Push the old image out to both sides", partial(curtainOut, rotation=0)
@@ -758,9 +770,6 @@ class TransitionTypes(StrEnum):
     Pinwheel_4 = auto(), "Draw a pinwheel with 4 hands", partial(pinwheel, wedges=4)
     Pinwheel_8 = auto(), "Draw a pinwheel with 8 hands", partial(pinwheel, wedges=8)
 
-    # Blast_Horiz = auto(), "Blast lines across", partial(blast, rotation=0)
-    # Blast_Vert  = auto(), "Blast lines across", partial(blast, rotation=90)
-
 class Directions(StrEnum):
     Up = auto()
     Down = auto()
@@ -800,6 +809,8 @@ class TransitionGroups(StrEnum):
     Slide = auto(), "Slide the new image in diagonally", Diagonal
     Expand = auto(), "Expand the new image in diagonally", Diagonal
     Shrink = auto(), "Shrink the old image out diagonally, uncovering the new", Diagonal
+    Stretch = auto(), "Stretch the image out from one side", Cardinal
+    Squeeze = auto(), "Squeeze the image in to one side", Cardinal
     CurtainIn = auto(), "Close a curtain with the new image", UpDown
     CurtainOut = auto(), "Open a curtain exposing the new image", UpDown
     Fade = auto(), "Fade from one image to the other", [None, Directions.OutIn]
@@ -819,8 +830,6 @@ class TransitionGroups(StrEnum):
     Lines = auto(), "Draw lines one at a time", UpDown
     PageTurn = auto(), "Turn a page", None
     Pinwheel = auto(), "Draw a Pinwheel to change", ["1", "2", "4", "8"]
-    # Blast = auto(), "Blast rows across", UpDown
-
 
 def make_transitions(group):
     variants = group.variants
