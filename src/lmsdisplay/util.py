@@ -95,6 +95,7 @@ def nested_merge(src, values) -> dict:
     return values
 
 def nested_namespace(values) -> SimpleNamespace:
+    """ Parse a set of potentially nested dictionaries into a set of nested namespaces. """
     for k, v in values.items():
         if type(v) is dict:
             values[k] = nested_namespace(v)
@@ -128,16 +129,31 @@ def get_player(servers, name):
                     return plr
     raise PlayerNotFoundError(name)
 
-def contrasting_color(art: Image.Image) -> tuple[int, int, int, int]:
+def contrasting_color(art: Image.Image, in_color=False, region: None | tuple[float, float, float]=None) -> tuple[int, int, int, int]:
     """ Figure out a contrasting color to the "dominant" color of an image. """
     try:
+        # first, select the region we want to use.
+        if region:
+            x, y = art.size
+            xoffset, yoffset, yheight = region
+
+            top_x = int(xoffset * float(x))
+            bot_x = int((1.0 - xoffset) * float(x))
+
+            top_y = int(yoffset * float(y))
+            bot_y = int((yoffset + yheight) * float(y))
+
+            art = art.crop((top_x, top_y, bot_x, bot_y))
         # Get the averoge color of the current screen.
         # Do this by resizing the picture to 1 pixel, and grabbing the color
         small = art.resize((1, 1), resample=Image.Resampling.LANCZOS).convert("RGB")
         r, g, b = small.getpixel((0, 0))
         # Compute the contrasting color, based on the luma
-        luma = 0.299*r + 0.587*g + 0.114*b
-        color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
+        if in_color:
+            color = (255-r, 255-g, 255-b)
+        else:
+            luma = 0.299*r + 0.587*g + 0.114*b
+            color = (255, 255, 255, 200) if luma <= 128 else (0, 0, 0, 200)
     except:
         color = (255, 255, 255, 200)
     return color

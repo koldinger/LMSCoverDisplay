@@ -147,7 +147,7 @@ class StateMachine:
                 if self._config.show_volume_bar and event.volume != self._last_volume:
                     ic(self._last_volume, event.volume)
                     self._last_volume = event.volume
-                    over_color = util.contrasting_color(self._last_image)
+                    over_color = util.contrasting_color(self._last_image, True, (.06, .9, .05))
                     overlay = volume.drawVolume(event.volume, self._display.size(), color = over_color, xoffset=.05, yoffset=.9, yheight=.05)
                     # Set the overlay, and then send the image again to draw the overlaid image
                     self._display.set_overlay(overlay)
