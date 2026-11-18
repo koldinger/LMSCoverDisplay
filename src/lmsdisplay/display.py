@@ -35,7 +35,7 @@ from typing import Optional
 from icecream import ic
 from PIL import Image, ImageEnhance
 
-from . import transitions
+from . import transitions, screensaver
 
 # --------------------------------------------------------------------------
 # Display interface - subclass this to drive real hardware/UI
@@ -56,7 +56,7 @@ class Display:
                  orientation: int):
         self.imgsize = size
         self.orientation = orientation
-        self.saver: screensaver.ScreenSaver | None = None
+        self.saver: Optional[screensaver.ScreenSaver] = None
         self.transitions = translist or list(transitions.TransitionTypes)
         self.frames = frames
         self.frame_delay = frame_delay
@@ -65,25 +65,41 @@ class Display:
 
         self.dimming: float | None = None
         self.grayscale: bool = False
-        self.blank: Image.Image
+        self.blank: Image.Image = None
+        self.last: Image.Image = None
 
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
-        pass
+        """ Show the artwork specified. """
+        art = self._prepare_artwork(artwork)
+        self._do_show(art)
+        self.last = artwork     # Keep the unaltered original.   TODO: Come back to this later.
+
 
     def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
         # use the specified transition, or choose one
         trans = trans or random.choice(self.transitions)
 
         # Get values, overriding the internal values if specified
-        old_artwork = old_artwork or self.blank
-        new_artwork = new_artwork or self.blank
+        old_art = old_artwork or self.blank
+        new_art = new_artwork or self.blank
         frames = frames or self.frames
         frame_delay = frame_delay or self.frame_delay
 
+        # Prepare the artwork
+        old_art = self._prepare_artwork(old_art)
+        new_art = self._prepare_artwork(new_art)
+
+        # And do the actual transition
+        self._do_transition(old_art, new_art, trans, frames, frame_delay)
+
+        self.last = new_art
+
+    def _do_transition(self, old_art, new_art, trans, frames, frame_delay):
+        """ The actual work of doing the transition.   """
         func = trans.function
         nframes = 0
-        for i in func(old_artwork, new_artwork, frames):
-            self.show_artwork(i)
+        for i in func(old_art, new_art, frames):
+            self._do_show(i)
             time.sleep(frame_delay)
             nframes += 1
 
@@ -92,9 +108,6 @@ class Display:
     def set_transitions(self, trans:list[transitions.TransitionTypes]):
         self.transitions = trans or list(transitions.TransitionTypes)
         ic(self.transitions, trans)
-
-    def refresh(self):
-        pass
 
     def start_screensaver(self, saver):
         ic(saver)
@@ -115,11 +128,19 @@ class Display:
     def clear(self) -> None:
         pass
 
-    def dim(self, amount: float) -> None:
+    def refresh(self):
+        pass
+
+
+    def dim(self, amount: float, grayscale: bool) -> None:
+        old = self._prepare_artwork(self.last)      # Prepare the old image based on the current configuration
         self.dimming = amount
+        self.grayscale = grayscale
+        new = self._prepare_artwork(self.last)      # Prepare the new image based on the new configuration.
+        self._do_transition(old, new, transitions.TransitionTypes.Fade, self.frames, self.frame_delay)
 
     def undim(self) -> None:
-        self.dimming = None
+        self.dim(None, False)
 
     def size(self) -> tuple[int, int]:
         return self.imgsize
@@ -147,6 +168,9 @@ class Display:
             art = ImageEnhance.Color(art).enhance(0)
 
         return art
+
+    def _do_show(self, art):
+        pass
 
 
 def FlashenDisplay(trans_list, frames, frame_delay,  size, orientation, driver_config) -> Display:
