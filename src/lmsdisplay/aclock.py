@@ -51,52 +51,52 @@ class AnalogClock:
     absolute length or width being specified.   If given a float, the length or width will be calculated as a ratio
     of the radius.
     Options are:
-        size:           [Required]The size of the canvas the clock is being drawn on.   Tuple(width, height)
-        timezone:       Timezone to generate the time in.   Default: current locale
-        center:         Center point of the clock.   Default: center of the canvas.   Tuple(width, height)
-        radius:         Radius of the clock circle.  Default: half the smaller of height or width of the canvas
-        ticks:          Draw tick marks at every hour marker. Default: True
-        tick_length:    Length of each tick.   Default: 0.05
-        tick_width:     Width of each tick.   Default: 1
-        tick_color:     Color of each tick.   Default: white
-        edge_color:     Color of the outer circle.   Default: white
-        edge_width:     Width of the outer circle.   Default: 1
-        hand_color:     Color of hands.  Default: white
-        seconds:        Draw a second hand.  Default: False
-        hr_hand_color:  Color of the hour hand.   Default: hand_color
-        mn_hand_color:  Color of the minute hand.   Default: hand_color
-        sec_hand_color: Color of the second hand.   Default: hand_color
-        hand_width:     Width of hands. Default: 1
-        hr_hand_width:  Width of the hour hand. Default: hand_width
-        mn_hand_width:  Width of the minute hand. Default: hand_width
-        sec_hand_width: Width of the second hand. Default: hand_width
-        hr_hand_length: Length of the hour hand.  Default: .6
-        mn_hand_length: Length of the minute hand.  Default: .9
-        sec_hand_length:Length of the second hand.  Default: .8
-        tail:           Length of the tail of the hands. Default: 0
-        hr_tail:        Length of the tail of the hour hand. Default: tail
-        mn_tail:        Length of the tail of the minute, hand. Default: tail
-        sec_tail:       Length of the tail of the second hand. Default: tail
-        arrow_width:    Width of an arrow at the end of the hands.  Default: None (no arrow)
-        arrow_length:   Length of an arrow at the end of the hands.  Default: None (no arrow)
-        hr_arrow_width: Width of an arrow at the end of the hour hand.  Default: arrow_width
-        hr_arrow_length:Length of an arrow at the end of the hour hand.  Default: arrow_length
-        mn_arrow_width: Width of an arrow at the end of the minute hand.  Default: arrow_width
-        mn_arrow_length:Length of an arrow at the end of the minute hand.  Default: arrow_length
-        sec_arrow_width:Width of an arrow at the end of the second hand.  Default: arrow_width
+        size:               [Required]The size of the canvas the clock is being drawn on.   Tuple(width, height)
+        timezone:           Timezone to generate the time in.   Default: current locale
+        center:             Center point of the clock.   Default: center of the canvas.   Tuple(width, height)
+        radius:             Radius of the clock circle.  Default: half the smaller of height or width of the canvas
+        ticks:              Draw tick marks at every hour marker. Default: True
+        tick_length:        Length of each tick.   Default: 0.05
+        tick_width:         Width of each tick.   Default: 1
+        tick_color:         Color of each tick.   Default: white
+        edge_color:         Color of the outer circle.   Default: white
+        edge_width:         Width of the outer circle.   Default: 1
+        hand_color:         Color of hands.  Default: white
+        seconds:            Draw a second hand.  Default: False
+        hr_hand_color:      Color of the hour hand.   Default: hand_color
+        mn_hand_color:      Color of the minute hand.   Default: hand_color
+        sec_hand_color:     Color of the second hand.   Default: hand_color
+        hand_width:         Width of hands. Default: 1
+        hr_hand_width:      Width of the hour hand. Default: hand_width
+        mn_hand_width:      Width of the minute hand. Default: hand_width
+        sec_hand_width:     Width of the second hand. Default: hand_width
+        hr_hand_length:     Length of the hour hand.  Default: .6
+        mn_hand_length:     Length of the minute hand.  Default: .9
+        sec_hand_length:    Length of the second hand.  Default: .8
+        tail:               Length of the tail of the hands. Default: 0
+        hr_tail:            Length of the tail of the hour hand. Default: tail
+        mn_tail:            Length of the tail of the minute, hand. Default: tail
+        sec_tail:           Length of the tail of the second hand. Default: tail
+        arrow_width:        Width of an arrow at the end of the hands.  Default: None (no arrow)
+        arrow_length:       Length of an arrow at the end of the hands.  Default: None (no arrow)
+        hr_arrow_width:     Width of an arrow at the end of the hour hand.  Default: arrow_width
+        hr_arrow_length:    Length of an arrow at the end of the hour hand.  Default: arrow_length
+        mn_arrow_width:     Width of an arrow at the end of the minute hand.  Default: arrow_width
+        mn_arrow_length:    Length of an arrow at the end of the minute hand.  Default: arrow_length
+        sec_arrow_width:    Width of an arrow at the end of the second hand.  Default: arrow_width
         sec_arrow_length:   Length of an arrow at the end of the second hand.  Default: arrow_length
         background_color:   Base color of the canvas.  Default: black
         background_image:   An image to draw the clock over.  Default: None
-        image_pos:      A position tuple for the upper left corner of the image.
-        hub_radius:     Radius of a circle drawn at the center.  Default: None
-        hub_color:      Color of the hub.  Default: hand_color
-        alpha:          Alpha value for the clock.  Default 255 (opaque).
-        bg_alpha:       Alpha value for the backgroutnd.   Default: 0 (transparent)
-        show_numerals:  Show numbers at the 3, 6, 9, and 12 positions:  Default: False
-        numerals:       The numerals to use. Default: (12, 3, 6, 9)
-        numerals_color: Color to draw the numbers in.   Default: 
-        numerals_font: str|None = None,
-        numerals_size: OptInt = None,
+        image_pos:          A position tuple for the upper left corner of the image.
+        hub_radius:         Radius of a circle drawn at the center.  Default: None
+        hub_color:          Color of the hub.  Default: hand_color
+        alpha:              Alpha value for the clock.  Default 255 (opaque).
+        bg_alpha:           Alpha value for the backgroutnd.   Default: 0 (transparent).  Only used if a background image is specified.
+        show_numerals:      Show numbers at the 3, 6, 9, and 12 positions:  Default: False
+        numerals:           The numerals to use. Default: (12, 3, 6, 9)
+        numerals_color:     Color to draw the numbers in.   Default: 
+        numerals_font:      str|None = None,
+        numerals_size:      OptInt = None,
 
         Notes:
         For arrows, both a width and length must be specified, although one can be grabbed from the general value,
@@ -246,8 +246,16 @@ class AnalogClock:
         if show_numerals and numerals_font and numerals_size:
             self.font = ImageFont.truetype(numerals_font, numerals_size)
 
-
     def perp_points(self, distance, angle, base):
+        """
+        Calculate two points that are end points of a line perpendicular
+        to another line.
+
+        distance: The distance from the center of the clock.
+        angle: The angle of the hand.
+        base: The length between the two points on the perpendicular line.   Each will
+        be put 1/2 this away.   Should be even for best results.
+        """
         a = math.radians((angle + 270) % 360)
         # Find the point where the perpendicular line starts
         px, py = self.point(distance, angle)
@@ -267,14 +275,19 @@ class AnalogClock:
 
         return (x1, y1), (x2, y2)
 
-    def point(self, length, angle):
+    def point(self, length: int, angle: int):
+        """ Compute the end point of a hand from the center. """
+
+        # Compute the angle, in radians, from the top.  Pillow puts 0 degrees at 3 oclock
         a = math.radians((angle + 270) % 360)
+        # And the x and y
         x = length * math.cos(a) + self.center[0]
         y = length * math.sin(a) + self.center[1]
         #ic(angle, a, x, y)
         return (x, y)
 
-    def base_clock(self) -> tuple[Image.Image, ImageDraw.Draw]:
+    def draw_face(self) -> tuple[Image.Image, ImageDraw.Draw]:
+        """ Draw the basic clock face, without any hands. """
         image = Image.new("RGBA", self.size, color=self.background_color)
         ic(self.size, self.background_color)
         canvas = ImageDraw.Draw(image)
@@ -299,10 +312,16 @@ class AnalogClock:
         return image, canvas
 
     def arrow_points(self, distance, angle, width, length):
+        """ Draw points at the end of an arrow. """
         return ic(self.perp_points(distance, angle, width) + tuple(self.point(distance + length, angle)))
 
     def draw(self, hours:int, minutes:int, seconds:int) -> Image.Image:
-        image, canvas = self.base_clock()
+        """
+        Draw the clock for the time specified.
+
+        Invokes the draw_face method to draw the face, and then draws the hands on top of it.
+        """
+        image, canvas = self.draw_face()
 
         # Calculate angles for each hand.
         a_hr = hours * 30
@@ -351,10 +370,12 @@ class AnalogClock:
         return image
 
     def draw_now(self) -> Image.Image:
+        """ Convienience method.   Draw the curret time. """
         now = datetime.now(self.timezone).time()
         return self.draw(now.hour, now.minute, now.second)
 
-    def draw_time(self, now: time) -> Image.Image:
+    def draw_time(self, now: time|datetime) -> Image.Image:
+        """ Draw a time based on a time passed in. """
         return self.draw(now.hour, now.minute, now.second)
 
 if __name__ == "__main__":
