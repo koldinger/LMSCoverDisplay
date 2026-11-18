@@ -118,7 +118,7 @@ class CoversScreenSaver(ArtMixin, ScreenSaver):
                 # Suppress all exceptions.  If anything goes wrong, just go round the loop again.
                 try:
                     album = self.random_album()
-                    track_id = album["artwork_track_id"]
+                    track_id = album.get("artwork_track_id", -1)
                     ic(album)
                     art = self.get_art(track_id)
                     if not art:
@@ -220,7 +220,7 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
             if self.covers:
                 last_img = next_img
                 album = self.random_album()
-                track_id = album["artwork_track_id"]
+                track_id = album.get("artwork_track_id", -1)
                 art = self.get_art(track_id)
                 next_img = self.adjuster.adjustImage(art) if art else self.blank
             self.display.transition(last_img, next_img, transitions.TransitionTypes.Fade)
