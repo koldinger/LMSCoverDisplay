@@ -51,8 +51,8 @@ TIMEOUT_DEF = 120
 
 class StateMachine:
     def __init__(self,
-                 config:SimpleNamespace,
-                 disp:display.Display,
+                 config: SimpleNamespace,
+                 disp: display.Display,
                  player: LMSPlayer,
                  timezone: datetime.tzinfo,
                  adjuster: util.ImageAdjuster,
@@ -91,7 +91,10 @@ class StateMachine:
             self._dimmed = util.betweentimes(datetime.now().time(), self._dim_start, self._dim_end)
             if self._dimmed:
                 print("Setting Dimmed Mode")
-                self._display.dim(config.dimmed_brightness)
+                self._display.dim(config.dimmed_brightness, config.dimmed_grayscale)
+            else:
+                # Just in case the display is already ni that state, reset it
+                self._display.undim()
             dim_time = util.next_time(self._dim_start)
             undim_time = util.next_time(self._dim_end)
             ic(dim_time, undim_time)
@@ -99,6 +102,8 @@ class StateMachine:
             self._undim_event = self._scheduler.enterabs(undim_time.timestamp(),  queue.Queue.put, (self.queue, PlayEvent(EventType.UNDIM)))
         else:
             self._dimmed = False
+            self._display.undim()
+
 
     def stop(self):
         self._stop = True
@@ -194,22 +199,17 @@ class StateMachine:
         print("Dimming")
         if self._config.disable_screensaver_dimmed and self._saver:
             self.stop_screensaver()
-        self._display.dim(self._config.dimmed_brightness)
-        if self._config.dimmed_grayscale:
-            self._display.grayscale = True
+        self._display.dim(self._config.dimmed_brightness, self._config.dimmed_grayscale)
 
         self._dim_event = self._scheduler.enterabs(util.next_time(self._dim_start, self._timezone).timestamp(),
                                                    queue.Queue.put,
                                                    (self.queue, PlayEvent(EventType.DIM)))
         self._dimmed = True
-        if self._state == States.PLAYING:
-            self._display.show_artwork(self._last_image)
 
     def undim(self):
         ic()
         print("Undimming")
         self._display.undim()
-        self._display.grayscale = False
         self._undim_event = self._scheduler.enterabs(util.next_time(self._dim_end, self._timezone).timestamp(),
                                                      queue.Queue.put,
                                                      (self.queue, PlayEvent(EventType.UNDIM)))

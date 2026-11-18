@@ -46,11 +46,8 @@ class FlashenDisplay(display.Display):
         self.blank = Image.new("RGB", self.imgsize)
         self.lock = RLock()
 
-    def show_artwork(self, artwork: Optional[Image.Image]) -> None:
+    def _do_show(self, artwork: Optional[Image.Image]) -> None:
         """ Send art to the flashchen-taschen display, over the network. """
-
-        artwork = self._prepare_artwork(artwork)
-
         px = artwork.load()
         with self.lock:
             for x in range(artwork.width):

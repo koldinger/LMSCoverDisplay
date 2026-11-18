@@ -66,11 +66,9 @@ class InternalDisplay(display.Display):
         self.blank = Image.new("RGB", self.imgsize)
 
 
-    def show_artwork(self, artwork: Optional[Image.Image]) -> None:
+    def _do_show(self, artwork: Optional[Image.Image]) -> None:
         """ Send art to the display. """
-        art = self._prepare_artwork(artwork)
-
-        self.canvas.SetImage(art.convert("RGB"))
+        self.canvas.SetImage(artwork.convert("RGB"))
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def clear(self) -> None:
