@@ -29,6 +29,7 @@
                     "dim_at_night"              : bool  (default false)
                     "dim_start_time"            : str   "HH:MM"  (default "22:00")
                     "dim_end_time"              : str   "HH:MM"  (default "07:00")
+                    "dimmed_grayscale"          : bool  (default false)
                     "dimmed_brightness"         : float (0.0–1.0, default 0.2)
                     "hostname"                  : str   (default "")
 
@@ -471,6 +472,11 @@
         </select>
         <div class="chevron-wrap"><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
       </div>
+    </div>
+
+    <div class="check-row" style="margin-top:1rem">
+      <input type="checkbox" id="dimmed-grayscale"{% if presets.dimmed_grayscale | default(false) %} checked{% endif %}>
+      <label for="dimmed-grayscale">Grayscale while dimmed</label>
     </div>
 
     <div class="slider-block" style="margin-top:1.25rem;margin-bottom:0">
@@ -1115,6 +1121,7 @@ function collectFormData() {
     dim_start_time:              dimChecked ? document.getElementById('start-time').value : null,
     dim_end_time:                dimChecked ? document.getElementById('end-time').value   : null,
     timezone:                    document.getElementById('timezone').value,
+    dimmed_grayscale:            document.getElementById('dimmed-grayscale').checked,
     dimmed_brightness:           parseFloat(document.getElementById('dimmed-brightness').value),
     hostname:                    document.getElementById('hostname').value || null,
     orientation:                 parseInt(document.getElementById('orientation').value, 10),

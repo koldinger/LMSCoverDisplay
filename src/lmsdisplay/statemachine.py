@@ -195,6 +195,9 @@ class StateMachine:
         if self._config.disable_screensaver_dimmed and self._saver:
             self.stop_screensaver()
         self._display.dim(self._config.dimmed_brightness)
+        if self._config.dimmed_grayscale:
+            self._display.grayscale = True
+
         self._dim_event = self._scheduler.enterabs(util.next_time(self._dim_start, self._timezone).timestamp(),
                                                    queue.Queue.put,
                                                    (self.queue, PlayEvent(EventType.DIM)))
@@ -206,6 +209,7 @@ class StateMachine:
         ic()
         print("Undimming")
         self._display.undim()
+        self._display.grayscale = False
         self._undim_event = self._scheduler.enterabs(util.next_time(self._dim_end, self._timezone).timestamp(),
                                                      queue.Queue.put,
                                                      (self.queue, PlayEvent(EventType.UNDIM)))

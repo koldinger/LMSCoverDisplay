@@ -30,9 +30,9 @@
 from types import SimpleNamespace
 from typing import Optional
 
+import rgbmatrix
 #from icecream import ic
 from PIL import Image
-import rgbmatrix
 
 from . import display, transitions
 

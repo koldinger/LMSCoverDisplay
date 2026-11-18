@@ -40,6 +40,7 @@ defaults = {
     "dim_start_time" : "22:00",
     "dim_end_time" : "07:00",
     "dimmed_brightness" : 0.41,
+    "dimmed_garyscale" : False,
     "orientation" : 0,
     "image_size" : 64,
     "enable_screensaver": False,

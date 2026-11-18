@@ -54,16 +54,18 @@ class Display:
                  frame_delay: float,
                  size: tuple[int, int],
                  orientation: int):
-        self.dimming: float | None = None
         self.imgsize = size
         self.orientation = orientation
         self.saver: screensaver.ScreenSaver | None = None
         self.transitions = translist or list(transitions.TransitionTypes)
         self.frames = frames
         self.frame_delay = frame_delay
-        self.blank: Image.Image
         self.overlay: Optional[Image.Image] = None
         self.saver:   Optional[screensaver.ScreenSaver] = None
+
+        self.dimming: float | None = None
+        self.grayscale: bool = False
+        self.blank: Image.Image
 
     def show_artwork(self, artwork: Optional[Image.Image]) -> None:
         pass
@@ -140,6 +142,9 @@ class Display:
         if self.dimming is not None:
             # Wish there was some way to cache this.
             art = ImageEnhance.Brightness(art).enhance(self.dimming)
+
+        if self.grayscale:
+            art = ImageEnhance.Color(art).enhance(0)
 
         return art
 
