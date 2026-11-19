@@ -56,6 +56,7 @@ defaults = {
             "hour_format": 12,
             "font": "regular",
             "color": "#ff0000",
+            "show_date": False,
         },
         "analog": {
             "display_covers": False,

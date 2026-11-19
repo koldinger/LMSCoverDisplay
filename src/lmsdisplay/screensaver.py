@@ -32,6 +32,7 @@ import threading
 import time
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import urljoin
 import importlib.resources
 
@@ -147,7 +148,7 @@ class CoversScreenSaver(ArtMixin, ScreenSaver):
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display: display.Display, brightness: float, time_fmt: str, font: str, color: str|tuple , timezone: str, adjuster: util.ImageAdjuster):
+    def __init__(self, display: display.Display, brightness: float, time_fmt: str, date: bool, font: str, color: str|tuple , timezone: str, adjuster: util.ImageAdjuster):
         super().__init__(display, brightness)
         self.adjuster = adjuster
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
@@ -155,9 +156,14 @@ class DigitalClockScreenSaver(ScreenSaver):
         self.color = color
         # Change the format name from something like bold-italic to BoldItalic
         style = font.title().replace("_", "")
-        fontname = f"DSEG7Modern-{style}.woff2"
+        fontfamily = "DSEG7Modern"
+        fontname = f"{fontfamily}-{style}.woff2"
         fontpath = importlib.resources.files("lmsdisplay").joinpath("fonts").joinpath(fontname)
+        #fontpath = Path("./test/Source_Sans_3/static") / fontname
+        ic(fontpath)
         self.font = ImageFont.truetype(fontpath, 48)
+        self.date = date
+        self.datefont = ImageFont.truetype(fontpath, 20)
 
     def run(self):
         self.stopped = False
@@ -167,21 +173,31 @@ class DigitalClockScreenSaver(ScreenSaver):
         images = []
 
         while not self.stopped:
-            now = datetime.now(self.timezone).time()
+            now = datetime.now(self.timezone)
             # If the minute has chnaged, update the screen.
             if now.minute != minute:
                 ic("Updating time", now)
                 minute = now.minute
                 images = [Image.new("RGB", (200, 200), color="black") for i in range(0, 2)]
 
+                # Generate 2 images, one with a colon, one without.
                 for i in [0, 1]:
                     drw = ImageDraw.Draw(images[i])
                     txt = now.strftime(self.formats[i])
                     drw.text((100, 100), txt, fill=self.color, font=self.font, anchor="mm")
 
+                    # Add date stuff
+                    #txt = dt.strftime("%A")
+                    #drw.text((100, 50), txt, fill=self.color, font=self.datefont, anchor="mm")
+
+                    if self.date:
+                        txt = now.strftime("%D")
+                        drw.text((100, 150), txt, fill=self.color, font=self.datefont, anchor="mm")
+
                     images[i] = self.adjuster.adjustImage(images[i])
                     if self.brightness < 1:
                         images[i] = ImageEnhance.Brightness(images[i]).enhance(self.brightness)
+
 
             n = self.display.transition(last_img, images[0], transitions.TransitionTypes.Fade, frames=5)
             s = max((1.0 - (n * self.display.frame_delay)), 0)
@@ -235,6 +251,7 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
         ic("Screensaver Done")
 
 if __name__ == "__main__":
+    import zoneinfo
     from types import SimpleNamespace
     def run_saver(saver):
         t = threading.Thread(target=saver.run, daemon=True)
@@ -243,6 +260,7 @@ if __name__ == "__main__":
         saver.stop()
         t.join()
 
+    tz = zoneinfo.ZoneInfo("America/Los_Angeles")
     server = LMSServer()
     #display = display.FlashenDisplay("localhost", 1337, 64, 64, 0)
     config = {
@@ -251,9 +269,9 @@ if __name__ == "__main__":
     }
     disp = display.FlashenDisplay([], 25, 0.05, (64, 64), 0, SimpleNamespace(**config))
     adjuster = util.ImageAdjuster(1.0, 1.0, 64)
-    s = CoversScreenSaver(disp, server, 5, 0.05, adjuster)
+    s = CoversScreenSaver(disp, 1.0, server, 5, 0.05, adjuster)
     run_saver(s)
-    s = DigitalClockScreenSaver(disp, 12, "bold-italic", adjuster)
+    s = DigitalClockScreenSaver(disp, 1.0, 12, True, "regular", "red", tz, adjuster)
     run_saver(s)
-    s = AnalogClockScreenSaver(disp, 12, "bold-italic", adjuster)
+    s = AnalogClockScreenSaver(disp, 1.0, 12, "bolditalic", adjuster)
     run_saver(s)

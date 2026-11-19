@@ -78,6 +78,7 @@ def reload_config():
     global args, config
     print("Reloading Configuration")
     args, config = process_cmdline()
+
     # clear the cache on getArt so we get changes to images immediately
     if monitor:
         monitor.clear_art_cache()
@@ -85,8 +86,8 @@ def reload_config():
     # Stop the statemachine.
     event_q.put(events.PlayEvent(events.EventType.END))
 
-def handle_quit(_signum, _frame):
-    print("Received SIGTERM")
+def handle_quit(signum, _frame):
+    print(f"Received {signal.Signals(signum).name}")
     if state_machine:
         state_machine.stop()
     if monitor:
@@ -238,6 +239,7 @@ def init_saver(config, player, timezone, display, adjuster):
                 c = config.screensavers.clock
                 saver = screensaver.DigitalClockScreenSaver(display, config.screensavers.brightness,
                                                             c.hour_format,
+                                                            c.show_date,
                                                             c.font,
                                                             c.color,
                                                             timezone,
@@ -271,8 +273,8 @@ def main():
     console = Console()
 
     signal.signal(signal.SIGHUP, handle_sighup)
-    signal.signal(signal.SIGTERM, handle_quit)
-    signal.signal(signal.SIGQUIT, handle_quit)
+    #signal.signal(signal.SIGTERM, handle_quit)
+    #signal.signal(signal.SIGQUIT, handle_quit)
 
     if args.watch_config:
         threading.Thread(target=watch_config, args=(args.config,), daemon=True).start()

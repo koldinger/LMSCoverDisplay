@@ -75,7 +75,12 @@ class Display:
         self.last = artwork     # Keep the unaltered original.   TODO: Come back to this later.
 
 
-    def transition(self, old_artwork: Optional[Image.Image], new_artwork: Optional[Image.Image], trans: Optional[transitions.TransitionTypes] = None, frames=None, frame_delay=None) -> int:
+    def transition(self,
+                   old_artwork: Optional[Image.Image],
+                   new_artwork: Optional[Image.Image],
+                   trans: Optional[transitions.TransitionTypes] = None,
+                   frames: Optional[int] = None,
+                   frame_delay: Optional[int] = None) -> int:
         # use the specified transition, or choose one
         trans = trans or random.choice(self.transitions)
 
@@ -89,10 +94,10 @@ class Display:
         old_art = self._prepare_artwork(old_art)
         new_art = self._prepare_artwork(new_art)
 
-        # And do the actual transition
-        self._do_transition(old_art, new_art, trans, frames, frame_delay)
-
         self.last = new_art
+        # And do the actual transition
+        return self._do_transition(old_art, new_art, trans, frames, frame_delay)
+
 
     def _do_transition(self, old_art, new_art, trans, frames, frame_delay):
         """ The actual work of doing the transition.   """
