@@ -47,8 +47,8 @@ from pid import PidFile
 from PIL import Image, ImageColor
 from rich.console import Console
 
-from . import (defaults, discovery, screensaver, display, events, lms_monitor, qrcodes,
-               statemachine, transitions, util)
+from . import (defaults, discovery, events, lms_monitor, qrcodes,
+               screensaver, statemachine, transitions, util, display)
 
 rich.traceback.install()
 args: argparse.Namespace
@@ -214,11 +214,11 @@ def init_display():
     trans_list = make_translist(config.transitions)
     match config.drivers.driver:
         case "flaschen":
-            return display.FlashenDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.flaschen)
+            return display.FlashenDisplay(trans_list, config.transition_frames, config.transition_fps, size, config.orientation, config.drivers.flaschen)
         case "internal":
-            return display.InternalDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.internal)
+            return display.InternalDisplay(trans_list, config.transition_frames, config.transition_fps, size, config.orientation, config.drivers.internal)
         case "emulated":
-            return display.EmulatedDisplay(trans_list, config.transition_frames, config.frame_delay, size, config.orientation, config.drivers.internal)
+            return display.EmulatedDisplay(trans_list, config.transition_frames, config.transition_fps, size, config.orientation, config.drivers.internal)
         case _:
             raise ValueError(config.driver)
 
@@ -237,7 +237,8 @@ def init_saver(config, player, timezone, display, adjuster):
                                                       adjuster)
             case "clock":
                 c = config.screensavers.clock
-                saver = screensaver.DigitalClockScreenSaver(display, config.screensavers.brightness,
+                saver = screensaver.DigitalClockScreenSaver(display,
+                                                            config.screensavers.brightness,
                                                             c.hour_format,
                                                             c.show_date,
                                                             c.font,

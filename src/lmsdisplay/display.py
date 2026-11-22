@@ -50,16 +50,17 @@ class Display:
 
     def __init__(self,
                  translist: list[transitions.TransitionTypes],
-                 frames: int,
-                 frame_delay: float,
+                 transition_frames: int,
+                 transition_fps: float,
                  size: tuple[int, int],
                  orientation: int):
         self.imgsize = size
         self.orientation = orientation
         self.saver: Optional[screensaver.ScreenSaver] = None
         self.transitions = translist or list(transitions.TransitionTypes)
-        self.frames = frames
-        self.frame_delay = frame_delay
+        self.trantsition_frames = transition_frames
+        self.transition_fps = transition_fps
+        self.frame_delay = 1.0 / transition_fps
         self.overlay: Optional[Image.Image] = None
         self.saver:   Optional[screensaver.ScreenSaver] = None
 
@@ -87,7 +88,7 @@ class Display:
         # Get values, overriding the internal values if specified
         old_art = old_artwork or self.blank
         new_art = new_artwork or self.blank
-        frames = frames or self.frames
+        frames = frames or self.trantsition_frames
         frame_delay = frame_delay or self.frame_delay
 
         # Prepare the artwork
@@ -112,7 +113,7 @@ class Display:
 
     def set_transitions(self, trans:list[transitions.TransitionTypes]):
         self.transitions = trans or list(transitions.TransitionTypes)
-        ic(self.transitions, trans)
+        #ic(self.transitions, trans)
 
     def start_screensaver(self, saver):
         ic(saver)
@@ -142,7 +143,7 @@ class Display:
         self.dimming = amount
         self.grayscale = grayscale
         new = self._prepare_artwork(self.last)      # Prepare the new image based on the new configuration.
-        self._do_transition(old, new, transitions.TransitionTypes.Fade, self.frames, self.frame_delay)
+        self._do_transition(old, new, transitions.TransitionTypes.Fade, self.trantsition_frames, self.frame_delay)
 
     def undim(self) -> None:
         self.dim(None, False)
@@ -178,14 +179,14 @@ class Display:
         pass
 
 
-def FlashenDisplay(trans_list, frames, frame_delay,  size, orientation, driver_config) -> Display:
+def FlashenDisplay(trans_list, transition_frames, transition_fps,  size, orientation, driver_config) -> Display:
     from . import display_flaschen
-    return display_flaschen.FlashenDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
+    return display_flaschen.FlashenDisplay(trans_list, transition_frames, transition_fps, size, orientation, driver_config)
 
-def InternalDisplay(trans_list, frames, frame_delay, size, orientation, driver_config) -> Display:
+def InternalDisplay(trans_list, transition_frames, transition_fps, size, orientation, driver_config) -> Display:
     from . import display_internal
-    return display_internal.InternalDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
+    return display_internal.InternalDisplay(trans_list, transition_frames, transition_fps, size, orientation, driver_config)
 
-def EmulatedDisplay(trans_list, frames, frame_delay, size, orientation, driver_config) -> Display:
+def EmulatedDisplay(trans_list, transition_frames, transition_fps, size, orientation, driver_config) -> Display:
     from . import display_emulated
-    return display_emulated.EmulatedDisplay(trans_list, frames, frame_delay, size, orientation, driver_config)
+    return display_emulated.EmulatedDisplay(trans_list, transition_frames, transition_fps, size, orientation, driver_config)

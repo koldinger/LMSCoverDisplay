@@ -11,7 +11,7 @@
                     "color_saturation"          : float (0–2,    default 1.0)
                     "contrast_enhancement"      : float (0–2,    default 1.0)
                     "transition_frames"         : int   (1–64,   default 20)
-                    "frame_delay"               : float (0–2,    default 0.15)
+                    "transition_fps"               : int   (1–30 FPS, default 20)
                     "pause_delay"               : int   (0–300s, default 0)
                     "enable_screensaver"        : bool  (default false)
                     "disable_screensaver_dimmed": bool  (default false)
@@ -419,12 +419,12 @@
   </div>
 
   <div class="slider-block">
-    <div class="section-label">Frame delay in transitions</div>
+    <div class="section-label">Transition frame rate (FPS)</div>
     <div class="slider-row">
-      <input type="range" id="frame_delay" min="0" max="2" step="0.05" value="{{ presets.frame_delay | default(0.15) }}">
-      <span class="slider-val" id="frame_delay-val">{{ presets.frame_delay | default(0.15) }}</span>
+      <input type="range" id="transition_fps" min="1" max="30" step="1" value="{{ presets.transition_fps | default(20) }}">
+      <span class="slider-val" id="transition_fps-val">{{ presets.transition_fps | default(20) }}</span>
     </div>
-    <div class="range-ends"><span>0</span><span>2</span></div>
+    <div class="range-ends"><span>1</span><span>30</span></div>
   </div>
 
   <div class="slider-block">
@@ -1093,7 +1093,7 @@ function collectFormData() {
     color_saturation:            parseFloat(document.getElementById('saturation').value),
     contrast_enhancement:        parseFloat(document.getElementById('contrast').value),
     transition_frames:           parseInt(document.getElementById('transition_frames').value, 10),
-    frame_delay:                 parseFloat(document.getElementById('frame_delay').value),
+    transition_fps:                 parseInt(document.getElementById('transition_fps').value, 10),
     pause_delay:                 parseInt(document.getElementById('pausedelay').value, 10),
     enable_screensaver:          document.getElementById('enable-screensaver').checked,
     disable_screensaver_dimmed:  document.getElementById('disable-screensaver-dimmed').checked,
@@ -1646,7 +1646,7 @@ document.getElementById('btn-none').addEventListener('click', () => setAll(false
   ['saturation',       v => parseFloat(v).toFixed(1)],
   ['contrast',         v => parseFloat(v).toFixed(1)],
   ['transition_frames', v => parseInt(v)],
-  ['frame_delay',       v => parseFloat(v).toFixed(2)],
+  ['transition_fps',       v => parseInt(v) + ' FPS'],
   ['pausedelay',       v => parseInt(v) + 's'],
   ['displaytime',      v => parseInt(v) + 's'],
 ].forEach(([id, fmt]) => {

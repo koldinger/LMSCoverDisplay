@@ -30,7 +30,8 @@
 import random
 import threading
 import time
-from datetime import datetime
+import zoneinfo
+from datetime import datetime, tzinfo
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urljoin
@@ -61,9 +62,6 @@ class ScreenSaver:
 
     def run(self):
         pass
-
-    def set_display(self, display: display.Display|None):
-        self.display = display
 
 class ArtMixin:
     """ Mixin to retrieve album covers (art) from the server, usually for random albums. """
@@ -148,22 +146,36 @@ class CoversScreenSaver(ArtMixin, ScreenSaver):
 
 
 class DigitalClockScreenSaver(ScreenSaver):
-    def __init__(self, display: display.Display, brightness: float, time_fmt: str, date: bool, font: str, color: str|tuple , timezone: str, adjuster: util.ImageAdjuster):
+    def __init__(self, display: display.Display, brightness: float, time_fmt: int, date: bool, font: str, color: str|tuple , timezone: tzinfo, adjuster: util.ImageAdjuster):
         super().__init__(display, brightness)
+        ic(display, brightness, time_fmt, date, font, date, color, timezone, adjuster)
         self.adjuster = adjuster
         self.formats = ["%-I:%M", "%-I %M"] if time_fmt == 12 else ["%-H:%M", "%-H %M"]
         self.timezone = timezone
         self.color = color
         # Change the format name from something like bold-italic to BoldItalic
-        style = font.title().replace("_", "")
+        style = font.title ().replace("_", "")
         fontfamily = "DSEG7Modern"
         fontname = f"{fontfamily}-{style}.woff2"
         fontpath = importlib.resources.files("lmsdisplay").joinpath("fonts").joinpath(fontname)
         #fontpath = Path("./test/Source_Sans_3/static") / fontname
-        ic(fontpath)
         self.font = ImageFont.truetype(fontpath, 48)
         self.date = date
         self.datefont = ImageFont.truetype(fontpath, 20)
+
+
+    def makeClockImage(self, now: datetime, fmt: str):
+        img = Image.new("RGB", (200, 200), color="black")
+        drw = ImageDraw.Draw(img)
+        txt = now.strftime(fmt)
+        drw.text((100, 100), txt, fill=self.color, font=self.font, anchor="mm")
+
+        if self.date:
+            txt = now.strftime("%D")
+            drw.text((100, 150), txt, fill=self.color, font=self.datefont, anchor="mm")
+
+        return img
+
 
     def run(self):
         self.stopped = False
@@ -172,8 +184,11 @@ class DigitalClockScreenSaver(ScreenSaver):
         last_img = self.adjuster.adjustImage(BLANK)
         images = []
 
+        trans = transitions.TransitionTypes.Fade
+
         while not self.stopped:
             now = datetime.now(self.timezone)
+
             # If the minute has chnaged, update the screen.
             if now.minute != minute:
                 ic("Updating time", now)
@@ -181,29 +196,19 @@ class DigitalClockScreenSaver(ScreenSaver):
                 images = [Image.new("RGB", (200, 200), color="black") for i in range(0, 2)]
 
                 # Generate 2 images, one with a colon, one without.
-                for i in [0, 1]:
-                    drw = ImageDraw.Draw(images[i])
-                    txt = now.strftime(self.formats[i])
-                    drw.text((100, 100), txt, fill=self.color, font=self.font, anchor="mm")
+                for i, fmt in enumerate(self.formats):
+                    clk_img = self.makeClockImage(now, fmt)
+                    images[i] = self.adjuster.adjustImage(clk_img)
 
-                    # Add date stuff
-                    #txt = dt.strftime("%A")
-                    #drw.text((100, 50), txt, fill=self.color, font=self.datefont, anchor="mm")
-
-                    if self.date:
-                        txt = now.strftime("%D")
-                        drw.text((100, 150), txt, fill=self.color, font=self.datefont, anchor="mm")
-
-                    images[i] = self.adjuster.adjustImage(images[i])
                     if self.brightness < 1:
                         images[i] = ImageEnhance.Brightness(images[i]).enhance(self.brightness)
 
-
-            n = self.display.transition(last_img, images[0], transitions.TransitionTypes.Fade, frames=5)
+            n = self.display.transition(last_img, images[0], trans, frames=5)
+            trans = transitions.TransitionTypes.Instant
             s = max((1.0 - (n * self.display.frame_delay)), 0)
             # sleep, using time.sleep becoause we don't wat to be interrupted here
             time.sleep(s)
-            n = self.display.transition(images[0], images[1], transitions.TransitionTypes.Fade, frames=5)
+            n = self.display.transition(last_img, images[1], trans, frames=5)
             last_img = images[1]
             self.stop_event.wait(timeout=s)
             self.stop_event.clear()
@@ -212,7 +217,7 @@ class DigitalClockScreenSaver(ScreenSaver):
         ic("Screensaver Done")
 
 class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
-    def __init__(self, display: display.Display, brightness: int, covers: bool, server: LMSServer, timezone, adjuster, aclock_args):
+    def __init__(self, display: display.Display, brightness: int, covers: bool, server: LMSServer, timezone: tzinfo, adjuster, aclock_args):
         super().__init__(display, brightness, server=server)
         self.clock = aclock.AnalogClock(display.size(), seconds=False, **aclock_args)
         self.timezone = timezone
@@ -251,7 +256,6 @@ class AnalogClockScreenSaver(ArtMixin, ScreenSaver):
         ic("Screensaver Done")
 
 if __name__ == "__main__":
-    import zoneinfo
     from types import SimpleNamespace
     def run_saver(saver):
         t = threading.Thread(target=saver.run, daemon=True)

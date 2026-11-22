@@ -33,7 +33,7 @@ defaults = {
     "color_saturation" : 1.6,
     "contrast_enhancement" : 1.6,
     "transition_frames" : 25,
-    "frame_delay" : 0.05,
+    "transition_fps" : 20,
     "pause_delay" : 30,
     "show_volume_bar" : True,
     "dim_at_night" : True,
